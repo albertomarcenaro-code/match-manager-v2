@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Play, Pause, StopCircle, Flag, RotateCcw } from 'lucide-react';
+import { Play, Pause, Flag, StopCircle, RotateCcw } from 'lucide-react';
 import { MatchState } from '@/types/match';
 import {
   AlertDialog,
@@ -19,6 +19,7 @@ interface TimerControlsProps {
   onPause: () => void;
   onResume: () => void;
   onEndPeriod: () => void;
+  onEndMatch: () => void;
   onUndo: () => void;
 }
 
@@ -28,6 +29,7 @@ export function TimerControls({
   onPause,
   onResume,
   onEndPeriod,
+  onEndMatch,
   onUndo,
 }: TimerControlsProps) {
   const canStartPeriod = !state.isRunning && !state.isMatchEnded && !state.needsStarterSelection;
@@ -94,6 +96,32 @@ export function TimerControls({
               <AlertDialogCancel>Annulla</AlertDialogCancel>
               <AlertDialogAction onClick={onEndPeriod}>
                 Conferma
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* End Match - separate button */}
+      {(canEndPeriod || (!state.isRunning && state.isMatchStarted && !state.isMatchEnded)) && (
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" size="lg" className="gap-2">
+              <StopCircle className="h-5 w-5" />
+              Fine partita
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Terminare la partita?</AlertDialogTitle>
+              <AlertDialogDescription>
+                La partita verrà conclusa con il punteggio finale: {state.homeTeam.score} - {state.awayTeam.score}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annulla</AlertDialogCancel>
+              <AlertDialogAction onClick={onEndMatch} className="bg-destructive hover:bg-destructive/90">
+                Termina partita
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

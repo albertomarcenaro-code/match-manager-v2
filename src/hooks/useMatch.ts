@@ -3,10 +3,38 @@ import { MatchState, MatchEvent, Player, OpponentPlayer, EventType, PeriodScore 
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
-const initialState: MatchState = {
+// Pre-loaded Athletic Club Albaro roster
+const ATHLETIC_ROSTER: Omit<Player, 'id'>[] = [
+  { name: 'BATTISTONE CRISTIAN', number: null, isOnField: false, isStarter: false },
+  { name: 'BENVENUTO MATTEO', number: null, isOnField: false, isStarter: false },
+  { name: 'CAPORUSSO GIUSEPPE', number: null, isOnField: false, isStarter: false },
+  { name: 'CATANESE VINCENZO', number: null, isOnField: false, isStarter: false },
+  { name: 'CHIARI MARCELLO', number: null, isOnField: false, isStarter: false },
+  { name: 'CHIAVASSA PIO GIOVANNI', number: null, isOnField: false, isStarter: false },
+  { name: 'CUTTICA CEREZO EDOARDO', number: null, isOnField: false, isStarter: false },
+  { name: 'DAVERO NICCOLO', number: null, isOnField: false, isStarter: false },
+  { name: 'FIORANI LEONARDO', number: null, isOnField: false, isStarter: false },
+  { name: 'GARCIA FABBRICATOR SAMUELE', number: null, isOnField: false, isStarter: false },
+  { name: 'GHIAZZA DIEGO', number: null, isOnField: false, isStarter: false },
+  { name: 'GIACOMELLI TOMMASO', number: null, isOnField: false, isStarter: false },
+  { name: 'GRANATA CHRISTIAN', number: null, isOnField: false, isStarter: false },
+  { name: 'LONGO NICOLO', number: null, isOnField: false, isStarter: false },
+  { name: 'MARCENARO CARLO', number: null, isOnField: false, isStarter: false },
+  { name: 'MASSA ANDREA', number: null, isOnField: false, isStarter: false },
+  { name: 'PAPALIA LEONARDO', number: null, isOnField: false, isStarter: false },
+  { name: 'PESSAGNO EDOARDO', number: null, isOnField: false, isStarter: false },
+  { name: 'PIRRELLO ALESSANDRO', number: null, isOnField: false, isStarter: false },
+  { name: 'ROSSI LORENZO', number: null, isOnField: false, isStarter: false },
+  { name: 'SALIS AARON', number: null, isOnField: false, isStarter: false },
+  { name: 'SESSAREGO LUIGI', number: null, isOnField: false, isStarter: false },
+  { name: 'TORRES THIAGO', number: null, isOnField: false, isStarter: false },
+  { name: 'TOSO FILIPPO', number: null, isOnField: false, isStarter: false },
+];
+
+const createInitialState = (): MatchState => ({
   homeTeam: {
     name: 'Athletic Club Albaro',
-    players: [],
+    players: ATHLETIC_ROSTER.map(p => ({ ...p, id: generateId() })),
     score: 0,
   },
   awayTeam: {
@@ -17,7 +45,7 @@ const initialState: MatchState = {
   events: [],
   currentPeriod: 0,
   periodDuration: 20,
-  totalPeriods: 2,
+  totalPeriods: 99, // Dynamic - no fixed limit
   elapsedTime: 0,
   isRunning: false,
   isPaused: false,
@@ -25,10 +53,10 @@ const initialState: MatchState = {
   isMatchEnded: false,
   periodScores: [],
   needsStarterSelection: true,
-};
+});
 
 export function useMatch() {
-  const [state, setState] = useState<MatchState>(initialState);
+  const [state, setState] = useState<MatchState>(createInitialState);
   const timerRef = useRef<number | null>(null);
 
   // Timer effect
@@ -282,10 +310,16 @@ export function useMatch() {
 
   const endPeriod = useCallback(() => {
     setState(prev => {
+      // Calculate period-specific scores
+      const previousPeriodScore = prev.periodScores.reduce(
+        (acc, ps) => ({ home: acc.home + ps.homeScore, away: acc.away + ps.awayScore }),
+        { home: 0, away: 0 }
+      );
+      
       const periodScore: PeriodScore = {
         period: prev.currentPeriod,
-        homeScore: prev.homeTeam.score,
-        awayScore: prev.awayTeam.score,
+        homeScore: prev.homeTeam.score - previousPeriodScore.home,
+        awayScore: prev.awayTeam.score - previousPeriodScore.away,
       };
 
       const event: MatchEvent = {
@@ -299,16 +333,59 @@ export function useMatch() {
         description: `Fine ${prev.currentPeriod}° tempo - ${prev.homeTeam.name} ${prev.homeTeam.score} - ${prev.awayTeam.score} ${prev.awayTeam.name}`,
       };
 
-      const isLastPeriod = prev.currentPeriod >= prev.totalPeriods;
-
       return {
         ...prev,
         isRunning: false,
         isPaused: false,
-        isMatchEnded: isLastPeriod,
-        needsStarterSelection: !isLastPeriod,
+        isMatchEnded: false,
+        needsStarterSelection: true,
         periodScores: [...prev.periodScores, periodScore],
         events: [...prev.events, event],
+      };
+    });
+  }, []);
+
+  const endMatch = useCallback(() => {
+    setState(prev => {
+      // If currently running, end the period first
+      let newState = { ...prev };
+      
+      if (prev.isRunning) {
+        const previousPeriodScore = prev.periodScores.reduce(
+          (acc, ps) => ({ home: acc.home + ps.homeScore, away: acc.away + ps.awayScore }),
+          { home: 0, away: 0 }
+        );
+        
+        const periodScore: PeriodScore = {
+          period: prev.currentPeriod,
+          homeScore: prev.homeTeam.score - previousPeriodScore.home,
+          awayScore: prev.awayTeam.score - previousPeriodScore.away,
+        };
+
+        const periodEndEvent: MatchEvent = {
+          id: generateId(),
+          type: 'period_end',
+          timestamp: prev.elapsedTime,
+          period: prev.currentPeriod,
+          team: 'home',
+          homeScore: prev.homeTeam.score,
+          awayScore: prev.awayTeam.score,
+          description: `Fine ${prev.currentPeriod}° tempo - ${prev.homeTeam.name} ${prev.homeTeam.score} - ${prev.awayTeam.score} ${prev.awayTeam.name}`,
+        };
+
+        newState = {
+          ...newState,
+          periodScores: [...prev.periodScores, periodScore],
+          events: [...prev.events, periodEndEvent],
+        };
+      }
+
+      return {
+        ...newState,
+        isRunning: false,
+        isPaused: false,
+        isMatchEnded: true,
+        needsStarterSelection: false,
       };
     });
   }, []);
@@ -353,19 +430,21 @@ export function useMatch() {
     });
   }, []);
 
-  const recordOwnGoal = useCallback((team: 'home' | 'away', playerId: string) => {
+  const recordOwnGoal = useCallback((team: 'home' | 'away', playerId?: string) => {
     setState(prev => {
       let playerName = '';
       let playerNumber: number | undefined;
 
-      if (team === 'home') {
-        const player = prev.homeTeam.players.find(p => p.id === playerId);
-        playerName = player?.name || '';
-        playerNumber = player?.number || undefined;
-      } else {
-        const player = prev.awayTeam.players.find(p => p.id === playerId);
-        playerNumber = player?.number;
-        playerName = `#${playerNumber}`;
+      if (playerId) {
+        if (team === 'home') {
+          const player = prev.homeTeam.players.find(p => p.id === playerId);
+          playerName = player?.name || '';
+          playerNumber = player?.number || undefined;
+        } else {
+          const player = prev.awayTeam.players.find(p => p.id === playerId);
+          playerNumber = player?.number;
+          playerName = `#${playerNumber}`;
+        }
       }
 
       const event: MatchEvent = {
@@ -375,9 +454,9 @@ export function useMatch() {
         period: prev.currentPeriod,
         team,
         playerId,
-        playerName,
+        playerName: playerName || 'Autogol',
         playerNumber,
-        description: `⚽ AUTOGOL di ${playerName} (${team === 'home' ? prev.homeTeam.name : prev.awayTeam.name})`,
+        description: `⚽ AUTOGOL ${playerName ? `di ${playerName}` : ''} (${team === 'home' ? prev.homeTeam.name : prev.awayTeam.name})`,
       };
 
       // Own goal adds to opponent's score
@@ -505,8 +584,15 @@ export function useMatch() {
   }, []);
 
   const resetMatch = useCallback(() => {
-    setState(initialState);
+    setState(createInitialState());
   }, []);
+
+  // Helper to get goals for a specific period
+  const getGoalsForPeriod = useCallback((period: number) => {
+    return state.events.filter(e => 
+      e.period === period && (e.type === 'goal' || e.type === 'own_goal')
+    );
+  }, [state.events]);
 
   return {
     state,
@@ -527,10 +613,12 @@ export function useMatch() {
     pauseTimer,
     resumeTimer,
     endPeriod,
+    endMatch,
     recordGoal,
     recordOwnGoal,
     recordSubstitution,
     recordCard,
     resetMatch,
+    getGoalsForPeriod,
   };
 }

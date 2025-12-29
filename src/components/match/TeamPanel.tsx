@@ -3,13 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Player, OpponentPlayer } from '@/types/match';
 import { Target, RefreshCw, Square } from 'lucide-react';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -23,13 +16,13 @@ interface TeamPanelProps {
   isHome: boolean;
   isRunning: boolean;
   onGoal: (playerId: string) => void;
-  onOwnGoal: (playerId: string) => void;
+  onOwnGoal: () => void;
   onSubstitution: (outId: string, inId: string) => void;
   onYellowCard: (playerId: string) => void;
   onRedCard: (playerId: string) => void;
 }
 
-type ActionType = 'goal' | 'ownGoal' | 'substitution' | 'yellowCard' | 'redCard';
+type ActionType = 'goal' | 'substitution' | 'yellowCard' | 'redCard';
 
 export function TeamPanel({
   teamName,
@@ -60,9 +53,6 @@ export function TeamPanel({
       case 'goal':
         onGoal(playerId);
         break;
-      case 'ownGoal':
-        onOwnGoal(playerId);
-        break;
       case 'yellowCard':
         onYellowCard(playerId);
         break;
@@ -86,9 +76,9 @@ export function TeamPanel({
       {/* Team Header */}
       <div className={cn(
         "p-3 text-center",
-        isHome ? "gradient-header text-primary-foreground" : "bg-muted"
+        isHome ? "gradient-home text-team-home-foreground" : "gradient-away text-team-away-foreground"
       )}>
-        <h3 className="font-bold truncate">{teamName}</h3>
+        <h3 className="font-bold team-name-fluid">{teamName}</h3>
       </div>
 
       {/* Players List */}
@@ -96,7 +86,7 @@ export function TeamPanel({
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           In campo ({onFieldPlayers.length})
         </p>
-        <div className="space-y-1">
+        <div className="space-y-1 max-h-[180px] overflow-y-auto">
           {onFieldPlayers.map(player => (
             <div
               key={player.id}
@@ -117,7 +107,7 @@ export function TeamPanel({
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider pt-2">
               Panchina ({benchPlayers.length})
             </p>
-            <div className="space-y-1">
+            <div className="space-y-1 max-h-[120px] overflow-y-auto">
               {benchPlayers.map(player => (
                 <div
                   key={player.id}
@@ -136,52 +126,66 @@ export function TeamPanel({
         )}
       </div>
 
-      {/* Action Buttons */}
+      {/* Action Buttons - Vertical Layout */}
       {isRunning && (
-        <div className="p-3 border-t border-border grid grid-cols-2 gap-2">
+        <div className="p-3 border-t border-border flex flex-col gap-2">
+          {/* ROW 1: GOL */}
           <Button
             size="sm"
-            className="gap-1 bg-secondary hover:bg-secondary/90 text-secondary-foreground"
+            className={cn(
+              "w-full gap-2",
+              isHome 
+                ? "bg-team-home hover:bg-team-home/90 text-team-home-foreground" 
+                : "bg-team-away hover:bg-team-away/90 text-team-away-foreground"
+            )}
             onClick={() => setActionType('goal')}
           >
             <Target className="h-4 w-4" />
-            Gol
+            GOL
           </Button>
+          
+          {/* ROW 2: AUTOGOL - Immediate action */}
           <Button
             size="sm"
             variant="outline"
-            className="gap-1"
-            onClick={() => setActionType('ownGoal')}
+            className="w-full gap-2"
+            onClick={() => onOwnGoal()}
           >
             <Target className="h-4 w-4 rotate-180" />
-            Autogol
+            AUTOGOL
           </Button>
+          
+          {/* ROW 3: GIALLO */}
           <Button
             size="sm"
             variant="outline"
-            className="gap-1"
-            onClick={() => setActionType('substitution')}
-          >
-            <RefreshCw className="h-4 w-4" />
-            Cambio
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1 text-warning hover:text-warning"
+            className="w-full gap-2 text-warning hover:text-warning border-warning/50 hover:border-warning hover:bg-warning/10"
             onClick={() => setActionType('yellowCard')}
           >
             <Square className="h-4 w-4 fill-warning" />
-            Giallo
+            GIALLO
           </Button>
+          
+          {/* ROW 4: ROSSO */}
           <Button
             size="sm"
             variant="outline"
-            className="gap-1 text-destructive hover:text-destructive col-span-2"
+            className="w-full gap-2 text-destructive hover:text-destructive border-destructive/50 hover:border-destructive hover:bg-destructive/10"
             onClick={() => setActionType('redCard')}
           >
             <Square className="h-4 w-4 fill-destructive" />
-            Rosso
+            ROSSO
+          </Button>
+          
+          {/* ROW 5: SOSTITUZIONE - Full width */}
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full gap-2 mt-1"
+            onClick={() => setActionType('substitution')}
+          >
+            <RefreshCw className="h-4 w-4" />
+            SOSTITUZIONE
           </Button>
         </div>
       )}
@@ -195,7 +199,6 @@ export function TeamPanel({
           <DialogHeader>
             <DialogTitle>
               {actionType === 'goal' && 'Seleziona marcatore'}
-              {actionType === 'ownGoal' && 'Seleziona autore autogol'}
               {actionType === 'substitution' && (selectedPlayerOut ? 'Seleziona chi entra' : 'Seleziona chi esce')}
               {actionType === 'yellowCard' && 'Cartellino giallo a'}
               {actionType === 'redCard' && 'Cartellino rosso a'}
@@ -234,7 +237,7 @@ export function TeamPanel({
                 ))
               )
             ) : (
-              // Goal, own goal, cards - select from on-field players
+              // Goal, cards - select from on-field players
               onFieldPlayers.map(player => (
                 <button
                   key={player.id}

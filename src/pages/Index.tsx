@@ -45,6 +45,7 @@ const Index = () => {
     pauseTimer,
     resumeTimer,
     endPeriod,
+    endMatch,
     recordGoal,
     recordOwnGoal,
     recordSubstitution,
@@ -166,18 +167,19 @@ const Index = () => {
                 onPause={pauseTimer}
                 onResume={resumeTimer}
                 onEndPeriod={endPeriod}
+                onEndMatch={endMatch}
                 onUndo={undoLastEvent}
               />
 
               {/* Team Panels */}
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <TeamPanel
                   teamName={state.homeTeam.name}
                   players={state.homeTeam.players.filter(p => p.number !== null)}
                   isHome={true}
                   isRunning={state.isRunning && !state.isPaused}
                   onGoal={(id) => recordGoal('home', id)}
-                  onOwnGoal={(id) => recordOwnGoal('home', id)}
+                  onOwnGoal={() => recordOwnGoal('home')}
                   onSubstitution={(outId, inId) => recordSubstitution('home', outId, inId)}
                   onYellowCard={(id) => recordCard('home', id, 'yellow')}
                   onRedCard={(id) => recordCard('home', id, 'red')}
@@ -189,7 +191,7 @@ const Index = () => {
                   isHome={false}
                   isRunning={state.isRunning && !state.isPaused}
                   onGoal={(id) => recordGoal('away', id)}
-                  onOwnGoal={(id) => recordOwnGoal('away', id)}
+                  onOwnGoal={() => recordOwnGoal('away')}
                   onSubstitution={(outId, inId) => recordSubstitution('away', outId, inId)}
                   onYellowCard={(id) => recordCard('away', id, 'yellow')}
                   onRedCard={(id) => recordCard('away', id, 'red')}
