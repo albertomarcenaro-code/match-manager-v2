@@ -81,54 +81,9 @@ export function TeamPanel({
         <h3 className="font-bold team-name-fluid">{teamName}</h3>
       </div>
 
-      {/* Players List */}
-      <div className="p-3 space-y-2">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          In campo ({onFieldPlayers.length})
-        </p>
-        <div className="space-y-1 max-h-[180px] overflow-y-auto">
-          {onFieldPlayers.map(player => (
-            <div
-              key={player.id}
-              className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-on-field/10 border border-on-field/20"
-            >
-              <span className="w-8 h-8 flex items-center justify-center rounded-full bg-on-field text-on-field-foreground text-sm font-bold">
-                {player.number}
-              </span>
-              <span className="flex-1 text-sm font-medium truncate">
-                {'name' in player ? player.name : ''}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {benchPlayers.length > 0 && (
-          <>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider pt-2">
-              Panchina ({benchPlayers.length})
-            </p>
-            <div className="space-y-1 max-h-[120px] overflow-y-auto">
-              {benchPlayers.map(player => (
-                <div
-                  key={player.id}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-on-bench/10 border border-on-bench/20"
-                >
-                  <span className="w-8 h-8 flex items-center justify-center rounded-full bg-on-bench text-on-bench-foreground text-sm font-bold">
-                    {player.number}
-                  </span>
-                  <span className="flex-1 text-sm font-medium truncate">
-                    {'name' in player ? player.name : ''}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Action Buttons - Vertical Layout */}
+      {/* Action Buttons - Vertical Layout (FIRST when match is running) */}
       {isRunning && (
-        <div className="p-3 border-t border-border flex flex-col gap-2">
+        <div className="p-3 border-b border-border flex flex-col gap-2">
           {/* ROW 1: GOL */}
           <Button
             size="sm"
@@ -189,6 +144,51 @@ export function TeamPanel({
           </Button>
         </div>
       )}
+
+      {/* Players List */}
+      <div className="p-3 space-y-2">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          In campo ({onFieldPlayers.length})
+        </p>
+        <div className="space-y-1 max-h-[180px] overflow-y-auto">
+          {onFieldPlayers.map(player => (
+            <div
+              key={player.id}
+              className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-on-field/10 border border-on-field/20"
+            >
+              <span className="w-8 h-8 flex items-center justify-center rounded-full bg-on-field text-on-field-foreground text-sm font-bold">
+                {player.number}
+              </span>
+              <span className="flex-1 text-sm font-medium truncate">
+                {'name' in player ? player.name : ''}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {benchPlayers.length > 0 && (
+          <>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider pt-2">
+              Panchina ({benchPlayers.length})
+            </p>
+            <div className="space-y-1 max-h-[120px] overflow-y-auto">
+              {benchPlayers.map(player => (
+                <div
+                  key={player.id}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-on-bench/10 border border-on-bench/20"
+                >
+                  <span className="w-8 h-8 flex items-center justify-center rounded-full bg-on-bench text-on-bench-foreground text-sm font-bold">
+                    {player.number}
+                  </span>
+                  <span className="flex-1 text-sm font-medium truncate">
+                    {'name' in player ? player.name : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Action Dialog */}
       <Dialog open={actionType !== null} onOpenChange={() => {

@@ -48,30 +48,12 @@ export function RosterSetup({
   const handleUpdateNumber = (playerId: string, value: string) => {
     const numValue = value === '' ? null : parseInt(value, 10);
     if (numValue !== null && isNaN(numValue)) return;
-    
-    // Check for duplicate (exact number match, not substring)
-    if (numValue !== null) {
-      const isDuplicate = homePlayers.some(p => 
-        p.id !== playerId && p.number === numValue
-      );
-      if (isDuplicate) {
-        toast.error(`Il numero ${numValue} è già assegnato a un altro giocatore`);
-        return;
-      }
-    }
-    
     onUpdatePlayerNumber(playerId, numValue);
   };
 
   const handleAddOpponent = () => {
     const num = parseInt(newOpponentNumber, 10);
     if (!isNaN(num) && num > 0) {
-      // Check for exact duplicate
-      const isDuplicate = awayPlayers.some(p => p.number === num);
-      if (isDuplicate) {
-        toast.error(`Il numero ${num} è già presente nella squadra avversaria`);
-        return;
-      }
       onAddOpponentPlayer(num);
       setNewOpponentNumber('');
     }
