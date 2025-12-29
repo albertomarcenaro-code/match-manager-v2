@@ -66,6 +66,14 @@ export default {
           DEFAULT: "hsl(var(--on-bench))",
           foreground: "hsl(var(--on-bench-foreground))",
         },
+        "team-home": {
+          DEFAULT: "hsl(var(--team-home))",
+          foreground: "hsl(var(--team-home-foreground))",
+        },
+        "team-away": {
+          DEFAULT: "hsl(var(--team-away))",
+          foreground: "hsl(var(--team-away-foreground))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

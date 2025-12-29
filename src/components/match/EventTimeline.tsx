@@ -15,7 +15,9 @@ export function EventTimeline({ events, homeTeamName, awayTeamName }: EventTimel
     return `${mins}'${secs > 0 ? secs.toString().padStart(2, '0') : ''}`;
   };
 
-  const getEventIcon = (type: MatchEvent['type']) => {
+  const getEventIcon = (type: MatchEvent['type'], team: 'home' | 'away') => {
+    const borderColor = team === 'home' ? 'border-team-home' : 'border-team-away';
+    
     switch (type) {
       case 'goal':
         return <Target className="h-4 w-4" />;
@@ -36,21 +38,23 @@ export function EventTimeline({ events, homeTeamName, awayTeamName }: EventTimel
     }
   };
 
-  const getEventStyles = (type: MatchEvent['type']) => {
+  const getIconContainerStyles = (type: MatchEvent['type'], team: 'home' | 'away') => {
+    const teamBorder = team === 'home' ? 'border-team-home' : 'border-team-away';
+    
     switch (type) {
       case 'goal':
-        return 'bg-secondary/10 border-secondary/30 text-secondary';
+        return cn('bg-secondary/10 border-2', teamBorder, 'text-secondary');
       case 'own_goal':
-        return 'bg-destructive/10 border-destructive/30 text-destructive';
+        return cn('bg-destructive/10 border-2', teamBorder, 'text-destructive');
       case 'yellow_card':
-        return 'bg-warning/10 border-warning/30 text-warning-foreground';
+        return cn('bg-warning/10 border-2', teamBorder, 'text-warning-foreground');
       case 'red_card':
-        return 'bg-destructive/10 border-destructive/30 text-destructive';
+        return cn('bg-destructive/10 border-2', teamBorder, 'text-destructive');
       case 'period_start':
       case 'period_end':
-        return 'bg-primary/10 border-primary/30 text-primary';
+        return 'bg-primary/10 border-2 border-primary/30 text-primary';
       default:
-        return 'bg-muted border-border';
+        return cn('bg-muted border-2', teamBorder);
     }
   };
 
@@ -64,15 +68,6 @@ export function EventTimeline({ events, homeTeamName, awayTeamName }: EventTimel
     );
   }
 
-  // Group events by period
-  const eventsByPeriod: Record<number, MatchEvent[]> = {};
-  events.forEach(event => {
-    if (!eventsByPeriod[event.period]) {
-      eventsByPeriod[event.period] = [];
-    }
-    eventsByPeriod[event.period].push(event);
-  });
-
   return (
     <div className="bg-card rounded-xl shadow-card overflow-hidden">
       <div className="p-3 border-b border-border">
@@ -82,43 +77,39 @@ export function EventTimeline({ events, homeTeamName, awayTeamName }: EventTimel
       </div>
       
       <div className="divide-y divide-border max-h-[400px] overflow-y-auto">
-        {Object.entries(eventsByPeriod).map(([period, periodEvents]) => (
-          <div key={period}>
-            {periodEvents.map((event, idx) => (
-              <div
-                key={event.id}
-                className={cn(
-                  "flex items-start gap-3 p-3 animate-slide-up",
-                  idx === periodEvents.length - 1 && event.type !== 'period_end' ? 'bg-accent/50' : ''
-                )}
-                style={{ animationDelay: `${idx * 50}ms` }}
-              >
-                {/* Time */}
-                <div className="w-12 flex-shrink-0 text-right">
-                  <span className="text-sm font-mono font-medium text-muted-foreground">
-                    {event.type === 'period_start' ? '-' : formatTime(event.timestamp)}
-                  </span>
-                </div>
+        {events.map((event, idx) => (
+          <div
+            key={event.id}
+            className={cn(
+              "flex items-start gap-3 p-3 animate-slide-up",
+              idx === events.length - 1 && event.type !== 'period_end' ? 'bg-accent/50' : ''
+            )}
+            style={{ animationDelay: `${idx * 50}ms` }}
+          >
+            {/* Time */}
+            <div className="w-12 flex-shrink-0 text-right">
+              <span className="text-sm font-mono font-medium text-muted-foreground">
+                {event.type === 'period_start' ? '-' : formatTime(event.timestamp)}
+              </span>
+            </div>
 
-                {/* Icon */}
-                <div className={cn(
-                  "w-8 h-8 flex items-center justify-center rounded-full border flex-shrink-0",
-                  getEventStyles(event.type)
-                )}>
-                  {getEventIcon(event.type)}
-                </div>
+            {/* Icon with team-colored border */}
+            <div className={cn(
+              "w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0",
+              getIconContainerStyles(event.type, event.team)
+            )}>
+              {getEventIcon(event.type, event.team)}
+            </div>
 
-                {/* Description */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{event.description}</p>
-                  {(event.type === 'period_end') && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {homeTeamName} {event.homeScore} - {event.awayScore} {awayTeamName}
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
+            {/* Description */}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">{event.description}</p>
+              {(event.type === 'period_end') && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {homeTeamName} {event.homeScore} - {event.awayScore} {awayTeamName}
+                </p>
+              )}
+            </div>
           </div>
         ))}
       </div>
