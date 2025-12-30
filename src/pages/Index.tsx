@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Helmet } from 'react-helmet';
 
-type AppPhase = 'setup' | 'match';
+type AppPhase = 'setup' | 'starterSelection' | 'match';
 
 const Index = () => {
   const [phase, setPhase] = useState<AppPhase>('setup');
@@ -51,9 +51,12 @@ const Index = () => {
     recordSubstitution,
     recordCard,
     resetMatch,
+    forceStarterSelection,
   } = useMatch();
 
+  // When roster is complete, go to starter selection
   const handleRosterComplete = () => {
+    forceStarterSelection();
     setPhase('match');
   };
 
@@ -179,7 +182,7 @@ const Index = () => {
                   isHome={true}
                   isRunning={state.isRunning && !state.isPaused}
                   onGoal={(id) => recordGoal('home', id)}
-                  onOwnGoal={() => recordOwnGoal('home')}
+                  onOwnGoal={(id) => recordOwnGoal('home', id)}
                   onSubstitution={(outId, inId) => recordSubstitution('home', outId, inId)}
                   onYellowCard={(id) => recordCard('home', id, 'yellow')}
                   onRedCard={(id) => recordCard('home', id, 'red')}
@@ -191,7 +194,7 @@ const Index = () => {
                   isHome={false}
                   isRunning={state.isRunning && !state.isPaused}
                   onGoal={(id) => recordGoal('away', id)}
-                  onOwnGoal={() => recordOwnGoal('away')}
+                  onOwnGoal={(id) => recordOwnGoal('away', id)}
                   onSubstitution={(outId, inId) => recordSubstitution('away', outId, inId)}
                   onYellowCard={(id) => recordCard('away', id, 'yellow')}
                   onRedCard={(id) => recordCard('away', id, 'red')}

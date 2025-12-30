@@ -52,7 +52,9 @@ export function EventTimeline({ events, homeTeamName, awayTeamName }: EventTimel
         return cn('bg-destructive/10 border-2', teamBorder, 'text-destructive');
       case 'period_start':
       case 'period_end':
-        return 'bg-primary/10 border-2 border-primary/30 text-primary';
+        return 'bg-muted/50 border-2 border-muted-foreground/30 text-muted-foreground';
+      case 'substitution':
+        return cn('bg-muted/30 border-2', teamBorder, 'text-muted-foreground');
       default:
         return cn('bg-muted border-2', teamBorder);
     }

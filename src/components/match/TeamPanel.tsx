@@ -16,13 +16,13 @@ interface TeamPanelProps {
   isHome: boolean;
   isRunning: boolean;
   onGoal: (playerId: string) => void;
-  onOwnGoal: () => void;
+  onOwnGoal: (playerId: string) => void;
   onSubstitution: (outId: string, inId: string) => void;
   onYellowCard: (playerId: string) => void;
   onRedCard: (playerId: string) => void;
 }
 
-type ActionType = 'goal' | 'substitution' | 'yellowCard' | 'redCard';
+type ActionType = 'goal' | 'ownGoal' | 'substitution' | 'yellowCard' | 'redCard';
 
 export function TeamPanel({
   teamName,
@@ -52,6 +52,9 @@ export function TeamPanel({
     switch (actionType) {
       case 'goal':
         onGoal(playerId);
+        break;
+      case 'ownGoal':
+        onOwnGoal(playerId);
         break;
       case 'yellowCard':
         onYellowCard(playerId);
@@ -99,12 +102,12 @@ export function TeamPanel({
             GOL
           </Button>
           
-          {/* ROW 2: AUTOGOL - Immediate action */}
+          {/* ROW 2: AUTOGOL - Now opens selector */}
           <Button
             size="sm"
             variant="outline"
             className="w-full gap-2"
-            onClick={() => onOwnGoal()}
+            onClick={() => setActionType('ownGoal')}
           >
             <Target className="h-4 w-4 rotate-180" />
             AUTOGOL
@@ -197,8 +200,9 @@ export function TeamPanel({
       }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>
+          <DialogTitle>
               {actionType === 'goal' && 'Seleziona marcatore'}
+              {actionType === 'ownGoal' && 'Seleziona chi ha commesso l\'autogol'}
               {actionType === 'substitution' && (selectedPlayerOut ? 'Seleziona chi entra' : 'Seleziona chi esce')}
               {actionType === 'yellowCard' && 'Cartellino giallo a'}
               {actionType === 'redCard' && 'Cartellino rosso a'}
