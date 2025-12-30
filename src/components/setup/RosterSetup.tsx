@@ -80,7 +80,7 @@ export function RosterSetup({
         <div className="grid md:grid-cols-2 gap-6">
           {/* Home Team */}
           <div className="bg-card rounded-xl shadow-card overflow-hidden">
-            <div className="p-4 gradient-header text-primary-foreground">
+            <div className="p-4 gradient-home text-team-home-foreground">
               <div className="flex items-center gap-2 mb-3">
                 <Users className="h-5 w-5" />
                 <span className="font-bold">Squadra di casa</span>
@@ -89,7 +89,7 @@ export function RosterSetup({
                 value={homeTeamName}
                 onChange={(e) => onHomeTeamNameChange(e.target.value)}
                 placeholder="Nome squadra"
-                className="bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground placeholder:text-primary-foreground/50"
+                className="bg-team-home-foreground/10 border-team-home-foreground/20 text-team-home-foreground placeholder:text-team-home-foreground/50"
               />
             </div>
 
@@ -153,7 +153,7 @@ export function RosterSetup({
 
           {/* Away Team */}
           <div className="bg-card rounded-xl shadow-card overflow-hidden">
-            <div className="p-4 bg-muted">
+            <div className="p-4 gradient-away text-team-away-foreground">
               <div className="flex items-center gap-2 mb-3">
                 <Shield className="h-5 w-5" />
                 <span className="font-bold">Squadra ospite</span>
@@ -162,6 +162,7 @@ export function RosterSetup({
                 value={awayTeamName}
                 onChange={(e) => onAwayTeamNameChange(e.target.value)}
                 placeholder="Nome squadra avversaria"
+                className="bg-team-away-foreground/10 border-team-away-foreground/20 text-team-away-foreground placeholder:text-team-away-foreground/50"
               />
             </div>
 

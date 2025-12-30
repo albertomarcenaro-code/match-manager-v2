@@ -593,6 +593,12 @@ export function useMatch() {
       e.period === period && (e.type === 'goal' || e.type === 'own_goal')
     );
   }, [state.events]);
+  const forceStarterSelection = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      needsStarterSelection: true,
+    }));
+  }, []);
 
   return {
     state,
@@ -620,5 +626,6 @@ export function useMatch() {
     recordCard,
     resetMatch,
     getGoalsForPeriod,
+    forceStarterSelection,
   };
 }

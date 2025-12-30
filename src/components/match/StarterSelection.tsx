@@ -68,7 +68,7 @@ export function StarterSelection({
       <div className="grid md:grid-cols-2 gap-6">
         {/* Home Team */}
         <div className="bg-card rounded-xl shadow-card overflow-hidden">
-          <div className="p-3 gradient-header text-primary-foreground flex items-center justify-between">
+          <div className="p-3 gradient-home text-team-home-foreground flex items-center justify-between">
             <span className="font-bold">Casa</span>
             <span className="text-sm opacity-80">{selectedHome.size} selezionati</span>
           </div>
@@ -103,7 +103,7 @@ export function StarterSelection({
 
         {/* Away Team */}
         <div className="bg-card rounded-xl shadow-card overflow-hidden">
-          <div className="p-3 bg-muted flex items-center justify-between">
+          <div className="p-3 gradient-away text-team-away-foreground flex items-center justify-between">
             <span className="font-bold">Ospiti</span>
             <span className="text-sm opacity-80">{selectedAway.size} selezionati</span>
           </div>
