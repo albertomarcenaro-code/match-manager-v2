@@ -269,6 +269,23 @@ export function useMatch() {
             }),
           };
         }
+      } else if (lastEvent.type === 'red_card') {
+        // Reverse red card: restore player to field and remove expelled status
+        if (lastEvent.team === 'home') {
+          newState.homeTeam = {
+            ...newState.homeTeam,
+            players: newState.homeTeam.players.map(p =>
+              p.id === lastEvent.playerId ? { ...p, isOnField: true, isExpelled: false } : p
+            ),
+          };
+        } else {
+          newState.awayTeam = {
+            ...newState.awayTeam,
+            players: newState.awayTeam.players.map(p =>
+              p.id === lastEvent.playerId ? { ...p, isOnField: true, isExpelled: false } : p
+            ),
+          };
+        }
       }
 
       return newState;
@@ -575,6 +592,33 @@ export function useMatch() {
         playerNumber,
         description: `${cardType === 'yellow' ? '🟨' : '🟥'} Cartellino ${cardType === 'yellow' ? 'giallo' : 'rosso'} a ${playerName}`,
       };
+
+      // For red card: remove player from field and mark as expelled
+      if (cardType === 'red') {
+        if (team === 'home') {
+          return {
+            ...prev,
+            homeTeam: {
+              ...prev.homeTeam,
+              players: prev.homeTeam.players.map(p =>
+                p.id === playerId ? { ...p, isOnField: false, isExpelled: true } : p
+              ),
+            },
+            events: [...prev.events, event],
+          };
+        } else {
+          return {
+            ...prev,
+            awayTeam: {
+              ...prev.awayTeam,
+              players: prev.awayTeam.players.map(p =>
+                p.id === playerId ? { ...p, isOnField: false, isExpelled: true } : p
+              ),
+            },
+            events: [...prev.events, event],
+          };
+        }
+      }
 
       return {
         ...prev,

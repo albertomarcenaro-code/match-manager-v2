@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Player, OpponentPlayer } from '@/types/match';
+import { Player, OpponentPlayer, MatchEvent } from '@/types/match';
 import { Target, RefreshCw, Square } from 'lucide-react';
 import {
   Dialog,
@@ -15,6 +15,7 @@ interface TeamPanelProps {
   players: (Player | OpponentPlayer)[];
   isHome: boolean;
   isRunning: boolean;
+  events: MatchEvent[];
   onGoal: (playerId: string) => void;
   onOwnGoal: (playerId: string) => void;
   onSubstitution: (outId: string, inId: string) => void;
@@ -29,6 +30,7 @@ export function TeamPanel({
   players,
   isHome,
   isRunning,
+  events,
   onGoal,
   onOwnGoal,
   onSubstitution,
@@ -39,7 +41,17 @@ export function TeamPanel({
   const [selectedPlayerOut, setSelectedPlayerOut] = useState<string>('');
 
   const onFieldPlayers = players.filter(p => p.isOnField);
-  const benchPlayers = players.filter(p => !p.isOnField);
+  const benchPlayers = players.filter(p => !p.isOnField && !('isExpelled' in p && p.isExpelled));
+  const availableForSubstitution = benchPlayers; // Already excludes expelled players
+
+  // Get performance stats for a player
+  const getPlayerStats = (playerId: string) => {
+    const team = isHome ? 'home' : 'away';
+    const goals = events.filter(e => e.type === 'goal' && e.team === team && e.playerId === playerId).length;
+    const hasYellowCard = events.some(e => e.type === 'yellow_card' && e.team === team && e.playerId === playerId);
+    const hasRedCard = events.some(e => e.type === 'red_card' && e.team === team && e.playerId === playerId);
+    return { goals, hasYellowCard, hasRedCard };
+  };
 
   const getPlayerDisplay = (player: Player | OpponentPlayer) => {
     if ('name' in player && player.name) {
@@ -72,6 +84,27 @@ export function TeamPanel({
       setSelectedPlayerOut('');
       setActionType(null);
     }
+  };
+
+  // Render performance badges for a player
+  const renderBadges = (playerId: string) => {
+    const stats = getPlayerStats(playerId);
+    return (
+      <div className="flex items-center gap-0.5 flex-shrink-0">
+        {/* Goal badges */}
+        {Array.from({ length: stats.goals }).map((_, i) => (
+          <span key={`goal-${i}`} className="text-xs">⚽</span>
+        ))}
+        {/* Yellow card badge */}
+        {stats.hasYellowCard && (
+          <span className="w-3 h-4 bg-warning rounded-sm" title="Ammonizione" />
+        )}
+        {/* Red card badge */}
+        {stats.hasRedCard && (
+          <span className="w-3 h-4 bg-destructive rounded-sm" title="Espulsione" />
+        )}
+      </div>
+    );
   };
 
   return (
@@ -159,12 +192,13 @@ export function TeamPanel({
               key={player.id}
               className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-on-field/10 border border-on-field/20"
             >
-              <span className="w-8 h-8 flex items-center justify-center rounded-full bg-on-field text-on-field-foreground text-sm font-bold">
+              <span className="w-7 h-7 flex items-center justify-center rounded-full bg-on-field text-on-field-foreground text-xs font-bold flex-shrink-0">
                 {player.number}
               </span>
-              <span className="flex-1 text-sm font-medium truncate">
+              <span className="flex-1 text-xs font-medium truncate">
                 {'name' in player ? player.name : ''}
               </span>
+              {renderBadges(player.id)}
             </div>
           ))}
         </div>
@@ -180,12 +214,13 @@ export function TeamPanel({
                   key={player.id}
                   className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-on-bench/10 border border-on-bench/20"
                 >
-                  <span className="w-8 h-8 flex items-center justify-center rounded-full bg-on-bench text-on-bench-foreground text-sm font-bold">
+                  <span className="w-7 h-7 flex items-center justify-center rounded-full bg-on-bench text-on-bench-foreground text-xs font-bold flex-shrink-0">
                     {player.number}
                   </span>
-                  <span className="flex-1 text-sm font-medium truncate">
+                  <span className="flex-1 text-xs font-medium truncate">
                     {'name' in player ? player.name : ''}
                   </span>
+                  {renderBadges(player.id)}
                 </div>
               ))}
             </div>
@@ -226,8 +261,8 @@ export function TeamPanel({
                   </button>
                 ))
               ) : (
-                // Select player coming in
-                benchPlayers.map(player => (
+                // Select player coming in - only available (non-expelled) bench players
+                availableForSubstitution.map(player => (
                   <button
                     key={player.id}
                     className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors text-left"

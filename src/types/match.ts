@@ -4,12 +4,14 @@ export interface Player {
   number: number | null;
   isOnField: boolean;
   isStarter: boolean;
+  isExpelled?: boolean;
 }
 
 export interface OpponentPlayer {
   id: string;
   number: number;
   isOnField: boolean;
+  isExpelled?: boolean;
 }
 
 export interface Team {
