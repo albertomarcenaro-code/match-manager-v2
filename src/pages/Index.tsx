@@ -181,6 +181,7 @@ const Index = () => {
                   players={state.homeTeam.players.filter(p => p.number !== null)}
                   isHome={true}
                   isRunning={state.isRunning && !state.isPaused}
+                  events={state.events}
                   onGoal={(id) => recordGoal('home', id)}
                   onOwnGoal={(id) => recordOwnGoal('home', id)}
                   onSubstitution={(outId, inId) => recordSubstitution('home', outId, inId)}
@@ -193,6 +194,7 @@ const Index = () => {
                   players={state.awayTeam.players}
                   isHome={false}
                   isRunning={state.isRunning && !state.isPaused}
+                  events={state.events}
                   onGoal={(id) => recordGoal('away', id)}
                   onOwnGoal={(id) => recordOwnGoal('away', id)}
                   onSubstitution={(outId, inId) => recordSubstitution('away', outId, inId)}

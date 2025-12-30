@@ -2,9 +2,16 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Player, OpponentPlayer } from '@/types/match';
-import { Plus, Trash2, Users, Shield, Check } from 'lucide-react';
+import { Plus, Trash2, Users, Shield, Check, Hash } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 
 interface RosterSetupProps {
   homeTeamName: string;
@@ -37,6 +44,8 @@ export function RosterSetup({
 }: RosterSetupProps) {
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newOpponentNumber, setNewOpponentNumber] = useState('');
+  const [autoNumberDialogOpen, setAutoNumberDialogOpen] = useState(false);
+  const [autoNumberCount, setAutoNumberCount] = useState('');
 
   const handleAddPlayer = () => {
     if (newPlayerName.trim()) {
@@ -57,6 +66,42 @@ export function RosterSetup({
       onAddOpponentPlayer(num);
       setNewOpponentNumber('');
     }
+  };
+
+  const handleAutoNumber = () => {
+    const count = parseInt(autoNumberCount, 10);
+    if (isNaN(count) || count <= 0) {
+      toast.error('Inserisci un numero valido');
+      return;
+    }
+    
+    // Get players without numbers and assign progressive numbers
+    const playersWithoutNumbers = homePlayers.filter(p => p.number === null);
+    const toAssign = Math.min(count, playersWithoutNumbers.length);
+    
+    if (toAssign === 0) {
+      toast.info('Tutti i giocatori hanno già un numero assegnato');
+      setAutoNumberDialogOpen(false);
+      setAutoNumberCount('');
+      return;
+    }
+
+    // Find the next available numbers
+    const usedNumbers = new Set(homePlayers.filter(p => p.number !== null).map(p => p.number));
+    let nextNumber = 1;
+    
+    for (let i = 0; i < toAssign; i++) {
+      while (usedNumbers.has(nextNumber)) {
+        nextNumber++;
+      }
+      onUpdatePlayerNumber(playersWithoutNumbers[i].id, nextNumber);
+      usedNumbers.add(nextNumber);
+      nextNumber++;
+    }
+
+    toast.success(`Assegnati numeri a ${toAssign} giocatori`);
+    setAutoNumberDialogOpen(false);
+    setAutoNumberCount('');
   };
 
   const eligiblePlayers = homePlayers.filter(p => p.number !== null);
@@ -104,6 +149,15 @@ export function RosterSetup({
                 />
                 <Button onClick={handleAddPlayer} size="icon" className="flex-shrink-0">
                   <Plus className="h-5 w-5" />
+                </Button>
+                <Button 
+                  onClick={() => setAutoNumberDialogOpen(true)} 
+                  size="icon" 
+                  variant="outline"
+                  className="flex-shrink-0"
+                  title="Auto-numerazione"
+                >
+                  <Hash className="h-5 w-5" />
                 </Button>
               </div>
 
@@ -232,6 +286,36 @@ export function RosterSetup({
           </div>
         </div>
       </div>
+
+      {/* Auto-Numbering Dialog */}
+      <Dialog open={autoNumberDialogOpen} onOpenChange={setAutoNumberDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Auto-numerazione</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              Quanti giocatori vuoi numerare? I numeri verranno assegnati progressivamente (1, 2, 3...) ai primi giocatori senza numero.
+            </p>
+            <Input
+              type="number"
+              min="1"
+              value={autoNumberCount}
+              onChange={(e) => setAutoNumberCount(e.target.value)}
+              placeholder="Numero di giocatori"
+              onKeyDown={(e) => e.key === 'Enter' && handleAutoNumber()}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAutoNumberDialogOpen(false)}>
+              Annulla
+            </Button>
+            <Button onClick={handleAutoNumber}>
+              Assegna numeri
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
