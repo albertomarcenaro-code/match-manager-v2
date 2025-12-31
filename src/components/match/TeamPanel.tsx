@@ -40,8 +40,9 @@ export function TeamPanel({
   const [actionType, setActionType] = useState<ActionType | null>(null);
   const [selectedPlayerOut, setSelectedPlayerOut] = useState<string>('');
 
-  const onFieldPlayers = players.filter(p => p.isOnField);
-  const benchPlayers = players.filter(p => !p.isOnField && !('isExpelled' in p && p.isExpelled));
+  const onFieldPlayers = players.filter(p => p.isOnField && !p.isExpelled);
+  const benchPlayers = players.filter(p => !p.isOnField && !p.isExpelled);
+  const expelledPlayers = players.filter(p => p.isExpelled);
   const availableForSubstitution = benchPlayers; // Already excludes expelled players
 
   // Get performance stats for a player
@@ -221,6 +222,30 @@ export function TeamPanel({
                     {'name' in player ? player.name : ''}
                   </span>
                   {renderBadges(player.id)}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {expelledPlayers.length > 0 && (
+          <>
+            <p className="text-xs font-medium text-destructive uppercase tracking-wider pt-2">
+              Espulsi ({expelledPlayers.length})
+            </p>
+            <div className="space-y-1 max-h-[80px] overflow-y-auto">
+              {expelledPlayers.map(player => (
+                <div
+                  key={player.id}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-destructive/10 border border-destructive/30 opacity-60"
+                >
+                  <span className="w-7 h-7 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs font-bold flex-shrink-0">
+                    {player.number}
+                  </span>
+                  <span className="flex-1 text-xs font-medium truncate line-through">
+                    {'name' in player ? player.name : ''}
+                  </span>
+                  <span className="w-3 h-4 bg-destructive rounded-sm flex-shrink-0" title="Espulso" />
                 </div>
               ))}
             </div>
