@@ -46,6 +46,7 @@ export function RosterSetup({
   const [newOpponentNumber, setNewOpponentNumber] = useState('');
   const [autoNumberDialogOpen, setAutoNumberDialogOpen] = useState(false);
   const [autoNumberCount, setAutoNumberCount] = useState('');
+  const [autoNumberTeam, setAutoNumberTeam] = useState<'home' | 'away'>('home');
 
   const handleAddPlayer = () => {
     if (newPlayerName.trim()) {
@@ -75,31 +76,50 @@ export function RosterSetup({
       return;
     }
     
-    // Get players without numbers and assign progressive numbers
-    const playersWithoutNumbers = homePlayers.filter(p => p.number === null);
-    const toAssign = Math.min(count, playersWithoutNumbers.length);
-    
-    if (toAssign === 0) {
-      toast.info('Tutti i giocatori hanno già un numero assegnato');
-      setAutoNumberDialogOpen(false);
-      setAutoNumberCount('');
-      return;
-    }
+    if (autoNumberTeam === 'home') {
+      // Home team auto-numbering
+      const playersWithoutNumbers = homePlayers.filter(p => p.number === null);
+      const toAssign = Math.min(count, playersWithoutNumbers.length);
+      
+      if (toAssign === 0) {
+        toast.info('Tutti i giocatori hanno già un numero assegnato');
+        setAutoNumberDialogOpen(false);
+        setAutoNumberCount('');
+        return;
+      }
 
-    // Find the next available numbers
-    const usedNumbers = new Set(homePlayers.filter(p => p.number !== null).map(p => p.number));
-    let nextNumber = 1;
-    
-    for (let i = 0; i < toAssign; i++) {
-      while (usedNumbers.has(nextNumber)) {
+      const usedNumbers = new Set(homePlayers.filter(p => p.number !== null).map(p => p.number));
+      let nextNumber = 1;
+      
+      for (let i = 0; i < toAssign; i++) {
+        while (usedNumbers.has(nextNumber)) {
+          nextNumber++;
+        }
+        onUpdatePlayerNumber(playersWithoutNumbers[i].id, nextNumber);
+        usedNumbers.add(nextNumber);
         nextNumber++;
       }
-      onUpdatePlayerNumber(playersWithoutNumbers[i].id, nextNumber);
-      usedNumbers.add(nextNumber);
-      nextNumber++;
-    }
 
-    toast.success(`Assegnati numeri a ${toAssign} giocatori`);
+      toast.success(`Assegnati numeri a ${toAssign} giocatori`);
+    } else {
+      // Away team auto-numbering - create new players with progressive numbers
+      const usedNumbers = new Set(awayPlayers.map(p => p.number));
+      let nextNumber = 1;
+      let created = 0;
+      
+      for (let i = 0; i < count; i++) {
+        while (usedNumbers.has(nextNumber)) {
+          nextNumber++;
+        }
+        onAddOpponentPlayer(nextNumber);
+        usedNumbers.add(nextNumber);
+        nextNumber++;
+        created++;
+      }
+
+      toast.success(`Creati ${created} giocatori avversari con numeri progressivi`);
+    }
+    
     setAutoNumberDialogOpen(false);
     setAutoNumberCount('');
   };
@@ -151,7 +171,10 @@ export function RosterSetup({
                   <Plus className="h-5 w-5" />
                 </Button>
                 <Button 
-                  onClick={() => setAutoNumberDialogOpen(true)} 
+                  onClick={() => {
+                    setAutoNumberTeam('home');
+                    setAutoNumberDialogOpen(true);
+                  }} 
                   size="icon" 
                   variant="outline"
                   className="flex-shrink-0"
@@ -234,6 +257,18 @@ export function RosterSetup({
                 <Button onClick={handleAddOpponent} size="icon" className="flex-shrink-0">
                   <Plus className="h-5 w-5" />
                 </Button>
+                <Button 
+                  onClick={() => {
+                    setAutoNumberTeam('away');
+                    setAutoNumberDialogOpen(true);
+                  }} 
+                  size="icon" 
+                  variant="outline"
+                  className="flex-shrink-0"
+                  title="Auto-numerazione ospiti"
+                >
+                  <Hash className="h-5 w-5" />
+                </Button>
               </div>
 
               {/* Opponents List */}
@@ -291,11 +326,15 @@ export function RosterSetup({
       <Dialog open={autoNumberDialogOpen} onOpenChange={setAutoNumberDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Auto-numerazione</DialogTitle>
+            <DialogTitle>
+              Auto-numerazione {autoNumberTeam === 'home' ? 'Casa' : 'Ospiti'}
+            </DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <p className="text-sm text-muted-foreground mb-4">
-              Quanti giocatori vuoi numerare? I numeri verranno assegnati progressivamente (1, 2, 3...) ai primi giocatori senza numero.
+              {autoNumberTeam === 'home' 
+                ? 'Quanti giocatori vuoi numerare? I numeri verranno assegnati progressivamente (1, 2, 3...) ai primi giocatori senza numero.'
+                : 'Quanti giocatori avversari vuoi creare? Verranno creati con numeri progressivi (1, 2, 3...).'}
             </p>
             <Input
               type="number"
