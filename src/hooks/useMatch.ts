@@ -31,6 +31,8 @@ const ATHLETIC_ROSTER: Omit<Player, 'id'>[] = [
   { name: 'TOSO FILIPPO', number: null, isOnField: false, isStarter: false },
 ];
 
+const STORAGE_KEY = 'match-manager-state';
+
 const createInitialState = (): MatchState => ({
   homeTeam: {
     name: 'Athletic Club Albaro',
@@ -55,9 +57,53 @@ const createInitialState = (): MatchState => ({
   needsStarterSelection: true,
 });
 
+const loadStateFromStorage = (): MatchState | null => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved) as MatchState;
+      // If match was running, pause it on reload
+      if (parsed.isRunning) {
+        parsed.isPaused = true;
+      }
+      return parsed;
+    }
+  } catch (e) {
+    console.error('Failed to load match state from localStorage:', e);
+  }
+  return null;
+};
+
+const saveStateToStorage = (state: MatchState) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.error('Failed to save match state to localStorage:', e);
+  }
+};
+
+const clearStorage = () => {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (e) {
+    console.error('Failed to clear localStorage:', e);
+  }
+};
+
 export function useMatch() {
-  const [state, setState] = useState<MatchState>(createInitialState);
+  const [state, setState] = useState<MatchState>(() => {
+    const saved = loadStateFromStorage();
+    return saved || createInitialState();
+  });
   const timerRef = useRef<number | null>(null);
+
+  // Persist state to localStorage whenever it changes
+  useEffect(() => {
+    // Only save if match has started or there's meaningful data
+    if (state.isMatchStarted || state.homeTeam.players.some(p => p.number !== null) || state.awayTeam.players.length > 0) {
+      saveStateToStorage(state);
+    }
+  }, [state]);
 
   // Timer effect
   useEffect(() => {
@@ -628,6 +674,7 @@ export function useMatch() {
   }, []);
 
   const resetMatch = useCallback(() => {
+    clearStorage();
     setState(createInitialState());
   }, []);
 
