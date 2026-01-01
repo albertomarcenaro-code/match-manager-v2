@@ -21,20 +21,20 @@ export function ExportButton({ state }: ExportButtonProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const calculatePlayerMinutes = (team: 'home' | 'away'): PlayerMinutes => {
+  const calculatePlayerMinutes = (team: 'home' | 'away', periodsPlayed: number): PlayerMinutes => {
     const minutes: PlayerMinutes = {};
     const players = team === 'home' ? state.homeTeam.players : state.awayTeam.players;
     
     // Initialize all players
     players.forEach(p => {
       minutes[p.id] = { total: 0 };
-      for (let i = 1; i <= state.totalPeriods; i++) {
+      for (let i = 1; i <= periodsPlayed; i++) {
         minutes[p.id][i] = 0;
       }
     });
 
-    // Process each period
-    for (let period = 1; period <= state.currentPeriod; period++) {
+    // Process each played period
+    for (let period = 1; period <= periodsPlayed; period++) {
       const periodEvents = state.events.filter(e => e.period === period);
       const periodStart = periodEvents.find(e => e.type === 'period_start');
       const periodEnd = periodEvents.find(e => e.type === 'period_end');
@@ -135,7 +135,7 @@ export function ExportButton({ state }: ExportButtonProps) {
     // Calculate totals
     Object.keys(minutes).forEach(id => {
       let total = 0;
-      for (let i = 1; i <= state.totalPeriods; i++) {
+      for (let i = 1; i <= periodsPlayed; i++) {
         total += minutes[id][i] || 0;
       }
       minutes[id].total = total;
@@ -184,8 +184,13 @@ export function ExportButton({ state }: ExportButtonProps) {
   };
 
   const handleExport = () => {
-    const homeMinutes = calculatePlayerMinutes('home');
-    const awayMinutes = calculatePlayerMinutes('away');
+    // Determine how many periods were actually played
+    const periodsPlayed = state.periodScores.length > 0 
+      ? Math.max(...state.periodScores.map(ps => ps.period))
+      : state.currentPeriod;
+
+    const homeMinutes = calculatePlayerMinutes('home', periodsPlayed);
+    const awayMinutes = calculatePlayerMinutes('away', periodsPlayed);
 
     // Prepare match info sheet with scorers
     const matchInfo = [
@@ -242,10 +247,10 @@ export function ExportButton({ state }: ExportButtonProps) {
       ];
     });
 
-    // Build period columns headers
+    // Build period columns headers dynamically based on periods played
     const periodHeaders = [];
-    for (let i = 1; i <= state.totalPeriods; i++) {
-      periodHeaders.push(`Minuti T${i}`);
+    for (let i = 1; i <= periodsPlayed; i++) {
+      periodHeaders.push(`T${i}`);
     }
     periodHeaders.push('Minuti Totali');
 
@@ -255,7 +260,7 @@ export function ExportButton({ state }: ExportButtonProps) {
       .map(p => {
         const mins = homeMinutes[p.id] || { total: 0 };
         const periodMins = [];
-        for (let i = 1; i <= state.totalPeriods; i++) {
+        for (let i = 1; i <= periodsPlayed; i++) {
           periodMins.push(mins[i] || 0);
         }
         return [
@@ -271,7 +276,7 @@ export function ExportButton({ state }: ExportButtonProps) {
       .map(p => {
         const mins = awayMinutes[p.id] || { total: 0 };
         const periodMins = [];
-        for (let i = 1; i <= state.totalPeriods; i++) {
+        for (let i = 1; i <= periodsPlayed; i++) {
           periodMins.push(mins[i] || 0);
         }
         return [
