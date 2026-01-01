@@ -8,6 +8,8 @@ import { EventTimeline } from '@/components/match/EventTimeline';
 import { StarterSelection } from '@/components/match/StarterSelection';
 import { ExportButton } from '@/components/match/ExportButton';
 import { MatchSettings } from '@/components/match/MatchSettings';
+import { Header } from '@/components/layout/Header';
+import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
 import { RotateCcw, Edit } from 'lucide-react';
 import {
@@ -73,36 +75,41 @@ const Index = () => {
 
   if (phase === 'setup') {
     return (
-      <>
+      <div className="min-h-screen flex flex-col">
+        <Header />
         <Helmet>
           <title>Gestione Partita - Calcio Giovanile</title>
           <meta name="description" content="Applicazione per la gestione in tempo reale degli eventi durante partite di calcio giovanile. Traccia gol, sostituzioni, cartellini e cronaca live." />
         </Helmet>
-        <RosterSetup
-          homeTeamName={state.homeTeam.name}
-          awayTeamName={state.awayTeam.name}
-          homePlayers={state.homeTeam.players}
-          awayPlayers={state.awayTeam.players}
-          onHomeTeamNameChange={setHomeTeamName}
-          onAwayTeamNameChange={setAwayTeamName}
-          onAddPlayer={addPlayer}
-          onUpdatePlayerNumber={updatePlayerNumber}
-          onRemovePlayer={removePlayer}
-          onAddOpponentPlayer={addOpponentPlayer}
-          onRemoveOpponentPlayer={removeOpponentPlayer}
-          onComplete={handleRosterComplete}
-        />
-      </>
+        <div className="flex-1">
+          <RosterSetup
+            homeTeamName={state.homeTeam.name}
+            awayTeamName={state.awayTeam.name}
+            homePlayers={state.homeTeam.players}
+            awayPlayers={state.awayTeam.players}
+            onHomeTeamNameChange={setHomeTeamName}
+            onAwayTeamNameChange={setAwayTeamName}
+            onAddPlayer={addPlayer}
+            onUpdatePlayerNumber={updatePlayerNumber}
+            onRemovePlayer={removePlayer}
+            onAddOpponentPlayer={addOpponentPlayer}
+            onRemoveOpponentPlayer={removeOpponentPlayer}
+            onComplete={handleRosterComplete}
+          />
+        </div>
+        <Footer />
+      </div>
     );
   }
 
   return (
-    <>
+    <div className="min-h-screen flex flex-col">
+      <Header />
       <Helmet>
         <title>{state.homeTeam.name} vs {state.awayTeam.name} - Partita in Corso</title>
         <meta name="description" content={`Segui la partita ${state.homeTeam.name} contro ${state.awayTeam.name}. Cronaca live e gestione eventi.`} />
       </Helmet>
-      <main className="min-h-screen bg-background p-4 pb-8">
+      <main className="flex-1 bg-background p-4 pb-8">
         <div className="max-w-6xl mx-auto space-y-4">
           {/* Top Bar */}
           <div className="flex items-center justify-between gap-2">
@@ -220,7 +227,8 @@ const Index = () => {
           )}
         </div>
       </main>
-    </>
+      <Footer />
+    </div>
   );
 };
 
