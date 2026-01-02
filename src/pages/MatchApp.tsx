@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMatch } from '@/hooks/useMatch';
+import { useAuth } from '@/contexts/AuthContext';
 import { RosterSetup } from '@/components/setup/RosterSetup';
 import { MatchHeader } from '@/components/match/MatchHeader';
 import { TimerControls } from '@/components/match/TimerControls';
@@ -11,7 +12,7 @@ import { MatchSettings } from '@/components/match/MatchSettings';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
-import { RotateCcw, Edit } from 'lucide-react';
+import { RotateCcw, Edit, LogOut } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,16 +25,21 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Helmet } from 'react-helmet';
+import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 type AppPhase = 'setup' | 'starterSelection' | 'match';
 
-const Index = () => {
+const MatchApp = () => {
+  const navigate = useNavigate();
+  const { user, isGuest, signOut, exitGuest } = useAuth();
   const [phase, setPhase] = useState<AppPhase>('setup');
   const {
     state,
     setHomeTeamName,
     setAwayTeamName,
     addPlayer,
+    bulkAddPlayers,
     updatePlayerNumber,
     removePlayer,
     addOpponentPlayer,
@@ -56,7 +62,6 @@ const Index = () => {
     forceStarterSelection,
   } = useMatch();
 
-  // When roster is complete, go to starter selection
   const handleRosterComplete = () => {
     forceStarterSelection();
     setPhase('match');
@@ -73,15 +78,44 @@ const Index = () => {
     setPhase('setup');
   };
 
+  const handleLogout = async () => {
+    if (isGuest) {
+      exitGuest();
+    } else {
+      await signOut();
+    }
+    toast.success('Disconnesso');
+    navigate('/');
+  };
+
   if (phase === 'setup') {
     return (
       <div className="min-h-screen flex flex-col">
         <Header />
         <Helmet>
-          <title>Gestione Partita - Calcio Giovanile</title>
+          <title>Gestione Partita - Match Manager Live</title>
           <meta name="description" content="Applicazione per la gestione in tempo reale degli eventi durante partite di calcio giovanile. Traccia gol, sostituzioni, cartellini e cronaca live." />
         </Helmet>
         <div className="flex-1">
+          <div className="max-w-4xl mx-auto p-4">
+            <div className="flex justify-between items-center mb-4">
+              <div className="text-sm text-muted-foreground">
+                {isGuest ? (
+                  <span className="flex items-center gap-1">
+                    🎭 Modalità Ospite
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1">
+                    👤 {user?.email}
+                  </span>
+                )}
+              </div>
+              <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-1">
+                <LogOut className="h-4 w-4" />
+                Esci
+              </Button>
+            </div>
+          </div>
           <RosterSetup
             homeTeamName={state.homeTeam.name}
             awayTeamName={state.awayTeam.name}
@@ -95,6 +129,7 @@ const Index = () => {
             onAddOpponentPlayer={addOpponentPlayer}
             onRemoveOpponentPlayer={removeOpponentPlayer}
             onComplete={handleRosterComplete}
+            onBulkAddPlayers={bulkAddPlayers}
           />
         </div>
         <Footer />
@@ -106,23 +141,28 @@ const Index = () => {
     <div className="min-h-screen flex flex-col">
       <Header />
       <Helmet>
-        <title>{state.homeTeam.name} vs {state.awayTeam.name} - Partita in Corso</title>
+        <title>{state.homeTeam.name || 'Casa'} vs {state.awayTeam.name || 'Ospite'} - Partita in Corso</title>
         <meta name="description" content={`Segui la partita ${state.homeTeam.name} contro ${state.awayTeam.name}. Cronaca live e gestione eventi.`} />
       </Helmet>
       <main className="flex-1 bg-background p-4 pb-8">
         <div className="max-w-6xl mx-auto space-y-4">
           {/* Top Bar */}
           <div className="flex items-center justify-between gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPhase('setup')}
-              disabled={state.isRunning}
-              className="gap-1"
-            >
-              <Edit className="h-4 w-4" />
-              <span className="hidden sm:inline">Modifica rose</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPhase('setup')}
+                disabled={state.isRunning}
+                className="gap-1"
+              >
+                <Edit className="h-4 w-4" />
+                <span className="hidden sm:inline">Modifica rose</span>
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-1">
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
 
             <div className="flex items-center gap-2">
               <MatchSettings
@@ -232,4 +272,4 @@ const Index = () => {
   );
 };
 
-export default Index;
+export default MatchApp;
