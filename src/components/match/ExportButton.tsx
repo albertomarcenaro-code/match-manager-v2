@@ -50,16 +50,52 @@ export function ExportButton({ state }: ExportButtonProps) {
       const playerEntryTime: { [id: string]: number } = {};
       const playerExpelled: { [id: string]: boolean } = {};
 
+      // Helper to check if player is a starter
+      const isPlayerStarter = (player: typeof players[0]): boolean => {
+        if (team === 'home') {
+          return 'isStarter' in player && (player as any).isStarter === true;
+        } else {
+          // Away team: isOnField at the start indicates they were selected as starters
+          // We check the initial state by looking at period_start events
+          return player.isOnField || false;
+        }
+      };
+
       // Find starters at period start (players who were on field when period started)
       // We need to track who was on field based on previous period end state
       if (period === 1) {
-        // First period: use isStarter
-        players.forEach(p => {
-          if ('isStarter' in p && p.isStarter) {
-            playerOnField[p.id] = true;
-            playerEntryTime[p.id] = 0;
-          }
-        });
+        // First period: use isStarter for home, isOnField initial state for away
+        if (team === 'home') {
+          players.forEach(p => {
+            if ('isStarter' in p && (p as any).isStarter) {
+              playerOnField[p.id] = true;
+              playerEntryTime[p.id] = 0;
+            }
+          });
+        } else {
+          // For away team, we need to determine who started by checking substitution events
+          // If a player was never subbed in but is currently on field or was subbed out, they started
+          const subbedInPlayers = new Set<string>();
+          const subbedOutPlayers = new Set<string>();
+          
+          state.events.filter(e => e.type === 'substitution' && e.team === 'away').forEach(e => {
+            if (e.playerInId) subbedInPlayers.add(e.playerInId);
+            if (e.playerOutId) subbedOutPlayers.add(e.playerOutId);
+          });
+          
+          players.forEach(p => {
+            // A player started if they were subbed out but never subbed in,
+            // or if they're currently on field and were never subbed in
+            const wasSubbedOut = subbedOutPlayers.has(p.id);
+            const wasSubbedIn = subbedInPlayers.has(p.id);
+            const isCurrentlyOnField = p.isOnField;
+            
+            if ((wasSubbedOut && !wasSubbedIn) || (isCurrentlyOnField && !wasSubbedIn)) {
+              playerOnField[p.id] = true;
+              playerEntryTime[p.id] = 0;
+            }
+          });
+        }
       } else {
         // Subsequent periods: check who was on field at end of previous period
         // by replaying events up to that point
@@ -67,11 +103,47 @@ export function ExportButton({ state }: ExportButtonProps) {
         const onFieldAtStart: { [id: string]: boolean } = {};
         
         // Start with original starters
-        players.forEach(p => {
-          if ('isStarter' in p && p.isStarter) {
-            onFieldAtStart[p.id] = true;
-          }
-        });
+        if (team === 'home') {
+          players.forEach(p => {
+            if ('isStarter' in p && (p as any).isStarter) {
+              onFieldAtStart[p.id] = true;
+            }
+          });
+        } else {
+          // For away team, determine starters from first period
+          const firstPeriodSubs = state.events.filter(
+            e => e.period === 1 && e.type === 'substitution' && e.team === 'away'
+          );
+          const subbedInP1 = new Set<string>();
+          const subbedOutP1 = new Set<string>();
+          
+          firstPeriodSubs.forEach(e => {
+            if (e.playerInId) subbedInP1.add(e.playerInId);
+            if (e.playerOutId) subbedOutP1.add(e.playerOutId);
+          });
+          
+          // Also check all substitutions to find who started
+          const allSubsAway = state.events.filter(
+            e => e.type === 'substitution' && e.team === 'away'
+          );
+          const allSubbedIn = new Set<string>();
+          const allSubbedOut = new Set<string>();
+          
+          allSubsAway.forEach(e => {
+            if (e.playerInId) allSubbedIn.add(e.playerInId);
+            if (e.playerOutId) allSubbedOut.add(e.playerOutId);
+          });
+          
+          players.forEach(p => {
+            const wasSubbedOut = allSubbedOut.has(p.id);
+            const wasSubbedIn = allSubbedIn.has(p.id);
+            const isCurrentlyOnField = p.isOnField;
+            
+            if ((wasSubbedOut && !wasSubbedIn) || (isCurrentlyOnField && !wasSubbedIn)) {
+              onFieldAtStart[p.id] = true;
+            }
+          });
+        }
 
         // Apply substitutions and red cards from previous periods
         previousPeriodEvents.forEach(event => {
