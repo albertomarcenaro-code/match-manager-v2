@@ -1,53 +1,25 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { MatchState, MatchEvent, Player, OpponentPlayer, EventType, PeriodScore } from '@/types/match';
+import { MatchState, MatchEvent, Player, OpponentPlayer, PeriodScore } from '@/types/match';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
-
-// Pre-loaded Athletic Club Albaro roster
-const ATHLETIC_ROSTER: Omit<Player, 'id'>[] = [
-  { name: 'BATTISTONE CRISTIAN', number: null, isOnField: false, isStarter: false },
-  { name: 'BENVENUTO MATTEO', number: null, isOnField: false, isStarter: false },
-  { name: 'CAPORUSSO GIUSEPPE', number: null, isOnField: false, isStarter: false },
-  { name: 'CATANESE VINCENZO', number: null, isOnField: false, isStarter: false },
-  { name: 'CHIARI MARCELLO', number: null, isOnField: false, isStarter: false },
-  { name: 'CHIAVASSA PIO GIOVANNI', number: null, isOnField: false, isStarter: false },
-  { name: 'CUTTICA CEREZO EDOARDO', number: null, isOnField: false, isStarter: false },
-  { name: 'DAVERO NICCOLO', number: null, isOnField: false, isStarter: false },
-  { name: 'FIORANI LEONARDO', number: null, isOnField: false, isStarter: false },
-  { name: 'GARCIA FABBRICATOR SAMUELE', number: null, isOnField: false, isStarter: false },
-  { name: 'GHIAZZA DIEGO', number: null, isOnField: false, isStarter: false },
-  { name: 'GIACOMELLI TOMMASO', number: null, isOnField: false, isStarter: false },
-  { name: 'GRANATA CHRISTIAN', number: null, isOnField: false, isStarter: false },
-  { name: 'LONGO NICOLO', number: null, isOnField: false, isStarter: false },
-  { name: 'MARCENARO CARLO', number: null, isOnField: false, isStarter: false },
-  { name: 'MASSA ANDREA', number: null, isOnField: false, isStarter: false },
-  { name: 'PAPALIA LEONARDO', number: null, isOnField: false, isStarter: false },
-  { name: 'PESSAGNO EDOARDO', number: null, isOnField: false, isStarter: false },
-  { name: 'PIRRELLO ALESSANDRO', number: null, isOnField: false, isStarter: false },
-  { name: 'ROSSI LORENZO', number: null, isOnField: false, isStarter: false },
-  { name: 'SALIS AARON', number: null, isOnField: false, isStarter: false },
-  { name: 'SESSAREGO LUIGI', number: null, isOnField: false, isStarter: false },
-  { name: 'TORRES THIAGO', number: null, isOnField: false, isStarter: false },
-  { name: 'TOSO FILIPPO', number: null, isOnField: false, isStarter: false },
-];
 
 const STORAGE_KEY = 'match-manager-state';
 
 const createInitialState = (): MatchState => ({
   homeTeam: {
-    name: 'Athletic Club Albaro',
-    players: ATHLETIC_ROSTER.map(p => ({ ...p, id: generateId() })),
+    name: '',
+    players: [],
     score: 0,
   },
   awayTeam: {
-    name: 'Squadra Avversaria',
+    name: '',
     players: [],
     score: 0,
   },
   events: [],
   currentPeriod: 0,
   periodDuration: 20,
-  totalPeriods: 99, // Dynamic - no fixed limit
+  totalPeriods: 99,
   elapsedTime: 0,
   isRunning: false,
   isPaused: false,
@@ -62,7 +34,6 @@ const loadStateFromStorage = (): MatchState | null => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved) as MatchState;
-      // If match was running, pause it on reload
       if (parsed.isRunning) {
         parsed.isPaused = true;
       }
@@ -97,15 +68,12 @@ export function useMatch() {
   });
   const timerRef = useRef<number | null>(null);
 
-  // Persist state to localStorage whenever it changes
   useEffect(() => {
-    // Only save if match has started or there's meaningful data
     if (state.isMatchStarted || state.homeTeam.players.some(p => p.number !== null) || state.awayTeam.players.length > 0) {
       saveStateToStorage(state);
     }
   }, [state]);
 
-  // Timer effect
   useEffect(() => {
     if (state.isRunning && !state.isPaused) {
       timerRef.current = window.setInterval(() => {
@@ -114,7 +82,6 @@ export function useMatch() {
           const periodSeconds = prev.periodDuration * 60;
           
           if (newTime >= periodSeconds) {
-            // Play buzzer sound
             try {
               const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
               const oscillator = audioContext.createOscillator();
@@ -173,6 +140,25 @@ export function useMatch() {
         players: [...prev.homeTeam.players, player],
       },
     }));
+  }, []);
+
+  const bulkAddPlayers = useCallback((names: string[]) => {
+    setState(prev => {
+      const newPlayers: Player[] = names.map(name => ({
+        id: generateId(),
+        name,
+        number: null,
+        isOnField: false,
+        isStarter: false,
+      }));
+      return {
+        ...prev,
+        homeTeam: {
+          ...prev.homeTeam,
+          players: newPlayers,
+        },
+      };
+    });
   }, []);
 
   const updatePlayerNumber = useCallback((playerId: string, number: number | null) => {
@@ -281,7 +267,6 @@ export function useMatch() {
       const lastEvent = prev.events[prev.events.length - 1];
       let newState = { ...prev, events: prev.events.slice(0, -1) };
 
-      // Reverse the effect of the event
       if (lastEvent.type === 'goal') {
         if (lastEvent.team === 'home') {
           newState.homeTeam = { ...newState.homeTeam, score: newState.homeTeam.score - 1 };
@@ -295,7 +280,6 @@ export function useMatch() {
           newState.homeTeam = { ...newState.homeTeam, score: newState.homeTeam.score - 1 };
         }
       } else if (lastEvent.type === 'substitution') {
-        // Reverse substitution
         if (lastEvent.team === 'home') {
           newState.homeTeam = {
             ...newState.homeTeam,
@@ -316,7 +300,6 @@ export function useMatch() {
           };
         }
       } else if (lastEvent.type === 'red_card') {
-        // Reverse red card: restore player to field and remove expelled status
         if (lastEvent.team === 'home') {
           newState.homeTeam = {
             ...newState.homeTeam,
@@ -373,7 +356,6 @@ export function useMatch() {
 
   const endPeriod = useCallback(() => {
     setState(prev => {
-      // Calculate period-specific scores
       const previousPeriodScore = prev.periodScores.reduce(
         (acc, ps) => ({ home: acc.home + ps.homeScore, away: acc.away + ps.awayScore }),
         { home: 0, away: 0 }
@@ -410,7 +392,6 @@ export function useMatch() {
 
   const endMatch = useCallback(() => {
     setState(prev => {
-      // If currently running, end the period first
       let newState = { ...prev };
       
       if (prev.isRunning) {
@@ -522,7 +503,6 @@ export function useMatch() {
         description: `⚽ AUTOGOL ${playerName ? `di ${playerName}` : ''} (${team === 'home' ? prev.homeTeam.name : prev.awayTeam.name})`,
       };
 
-      // Own goal adds to opponent's score
       return {
         ...prev,
         homeTeam: team === 'away' 
@@ -536,23 +516,19 @@ export function useMatch() {
     });
   }, []);
 
-  const recordSubstitution = useCallback((
-    team: 'home' | 'away',
-    playerOutId: string,
-    playerInId: string
-  ) => {
+  const recordSubstitution = useCallback((team: 'home' | 'away', playerOutId: string, playerInId: string) => {
     setState(prev => {
       let playerOutName = '';
-      let playerOutNumber: number | undefined;
       let playerInName = '';
+      let playerOutNumber: number | undefined;
       let playerInNumber: number | undefined;
 
       if (team === 'home') {
         const playerOut = prev.homeTeam.players.find(p => p.id === playerOutId);
         const playerIn = prev.homeTeam.players.find(p => p.id === playerInId);
         playerOutName = playerOut?.name || '';
-        playerOutNumber = playerOut?.number || undefined;
         playerInName = playerIn?.name || '';
+        playerOutNumber = playerOut?.number || undefined;
         playerInNumber = playerIn?.number || undefined;
       } else {
         const playerOut = prev.awayTeam.players.find(p => p.id === playerOutId);
@@ -570,12 +546,12 @@ export function useMatch() {
         period: prev.currentPeriod,
         team,
         playerOutId,
-        playerOutName,
-        playerOutNumber,
         playerInId,
+        playerOutName,
         playerInName,
+        playerOutNumber,
         playerInNumber,
-        description: `🔄 Sostituzione: ${playerInName} ⬆ ${playerOutName} ⬇`,
+        description: `🔄 ${playerOutName} ➡️ ${playerInName}`,
       };
 
       if (team === 'home') {
@@ -608,11 +584,7 @@ export function useMatch() {
     });
   }, []);
 
-  const recordCard = useCallback((
-    team: 'home' | 'away',
-    playerId: string,
-    cardType: 'yellow' | 'red'
-  ) => {
+  const recordCard = useCallback((team: 'home' | 'away', playerId: string, cardType: 'yellow' | 'red') => {
     setState(prev => {
       let playerName = '';
       let playerNumber: number | undefined;
@@ -636,40 +608,30 @@ export function useMatch() {
         playerId,
         playerName,
         playerNumber,
-        description: `${cardType === 'yellow' ? '🟨' : '🟥'} Cartellino ${cardType === 'yellow' ? 'giallo' : 'rosso'} a ${playerName}`,
+        description: `${cardType === 'yellow' ? '🟨' : '🟥'} Cartellino ${cardType === 'yellow' ? 'giallo' : 'rosso'} per ${playerName}`,
       };
 
-      // For red card: remove player from field and mark as expelled
+      let newState = { ...prev, events: [...prev.events, event] };
+
       if (cardType === 'red') {
         if (team === 'home') {
-          return {
-            ...prev,
-            homeTeam: {
-              ...prev.homeTeam,
-              players: prev.homeTeam.players.map(p =>
-                p.id === playerId ? { ...p, isOnField: false, isExpelled: true } : p
-              ),
-            },
-            events: [...prev.events, event],
+          newState.homeTeam = {
+            ...newState.homeTeam,
+            players: newState.homeTeam.players.map(p =>
+              p.id === playerId ? { ...p, isOnField: false, isExpelled: true } : p
+            ),
           };
         } else {
-          return {
-            ...prev,
-            awayTeam: {
-              ...prev.awayTeam,
-              players: prev.awayTeam.players.map(p =>
-                p.id === playerId ? { ...p, isOnField: false, isExpelled: true } : p
-              ),
-            },
-            events: [...prev.events, event],
+          newState.awayTeam = {
+            ...newState.awayTeam,
+            players: newState.awayTeam.players.map(p =>
+              p.id === playerId ? { ...p, isOnField: false, isExpelled: true } : p
+            ),
           };
         }
       }
 
-      return {
-        ...prev,
-        events: [...prev.events, event],
-      };
+      return newState;
     });
   }, []);
 
@@ -678,12 +640,6 @@ export function useMatch() {
     setState(createInitialState());
   }, []);
 
-  // Helper to get goals for a specific period
-  const getGoalsForPeriod = useCallback((period: number) => {
-    return state.events.filter(e => 
-      e.period === period && (e.type === 'goal' || e.type === 'own_goal')
-    );
-  }, [state.events]);
   const forceStarterSelection = useCallback(() => {
     setState(prev => ({
       ...prev,
@@ -696,6 +652,7 @@ export function useMatch() {
     setHomeTeamName,
     setAwayTeamName,
     addPlayer,
+    bulkAddPlayers,
     updatePlayerNumber,
     removePlayer,
     addOpponentPlayer,
@@ -716,7 +673,6 @@ export function useMatch() {
     recordSubstitution,
     recordCard,
     resetMatch,
-    getGoalsForPeriod,
     forceStarterSelection,
   };
 }
