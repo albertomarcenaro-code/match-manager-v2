@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Player, OpponentPlayer } from '@/types/match';
-import { Plus, Trash2, Users, Shield, Check, Hash, Upload, Save } from 'lucide-react';
+import { Plus, Trash2, Users, Shield, Check, Hash, Upload, Save, ArrowLeftRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,6 +15,17 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface RosterSetupProps {
   homeTeamName: string;
@@ -30,6 +41,7 @@ interface RosterSetupProps {
   onRemoveOpponentPlayer: (playerId: string) => void;
   onComplete: () => void;
   onBulkAddPlayers?: (names: string[]) => void;
+  onSwapTeams?: () => void;
 }
 
 export function RosterSetup({
@@ -46,6 +58,7 @@ export function RosterSetup({
   onRemoveOpponentPlayer,
   onComplete,
   onBulkAddPlayers,
+  onSwapTeams,
 }: RosterSetupProps) {
   const { user, isGuest } = useAuth();
   const [newPlayerName, setNewPlayerName] = useState('');
@@ -270,6 +283,38 @@ export function RosterSetup({
             <p className="text-sm text-primary mt-2">Caricamento dati salvati...</p>
           )}
         </div>
+
+        {/* Swap Teams Button */}
+        {onSwapTeams && (
+          <div className="flex justify-center">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <ArrowLeftRight className="h-4 w-4" />
+                  Scambia Squadre
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Scambiare le squadre?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    I dati della squadra di casa e della squadra ospite verranno invertiti. 
+                    Utile quando la tua squadra gioca in trasferta.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => {
+                    onSwapTeams();
+                    toast.success('Squadre scambiate');
+                  }}>
+                    Scambia
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        )}
 
         <div className="grid md:grid-cols-2 gap-6">
           {/* Home Team */}

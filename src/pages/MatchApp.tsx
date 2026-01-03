@@ -60,6 +60,7 @@ const MatchApp = () => {
     recordCard,
     resetMatch,
     forceStarterSelection,
+    swapTeams,
   } = useMatch();
 
   const handleRosterComplete = () => {
@@ -130,6 +131,7 @@ const MatchApp = () => {
             onRemoveOpponentPlayer={removeOpponentPlayer}
             onComplete={handleRosterComplete}
             onBulkAddPlayers={bulkAddPlayers}
+            onSwapTeams={swapTeams}
           />
         </div>
         <Footer />
