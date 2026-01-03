@@ -74,6 +74,13 @@ export function useMatch() {
     }
   }, [state]);
 
+  const audioPlayedRef = useRef<boolean>(false);
+
+  // Reset audio played flag when period changes
+  useEffect(() => {
+    audioPlayedRef.current = false;
+  }, [state.currentPeriod]);
+
   useEffect(() => {
     if (state.isRunning && !state.isPaused) {
       timerRef.current = window.setInterval(() => {
@@ -81,22 +88,10 @@ export function useMatch() {
           const newTime = prev.elapsedTime + 1;
           const periodSeconds = prev.periodDuration * 60;
           
-          if (newTime >= periodSeconds) {
-            try {
-              const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-              const oscillator = audioContext.createOscillator();
-              const gainNode = audioContext.createGain();
-              oscillator.connect(gainNode);
-              gainNode.connect(audioContext.destination);
-              oscillator.frequency.value = 800;
-              oscillator.type = 'sine';
-              gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-              gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-              oscillator.start(audioContext.currentTime);
-              oscillator.stop(audioContext.currentTime + 0.5);
-            } catch (e) {
-              console.log('Audio not supported');
-            }
+          // Play audio alert only once when time is up
+          if (newTime === periodSeconds && !audioPlayedRef.current) {
+            audioPlayedRef.current = true;
+            playEndPeriodAlert();
           }
           
           return { ...prev, elapsedTime: newTime };
@@ -110,6 +105,33 @@ export function useMatch() {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [state.isRunning, state.isPaused]);
+
+  const playEndPeriodAlert = () => {
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      // Play a whistle-like sound (three short beeps)
+      const playBeep = (startTime: number, frequency: number, duration: number) => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.frequency.value = frequency;
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0.5, startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+        oscillator.start(startTime);
+        oscillator.stop(startTime + duration);
+      };
+      
+      // Three ascending beeps like a referee whistle
+      playBeep(audioContext.currentTime, 800, 0.15);
+      playBeep(audioContext.currentTime + 0.2, 1000, 0.15);
+      playBeep(audioContext.currentTime + 0.4, 1200, 0.3);
+    } catch (e) {
+      console.log('Audio not supported');
+    }
+  };
 
   const setHomeTeamName = useCallback((name: string) => {
     setState(prev => ({
@@ -321,21 +343,23 @@ export function useMatch() {
     });
   }, []);
 
-  const startPeriod = useCallback(() => {
+  const startPeriod = useCallback((duration?: number) => {
     setState(prev => {
       const newPeriod = prev.currentPeriod + 1;
+      const periodDuration = duration !== undefined ? duration : prev.periodDuration;
       const event: MatchEvent = {
         id: generateId(),
         type: 'period_start',
         timestamp: 0,
         period: newPeriod,
         team: 'home',
-        description: `Inizio ${newPeriod}° tempo`,
+        description: `Inizio ${newPeriod}° tempo (${periodDuration} min)`,
       };
       
       return {
         ...prev,
         currentPeriod: newPeriod,
+        periodDuration,
         elapsedTime: 0,
         isRunning: true,
         isPaused: false,
@@ -647,6 +671,43 @@ export function useMatch() {
     }));
   }, []);
 
+  const swapTeams = useCallback(() => {
+    setState(prev => {
+      // Convert home players to opponent format and vice versa
+      const newAwayPlayers: OpponentPlayer[] = prev.homeTeam.players
+        .filter(p => p.number !== null)
+        .map(p => ({
+          id: p.id,
+          number: p.number!,
+          isOnField: p.isOnField,
+          isExpelled: p.isExpelled,
+        }));
+
+      const newHomePlayers: Player[] = prev.awayTeam.players.map(p => ({
+        id: p.id,
+        name: `Giocatore #${p.number}`,
+        number: p.number,
+        isOnField: p.isOnField,
+        isStarter: p.isOnField,
+        isExpelled: p.isExpelled,
+      }));
+
+      return {
+        ...prev,
+        homeTeam: {
+          name: prev.awayTeam.name,
+          players: newHomePlayers,
+          score: prev.awayTeam.score,
+        },
+        awayTeam: {
+          name: prev.homeTeam.name,
+          players: newAwayPlayers,
+          score: prev.homeTeam.score,
+        },
+      };
+    });
+  }, []);
+
   return {
     state,
     setHomeTeamName,
@@ -674,5 +735,6 @@ export function useMatch() {
     recordCard,
     resetMatch,
     forceStarterSelection,
+    swapTeams,
   };
 }

@@ -1,4 +1,5 @@
 import { MatchState, MatchEvent } from '@/types/match';
+import { cn } from '@/lib/utils';
 
 interface MatchHeaderProps {
   state: MatchState;
@@ -15,6 +16,9 @@ export function MatchHeader({ state }: MatchHeaderProps) {
     return `${Math.floor(seconds / 60)}'`;
   };
 
+  // Check if we're in overtime
+  const isOvertime = state.isRunning && state.elapsedTime >= state.periodDuration * 60;
+
   // Get goals for a specific period
   const getGoalsForPeriod = (period: number): MatchEvent[] => {
     return state.events.filter(e => 
@@ -25,7 +29,10 @@ export function MatchHeader({ state }: MatchHeaderProps) {
   return (
     <div className="bg-card rounded-xl shadow-card overflow-hidden">
       {/* Main Score Header */}
-      <div className="gradient-header text-primary-foreground p-4">
+      <div className={cn(
+        "gradient-header text-primary-foreground p-4 transition-colors duration-300",
+        isOvertime && "bg-destructive"
+      )}>
         {/* Teams and Score */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex-1 text-center px-2">
@@ -56,10 +63,24 @@ export function MatchHeader({ state }: MatchHeaderProps) {
             </p>
           </div>
 
-          <div className="bg-primary-foreground/10 backdrop-blur px-6 py-2 rounded-lg">
-            <p className={`text-3xl font-bold tabular-nums ${state.isRunning && !state.isPaused ? 'animate-pulse-ring' : ''}`}>
+          <div className={cn(
+            "backdrop-blur px-6 py-2 rounded-lg transition-all duration-300",
+            isOvertime 
+              ? "bg-destructive-foreground/20 animate-pulse" 
+              : "bg-primary-foreground/10"
+          )}>
+            <p className={cn(
+              "text-3xl font-bold tabular-nums",
+              state.isRunning && !state.isPaused && !isOvertime && "animate-pulse-ring",
+              isOvertime && "text-destructive-foreground"
+            )}>
               {formatTime(state.elapsedTime)}
             </p>
+            {isOvertime && (
+              <p className="text-xs text-center text-destructive-foreground/80 font-medium">
+                +{Math.floor((state.elapsedTime - state.periodDuration * 60) / 60)}' recupero
+              </p>
+            )}
           </div>
 
           <div className="text-center">
@@ -67,6 +88,7 @@ export function MatchHeader({ state }: MatchHeaderProps) {
             <p className="font-semibold text-sm">
               {state.isMatchEnded ? 'Terminata' : 
                state.isPaused ? 'In pausa' : 
+               isOvertime ? 'Recupero' :
                state.isRunning ? 'In corso' : 
                !state.isMatchStarted ? 'Da iniziare' : 'Intervallo'}
             </p>

@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, Flag, StopCircle, RotateCcw } from 'lucide-react';
 import { MatchState } from '@/types/match';
+import { PeriodDurationDialog } from './PeriodDurationDialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,10 +14,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { cn } from '@/lib/utils';
 
 interface TimerControlsProps {
   state: MatchState;
-  onStartPeriod: () => void;
+  onStartPeriod: (duration: number) => void;
   onPause: () => void;
   onResume: () => void;
   onEndPeriod: () => void;
@@ -32,16 +35,29 @@ export function TimerControls({
   onEndMatch,
   onUndo,
 }: TimerControlsProps) {
+  const [durationDialogOpen, setDurationDialogOpen] = useState(false);
+  
   const canStartPeriod = !state.isRunning && !state.isMatchEnded && !state.needsStarterSelection;
   const canEndPeriod = state.isRunning;
   const hasEvents = state.events.length > 0;
+  
+  // Check if we're in overtime (elapsed time >= period duration)
+  const isOvertime = state.elapsedTime >= state.periodDuration * 60;
+
+  const handleStartClick = () => {
+    setDurationDialogOpen(true);
+  };
+
+  const handleDurationConfirm = (duration: number) => {
+    onStartPeriod(duration);
+  };
 
   return (
     <div className="flex flex-wrap items-center justify-center gap-2 p-4 bg-card rounded-xl shadow-card">
       {/* Start/Resume Period */}
       {!state.isRunning && canStartPeriod && (
         <Button
-          onClick={onStartPeriod}
+          onClick={handleStartClick}
           className="gap-2 bg-secondary hover:bg-secondary/90 text-secondary-foreground"
           size="lg"
         >
@@ -76,13 +92,20 @@ export function TimerControls({
         </>
       )}
 
-      {/* End Period */}
+      {/* End Period - Text changes when in overtime */}
       {canEndPeriod && (
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="outline" size="lg" className="gap-2">
+            <Button 
+              variant={isOvertime ? "destructive" : "outline"} 
+              size="lg" 
+              className={cn(
+                "gap-2",
+                isOvertime && "animate-pulse"
+              )}
+            >
               <Flag className="h-5 w-5" />
-              Fine tempo
+              {isOvertime ? "Ferma tempo" : "Fine tempo"}
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
@@ -90,6 +113,11 @@ export function TimerControls({
               <AlertDialogTitle>Terminare il {state.currentPeriod}° tempo?</AlertDialogTitle>
               <AlertDialogDescription>
                 Il tempo verrà registrato con il punteggio attuale: {state.homeTeam.score} - {state.awayTeam.score}
+                {isOvertime && (
+                  <span className="block mt-2 text-destructive font-medium">
+                    Tempo regolamentare superato di {Math.floor((state.elapsedTime - state.periodDuration * 60) / 60)} minuti
+                  </span>
+                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -166,6 +194,15 @@ export function TimerControls({
           Partita terminata
         </p>
       )}
+
+      {/* Period Duration Dialog */}
+      <PeriodDurationDialog
+        isOpen={durationDialogOpen}
+        onClose={() => setDurationDialogOpen(false)}
+        onConfirm={handleDurationConfirm}
+        currentPeriod={state.currentPeriod}
+        defaultDuration={state.periodDuration}
+      />
     </div>
   );
 }
