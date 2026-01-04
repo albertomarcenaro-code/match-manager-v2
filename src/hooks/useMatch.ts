@@ -673,36 +673,17 @@ export function useMatch() {
 
   const swapTeams = useCallback(() => {
     setState(prev => {
-      // Convert home players to opponent format and vice versa
-      const newAwayPlayers: OpponentPlayer[] = prev.homeTeam.players
-        .filter(p => p.number !== null)
-        .map(p => ({
-          id: p.id,
-          number: p.number!,
-          isOnField: p.isOnField,
-          isExpelled: p.isExpelled,
-        }));
-
-      const newHomePlayers: Player[] = prev.awayTeam.players.map(p => ({
-        id: p.id,
-        name: `Giocatore #${p.number}`,
-        number: p.number,
-        isOnField: p.isOnField,
-        isStarter: p.isOnField,
-        isExpelled: p.isExpelled,
-      }));
-
+      // Simply swap team names while keeping all player data intact
+      // This is useful when your team plays away - you just swap positions
       return {
         ...prev,
         homeTeam: {
+          ...prev.homeTeam,
           name: prev.awayTeam.name,
-          players: newHomePlayers,
-          score: prev.awayTeam.score,
         },
         awayTeam: {
+          ...prev.awayTeam,
           name: prev.homeTeam.name,
-          players: newAwayPlayers,
-          score: prev.homeTeam.score,
         },
       };
     });
