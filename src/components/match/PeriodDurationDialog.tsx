@@ -45,13 +45,14 @@ export function PeriodDurationDialog({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    // Allow empty string or valid numbers 0-99
-    if (value === '' || (/^\d{1,2}$/.test(value) && parseInt(value, 10) <= 99)) {
+    // Allow empty string or any 0-99 (max 2 digits)
+    if (/^\d{0,2}$/.test(value)) {
       setDurationValue(value);
     }
   };
 
-  const isValid = durationValue !== '' && parseInt(durationValue, 10) > 0 && parseInt(durationValue, 10) <= 99;
+  const parsed = durationValue === '' ? NaN : parseInt(durationValue, 10);
+  const isValid = !isNaN(parsed) && parsed >= 0 && parsed <= 99;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -73,9 +74,10 @@ export function PeriodDurationDialog({
               pattern="[0-9]*"
               value={durationValue}
               onChange={handleInputChange}
+              onFocus={(e) => e.currentTarget.select()}
               className="text-center text-lg font-bold"
               autoFocus
-              placeholder="1-99"
+              placeholder="0-99"
             />
           </div>
           

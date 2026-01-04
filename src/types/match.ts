@@ -7,32 +7,19 @@ export interface Player {
   isExpelled?: boolean;
 }
 
-export interface OpponentPlayer {
-  id: string;
-  number: number;
-  isOnField: boolean;
-  isExpelled?: boolean;
-}
-
 export interface Team {
   name: string;
   players: Player[];
   score: number;
 }
 
-export interface OpponentTeam {
-  name: string;
-  players: OpponentPlayer[];
-  score: number;
-}
-
-export type EventType = 
-  | 'period_start' 
-  | 'period_end' 
-  | 'goal' 
-  | 'own_goal' 
-  | 'substitution' 
-  | 'yellow_card' 
+export type EventType =
+  | 'period_start'
+  | 'period_end'
+  | 'goal'
+  | 'own_goal'
+  | 'substitution'
+  | 'yellow_card'
   | 'red_card';
 
 export interface MatchEvent {
@@ -63,7 +50,7 @@ export interface PeriodScore {
 
 export interface MatchState {
   homeTeam: Team;
-  awayTeam: OpponentTeam;
+  awayTeam: Team;
   events: MatchEvent[];
   currentPeriod: number;
   periodDuration: number; // in minutes
@@ -76,3 +63,4 @@ export interface MatchState {
   periodScores: PeriodScore[];
   needsStarterSelection: boolean;
 }
+

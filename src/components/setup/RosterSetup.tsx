@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Player, OpponentPlayer } from '@/types/match';
+import { Player } from '@/types/match';
 import { Plus, Trash2, Users, Shield, Check, Hash, Upload, Save, ArrowLeftRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -31,7 +31,7 @@ interface RosterSetupProps {
   homeTeamName: string;
   awayTeamName: string;
   homePlayers: Player[];
-  awayPlayers: OpponentPlayer[];
+  awayPlayers: Player[];
   onHomeTeamNameChange: (name: string) => void;
   onAwayTeamNameChange: (name: string) => void;
   onAddPlayer: (name: string) => void;

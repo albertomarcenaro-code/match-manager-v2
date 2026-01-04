@@ -345,6 +345,7 @@ export function ExportButton({ state }: ExportButtonProps) {
       });
     
     const awayRoster = state.awayTeam.players
+      .filter(p => p.number !== null)
       .map(p => {
         const mins = awayMinutes[p.id] || { total: 0 };
         const periodMins = [];
@@ -353,7 +354,7 @@ export function ExportButton({ state }: ExportButtonProps) {
         }
         return [
           p.number,
-          `#${p.number}`,
+          p.name || `#${p.number}`,
           p.isExpelled ? 'Espulso' : (p.isOnField ? 'In Campo' : 'Panchina'),
           ...periodMins,
           mins.total
