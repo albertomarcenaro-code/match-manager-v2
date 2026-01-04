@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { MatchState, MatchEvent, Player, OpponentPlayer, PeriodScore } from '@/types/match';
+import { MatchState, MatchEvent, Player, PeriodScore } from '@/types/match';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -206,10 +206,12 @@ export function useMatch() {
   }, []);
 
   const addOpponentPlayer = useCallback((number: number) => {
-    const player: OpponentPlayer = {
+    const player: Player = {
       id: generateId(),
+      name: `Giocatore #${number}`,
       number,
       isOnField: false,
+      isStarter: false,
     };
     setState(prev => ({
       ...prev,
@@ -232,30 +234,22 @@ export function useMatch() {
 
   const setStarters = useCallback((playerIds: string[], isHome: boolean) => {
     setState(prev => {
-      if (isHome) {
-        return {
-          ...prev,
-          homeTeam: {
-            ...prev.homeTeam,
-            players: prev.homeTeam.players.map(p => ({
-              ...p,
-              isStarter: playerIds.includes(p.id),
-              isOnField: playerIds.includes(p.id),
-            })),
-          },
-        };
-      } else {
-        return {
-          ...prev,
-          awayTeam: {
-            ...prev.awayTeam,
-            players: prev.awayTeam.players.map(p => ({
-              ...p,
-              isOnField: playerIds.includes(p.id),
-            })),
-          },
-        };
-      }
+      const apply = (players: Player[]) =>
+        players.map(p => ({
+          ...p,
+          isStarter: playerIds.includes(p.id),
+          isOnField: playerIds.includes(p.id),
+        }));
+
+      return isHome
+        ? {
+            ...prev,
+            homeTeam: { ...prev.homeTeam, players: apply(prev.homeTeam.players) },
+          }
+        : {
+            ...prev,
+            awayTeam: { ...prev.awayTeam, players: apply(prev.awayTeam.players) },
+          };
     });
   }, []);
 
@@ -673,41 +667,11 @@ export function useMatch() {
 
   const swapTeams = useCallback(() => {
     setState(prev => {
-      // True swap: convert home players to opponent format and vice versa
-      // Home players have names, opponent players don't - we need to convert properly
-      
-      // Convert current home players (with names) to opponent format (numbers only)
-      const newAwayPlayers: OpponentPlayer[] = prev.homeTeam.players
-        .filter(p => p.number !== null)
-        .map(p => ({
-          id: p.id,
-          number: p.number!,
-          isOnField: p.isOnField,
-          isExpelled: p.isExpelled,
-        }));
-
-      // Convert current opponent players (numbers only) to home format (with generated names)
-      const newHomePlayers: Player[] = prev.awayTeam.players.map(p => ({
-        id: p.id,
-        name: `Giocatore #${p.number}`,
-        number: p.number,
-        isOnField: p.isOnField,
-        isStarter: p.isOnField,
-        isExpelled: p.isExpelled,
-      }));
-
+      const temp = prev.homeTeam;
       return {
         ...prev,
-        homeTeam: {
-          name: prev.awayTeam.name,
-          players: newHomePlayers,
-          score: prev.awayTeam.score,
-        },
-        awayTeam: {
-          name: prev.homeTeam.name,
-          players: newAwayPlayers,
-          score: prev.homeTeam.score,
-        },
+        homeTeam: prev.awayTeam,
+        awayTeam: temp,
       };
     });
   }, []);

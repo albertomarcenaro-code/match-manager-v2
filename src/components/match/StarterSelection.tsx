@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Player, OpponentPlayer } from '@/types/match';
+import { Player } from '@/types/match';
 import { Check, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface StarterSelectionProps {
   homePlayers: Player[];
-  awayPlayers: OpponentPlayer[];
+  awayPlayers: Player[];
   period: number;
   onConfirm: (homeStarters: string[], awayStarters: string[]) => void;
 }
@@ -22,7 +22,7 @@ export function StarterSelection({
     new Set(eligibleHomePlayers.filter(p => p.isStarter || p.isOnField).map(p => p.id))
   );
   const [selectedAway, setSelectedAway] = useState<Set<string>>(
-    new Set(awayPlayers.filter(p => p.isOnField).map(p => p.id))
+    new Set(awayPlayers.filter(p => p.isStarter || p.isOnField).map(p => p.id))
   );
 
   const toggleHome = (playerId: string) => {
@@ -127,8 +127,8 @@ export function StarterSelection({
                 )}>
                   {player.number}
                 </span>
-                <span className="flex-1 text-left text-sm font-medium">#{player.number}</span>
-                {selectedAway.has(player.id) && (
+                 <span className="flex-1 text-left text-sm font-medium">{player.name || `#${player.number ?? ''}`}</span>
+                 {selectedAway.has(player.id) && (
                   <Check className="h-5 w-5 text-on-field" />
                 )}
               </button>

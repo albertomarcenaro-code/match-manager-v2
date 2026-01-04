@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Player, OpponentPlayer, MatchEvent } from '@/types/match';
+import { Player, MatchEvent } from '@/types/match';
 import { Target, RefreshCw, Square } from 'lucide-react';
 import {
   Dialog,
@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 
 interface TeamPanelProps {
   teamName: string;
-  players: (Player | OpponentPlayer)[];
+  players: Player[];
   isHome: boolean;
   isRunning: boolean;
   events: MatchEvent[];
@@ -54,11 +54,9 @@ export function TeamPanel({
     return { goals, hasYellowCard, hasRedCard };
   };
 
-  const getPlayerDisplay = (player: Player | OpponentPlayer) => {
-    if ('name' in player && player.name) {
-      return `${player.number} - ${player.name}`;
-    }
-    return `#${player.number}`;
+  const getPlayerDisplay = (player: Player) => {
+    const num = player.number ?? '';
+    return player.name ? `${num} - ${player.name}` : `#${num}`;
   };
 
   const handleAction = (playerId: string) => {
@@ -197,7 +195,7 @@ export function TeamPanel({
                 {player.number}
               </span>
               <span className="flex-1 text-xs font-medium truncate">
-                {'name' in player ? player.name : ''}
+                {player.name}
               </span>
               {renderBadges(player.id)}
             </div>
@@ -219,7 +217,7 @@ export function TeamPanel({
                     {player.number}
                   </span>
                   <span className="flex-1 text-xs font-medium truncate">
-                    {'name' in player ? player.name : ''}
+                    {player.name}
                   </span>
                   {renderBadges(player.id)}
                 </div>
@@ -243,7 +241,7 @@ export function TeamPanel({
                     {player.number}
                   </span>
                   <span className="flex-1 text-xs font-medium truncate line-through">
-                    {'name' in player ? player.name : ''}
+                    {player.name}
                   </span>
                   <span className="w-3 h-4 bg-destructive rounded-sm flex-shrink-0" title="Espulso" />
                 </div>
