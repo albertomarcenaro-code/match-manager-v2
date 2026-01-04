@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,14 +26,32 @@ export function PeriodDurationDialog({
   currentPeriod,
   defaultDuration,
 }: PeriodDurationDialogProps) {
-  const [duration, setDuration] = useState(defaultDuration);
+  const [durationValue, setDurationValue] = useState(defaultDuration.toString());
+
+  // Reset value when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      setDurationValue(defaultDuration.toString());
+    }
+  }, [isOpen, defaultDuration]);
 
   const handleConfirm = () => {
-    if (duration > 0 && duration <= 60) {
-      onConfirm(duration);
+    const numValue = parseInt(durationValue, 10);
+    if (!isNaN(numValue) && numValue > 0 && numValue <= 99) {
+      onConfirm(numValue);
       onClose();
     }
   };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Allow empty string or valid numbers 0-99
+    if (value === '' || (/^\d{1,2}$/.test(value) && parseInt(value, 10) <= 99)) {
+      setDurationValue(value);
+    }
+  };
+
+  const isValid = durationValue !== '' && parseInt(durationValue, 10) > 0 && parseInt(durationValue, 10) <= 99;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -50,13 +68,14 @@ export function PeriodDurationDialog({
             <Label htmlFor="period-duration">Durata del tempo (minuti)</Label>
             <Input
               id="period-duration"
-              type="number"
-              min="1"
-              max="60"
-              value={duration}
-              onChange={(e) => setDuration(parseInt(e.target.value) || defaultDuration)}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={durationValue}
+              onChange={handleInputChange}
               className="text-center text-lg font-bold"
               autoFocus
+              placeholder="1-99"
             />
           </div>
           
@@ -73,6 +92,7 @@ export function PeriodDurationDialog({
           </Button>
           <Button 
             onClick={handleConfirm}
+            disabled={!isValid}
             className="gap-2 bg-secondary hover:bg-secondary/90 text-secondary-foreground"
           >
             <Play className="h-4 w-4" />
