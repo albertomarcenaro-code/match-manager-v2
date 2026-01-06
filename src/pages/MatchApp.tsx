@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMatch } from '@/hooks/useMatch';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBeforeUnload } from '@/hooks/useBeforeUnload';
 import { RosterSetup } from '@/components/setup/RosterSetup';
 import { MatchHeader } from '@/components/match/MatchHeader';
 import { TimerControls } from '@/components/match/TimerControls';
@@ -8,11 +9,12 @@ import { TeamPanel } from '@/components/match/TeamPanel';
 import { EventTimeline } from '@/components/match/EventTimeline';
 import { StarterSelection } from '@/components/match/StarterSelection';
 import { ExportButton } from '@/components/match/ExportButton';
+import { PDFExportButton } from '@/components/match/PDFExportButton';
 import { MatchSettings } from '@/components/match/MatchSettings';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
-import { RotateCcw, Edit, LogOut } from 'lucide-react';
+import { RotateCcw, Edit, LogOut, Trophy, Plus } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,20 +65,26 @@ const MatchApp = () => {
     swapTeams,
   } = useMatch();
 
+  // Warn before closing if timer is running
+  useBeforeUnload(state.isRunning && !state.isPaused, 'Hai una partita in corso. Sei sicuro di voler uscire?');
+
   const handleRosterComplete = () => {
     forceStarterSelection();
     setPhase('match');
+    toast.success('Configurazione completata');
   };
 
   const handleStartersConfirm = (homeStarters: string[], awayStarters: string[]) => {
     setStarters(homeStarters, true);
     setStarters(awayStarters, false);
     confirmStarters();
+    toast.success('Titolari confermati');
   };
 
   const handleNewMatch = () => {
     resetMatch();
     setPhase('setup');
+    toast.success('Nuova partita iniziata');
   };
 
   const handleLogout = async () => {
@@ -115,7 +123,33 @@ const MatchApp = () => {
                 <LogOut className="h-4 w-4" />
                 Esci
               </Button>
+              <Button variant="outline" size="sm" onClick={() => navigate('/tournament')} className="gap-1">
+                <Trophy className="h-4 w-4" />
+                <span className="hidden sm:inline">Torneo</span>
+              </Button>
             </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="secondary" size="sm" className="gap-1">
+                  <Plus className="h-4 w-4" />
+                  Nuova Partita
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Iniziare nuova partita?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    I dati della partita corrente verranno conservati. Procedi alla selezione titolari.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleRosterComplete}>
+                    Continua
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
           <RosterSetup
             homeTeamName={state.homeTeam.name}
@@ -259,10 +293,11 @@ const MatchApp = () => {
                 awayTeamName={state.awayTeam.name}
               />
 
-              {/* Export Button */}
+              {/* Export Buttons */}
               {state.isMatchEnded && (
-                <div className="flex justify-center pt-4">
+                <div className="flex justify-center gap-4 pt-4">
                   <ExportButton state={state} />
+                  <PDFExportButton state={state} />
                 </div>
               )}
             </>
