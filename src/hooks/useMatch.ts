@@ -1,9 +1,18 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { MatchState, MatchEvent, Player, PeriodScore } from '@/types/match';
+import { clearTimerState } from './useTimestamp';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
 const STORAGE_KEY = 'match-manager-state';
+const TIMER_STATE_KEY = 'match-timer-state';
+
+interface TimerPersistence {
+  startTimestamp: number | null;
+  pausedAt: number | null;
+  isRunning: boolean;
+  isPaused: boolean;
+}
 
 const createInitialState = (): MatchState => ({
   homeTeam: {
@@ -34,9 +43,27 @@ const loadStateFromStorage = (): MatchState | null => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved) as MatchState;
-      if (parsed.isRunning) {
+      
+      // Restore timer state from timestamp-based storage
+      const timerSaved = localStorage.getItem(TIMER_STATE_KEY);
+      if (timerSaved) {
+        const timerState: TimerPersistence = JSON.parse(timerSaved);
+        
+        if (timerState.isRunning && !timerState.isPaused && timerState.startTimestamp) {
+          // Calculate elapsed time from timestamp
+          parsed.elapsedTime = Math.floor((Date.now() - timerState.startTimestamp) / 1000);
+          parsed.isRunning = true;
+          parsed.isPaused = false;
+        } else if (timerState.isPaused && timerState.pausedAt !== null) {
+          parsed.elapsedTime = timerState.pausedAt;
+          parsed.isRunning = true;
+          parsed.isPaused = true;
+        }
+      } else if (parsed.isRunning) {
+        // Fallback: if no timer state but match was running, pause it
         parsed.isPaused = true;
       }
+      
       return parsed;
     }
   } catch (e) {
@@ -53,9 +80,24 @@ const saveStateToStorage = (state: MatchState) => {
   }
 };
 
+const saveTimerState = (startTimestamp: number | null, pausedAt: number | null, isRunning: boolean, isPaused: boolean) => {
+  try {
+    localStorage.setItem(TIMER_STATE_KEY, JSON.stringify({
+      startTimestamp,
+      pausedAt,
+      isRunning,
+      isPaused,
+    }));
+  } catch (e) {
+    console.error('Failed to save timer state:', e);
+  }
+};
+
 const clearStorage = () => {
   try {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(TIMER_STATE_KEY);
+    clearTimerState();
   } catch (e) {
     console.error('Failed to clear localStorage:', e);
   }
@@ -67,6 +109,8 @@ export function useMatch() {
     return saved || createInitialState();
   });
   const timerRef = useRef<number | null>(null);
+  const startTimestampRef = useRef<number | null>(null);
+  const pausedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (state.isMatchStarted || state.homeTeam.players.some(p => p.number !== null) || state.awayTeam.players.length > 0) {
@@ -81,15 +125,21 @@ export function useMatch() {
     audioPlayedRef.current = false;
   }, [state.currentPeriod]);
 
+  // Timestamp-based timer effect
   useEffect(() => {
     if (state.isRunning && !state.isPaused) {
+      // Initialize start timestamp if not set
+      if (!startTimestampRef.current) {
+        startTimestampRef.current = Date.now() - (state.elapsedTime * 1000);
+      }
+      
       timerRef.current = window.setInterval(() => {
         setState(prev => {
-          const newTime = prev.elapsedTime + 1;
+          const newTime = Math.floor((Date.now() - (startTimestampRef.current || Date.now())) / 1000);
           const periodSeconds = prev.periodDuration * 60;
           
           // Play audio alert only once when time is up
-          if (newTime === periodSeconds && !audioPlayedRef.current) {
+          if (newTime >= periodSeconds && !audioPlayedRef.current) {
             audioPlayedRef.current = true;
             playEndPeriodAlert();
           }
@@ -97,8 +147,17 @@ export function useMatch() {
           return { ...prev, elapsedTime: newTime };
         });
       }, 1000);
-    } else if (timerRef.current) {
+      
+      // Save timer state
+      saveTimerState(startTimestampRef.current, null, true, false);
+    } else if (state.isPaused) {
+      pausedAtRef.current = state.elapsedTime;
+      saveTimerState(startTimestampRef.current, state.elapsedTime, true, true);
+    }
+
+    if (timerRef.current && (!state.isRunning || state.isPaused)) {
       clearInterval(timerRef.current);
+      timerRef.current = null;
     }
 
     return () => {
@@ -338,6 +397,11 @@ export function useMatch() {
   }, []);
 
   const startPeriod = useCallback((duration?: number) => {
+    // Reset timestamp for new period
+    startTimestampRef.current = Date.now();
+    pausedAtRef.current = null;
+    audioPlayedRef.current = false;
+    
     setState(prev => {
       const newPeriod = prev.currentPeriod + 1;
       const periodDuration = duration !== undefined ? duration : prev.periodDuration;
@@ -349,6 +413,9 @@ export function useMatch() {
         team: 'home',
         description: `Inizio ${newPeriod}° tempo (${periodDuration} min)`,
       };
+      
+      // Save timer state immediately
+      saveTimerState(Date.now(), null, true, false);
       
       return {
         ...prev,
@@ -365,10 +432,17 @@ export function useMatch() {
   }, []);
 
   const pauseTimer = useCallback(() => {
+    pausedAtRef.current = state.elapsedTime;
+    saveTimerState(startTimestampRef.current, state.elapsedTime, true, true);
     setState(prev => ({ ...prev, isPaused: true }));
-  }, []);
+  }, [state.elapsedTime]);
 
   const resumeTimer = useCallback(() => {
+    // Recalculate start timestamp based on paused elapsed time
+    if (pausedAtRef.current !== null) {
+      startTimestampRef.current = Date.now() - (pausedAtRef.current * 1000);
+    }
+    saveTimerState(startTimestampRef.current, null, true, false);
     setState(prev => ({ ...prev, isPaused: false }));
   }, []);
 

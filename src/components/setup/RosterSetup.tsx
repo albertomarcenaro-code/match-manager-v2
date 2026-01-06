@@ -2,11 +2,14 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { Player } from '@/types/match';
-import { Plus, Trash2, Users, Shield, Check, Hash, Upload, Save, ArrowLeftRight } from 'lucide-react';
+import { Plus, Trash2, Users, Shield, Check, Hash, Upload, Save, ArrowLeftRight, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTournament } from '@/hooks/useTournament';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
@@ -61,6 +64,7 @@ export function RosterSetup({
   onSwapTeams,
 }: RosterSetupProps) {
   const { user, isGuest } = useAuth();
+  const { tournament, startTournament } = useTournament();
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newOpponentNumber, setNewOpponentNumber] = useState('');
   const [autoNumberDialogOpen, setAutoNumberDialogOpen] = useState(false);
@@ -70,6 +74,9 @@ export function RosterSetup({
   const [bulkImportText, setBulkImportText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [tournamentMode, setTournamentMode] = useState(tournament.isActive);
+  const [tournamentName, setTournamentName] = useState(tournament.name || '');
+  const [showTournamentDialog, setShowTournamentDialog] = useState(false);
 
   // Load saved data for logged-in users
   useEffect(() => {
@@ -77,6 +84,14 @@ export function RosterSetup({
       loadUserData();
     }
   }, [user, isGuest]);
+
+  // Sync tournament mode with tournament state
+  useEffect(() => {
+    setTournamentMode(tournament.isActive);
+    if (tournament.isActive) {
+      setTournamentName(tournament.name);
+    }
+  }, [tournament.isActive, tournament.name]);
 
   const loadUserData = async () => {
     if (!user) return;
@@ -263,6 +278,26 @@ export function RosterSetup({
     setAutoNumberCount('');
   };
 
+  const handleTournamentToggle = (enabled: boolean) => {
+    if (enabled && !tournament.isActive) {
+      setShowTournamentDialog(true);
+    } else if (!enabled) {
+      setTournamentMode(false);
+    }
+  };
+
+  const handleStartTournament = () => {
+    if (!tournamentName.trim()) {
+      toast.error('Inserisci un nome per il torneo');
+      return;
+    }
+    
+    const players = homePlayers.map(p => ({ name: p.name, number: p.number }));
+    startTournament(tournamentName, homeTeamName, players);
+    setTournamentMode(true);
+    setShowTournamentDialog(false);
+  };
+
   const eligiblePlayers = homePlayers.filter(p => p.number !== null);
   const canProceed = eligiblePlayers.length >= 1 && awayPlayers.length >= 1;
 
@@ -281,6 +316,26 @@ export function RosterSetup({
           </p>
           {isLoading && (
             <p className="text-sm text-primary mt-2">Caricamento dati salvati...</p>
+          )}
+        </div>
+
+        {/* Tournament Mode Toggle */}
+        <div className="flex items-center justify-center gap-4 p-4 bg-card rounded-xl shadow-card">
+          <div className="flex items-center gap-3">
+            <Trophy className={cn("h-5 w-5", tournamentMode ? "text-secondary" : "text-muted-foreground")} />
+            <Label htmlFor="tournament-mode" className="font-medium">
+              Modalità Torneo
+            </Label>
+          </div>
+          <Switch
+            id="tournament-mode"
+            checked={tournamentMode}
+            onCheckedChange={handleTournamentToggle}
+          />
+          {tournamentMode && (
+            <span className="text-sm text-secondary font-medium">
+              {tournament.name} - {tournament.matches.length} partite
+            </span>
           )}
         </div>
 
@@ -578,6 +633,43 @@ export function RosterSetup({
             </Button>
             <Button onClick={handleAutoNumber}>
               Assegna numeri
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Tournament Start Dialog */}
+      <Dialog open={showTournamentDialog} onOpenChange={setShowTournamentDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-secondary" />
+              Avvia Modalità Torneo
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              In modalità torneo, la rosa della tua squadra verrà bloccata e le statistiche cumulative 
+              (gol, minuti, cartellini) verranno tracciate per ogni giocatore.
+            </p>
+            <div>
+              <Label htmlFor="tournament-name">Nome del Torneo</Label>
+              <Input
+                id="tournament-name"
+                value={tournamentName}
+                onChange={(e) => setTournamentName(e.target.value)}
+                placeholder="Es. Campionato Primavera 2024"
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTournamentDialog(false)}>
+              Annulla
+            </Button>
+            <Button onClick={handleStartTournament} className="gap-2">
+              <Trophy className="h-4 w-4" />
+              Avvia Torneo
             </Button>
           </DialogFooter>
         </DialogContent>
