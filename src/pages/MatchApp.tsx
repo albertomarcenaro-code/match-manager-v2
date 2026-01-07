@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useMatch } from '@/hooks/useMatch';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBeforeUnload } from '@/hooks/useBeforeUnload';
+import { useTournament } from '@/hooks/useTournament';
 import { RosterSetup } from '@/components/setup/RosterSetup';
 import { MatchHeader } from '@/components/match/MatchHeader';
 import { TimerControls } from '@/components/match/TimerControls';
@@ -29,13 +30,16 @@ import {
 import { Helmet } from 'react-helmet';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { TournamentPlayerMatchStats } from '@/types/tournament';
 
 type AppPhase = 'setup' | 'starterSelection' | 'match';
 
 const MatchApp = () => {
   const navigate = useNavigate();
   const { user, isGuest, signOut, exitGuest } = useAuth();
+  const { tournament, addMatchToTournament } = useTournament();
   const [phase, setPhase] = useState<AppPhase>('setup');
+  const [matchSavedToTournament, setMatchSavedToTournament] = useState(false);
   const {
     state,
     setHomeTeamName,
@@ -65,6 +69,63 @@ const MatchApp = () => {
     swapTeams,
   } = useMatch();
 
+  // Calculate player stats for tournament
+  const calculatePlayerStats = useCallback((): TournamentPlayerMatchStats[] => {
+    const playerStats: TournamentPlayerMatchStats[] = [];
+    const periodsPlayed = state.periodScores.length > 0 
+      ? Math.max(...state.periodScores.map(ps => ps.period))
+      : state.currentPeriod;
+
+    state.homeTeam.players.forEach(player => {
+      let goals = 0;
+      let minutes = 0;
+      let yellowCards = 0;
+      let redCards = 0;
+
+      state.events.forEach(e => {
+        if (e.team === 'home' && e.playerId === player.id) {
+          if (e.type === 'goal') goals++;
+          if (e.type === 'yellow_card') yellowCards++;
+          if (e.type === 'red_card') redCards++;
+        }
+      });
+
+      // Calculate minutes (simplified - count if was starter or subbed in)
+      if (player.isStarter || state.events.some(e => e.type === 'substitution' && e.team === 'home' && e.playerInId === player.id)) {
+        minutes = periodsPlayed * state.periodDuration;
+      }
+
+      playerStats.push({
+        playerId: player.id,
+        playerName: player.name,
+        playerNumber: player.number,
+        goals,
+        minutes,
+        yellowCards,
+        redCards,
+      });
+    });
+
+    return playerStats;
+  }, [state]);
+
+  // Auto-save to tournament when match ends
+  useEffect(() => {
+    if (state.isMatchEnded && tournament.isActive && !matchSavedToTournament) {
+      const playerStats = calculatePlayerStats();
+      addMatchToTournament(
+        state.homeTeam.name,
+        state.awayTeam.name,
+        state.homeTeam.score,
+        state.awayTeam.score,
+        playerStats,
+        state.events,
+        state.periodScores
+      );
+      setMatchSavedToTournament(true);
+    }
+  }, [state.isMatchEnded, tournament.isActive, matchSavedToTournament, calculatePlayerStats, addMatchToTournament, state]);
+
   // Warn before closing if timer is running
   useBeforeUnload(state.isRunning && !state.isPaused, 'Hai una partita in corso. Sei sicuro di voler uscire?');
 
@@ -83,6 +144,7 @@ const MatchApp = () => {
 
   const handleNewMatch = () => {
     resetMatch();
+    setMatchSavedToTournament(false);
     setPhase('setup');
     toast.success('Nuova partita iniziata');
   };

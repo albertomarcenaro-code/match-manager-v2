@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { TournamentState, TournamentPlayer, TournamentMatch, TournamentPlayerMatchStats } from '@/types/tournament';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { MatchEvent, PeriodScore } from '@/types/match';
 import { toast } from 'sonner';
 
 const TOURNAMENT_STORAGE_KEY = 'tournament-state';
@@ -21,7 +20,14 @@ const createEmptyTournament = (): TournamentState => ({
 const loadFromLocalStorage = (): TournamentState | null => {
   try {
     const saved = localStorage.getItem(TOURNAMENT_STORAGE_KEY);
-    return saved ? JSON.parse(saved) : null;
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Validate the structure
+      if (parsed && typeof parsed === 'object' && 'isActive' in parsed) {
+        return parsed;
+      }
+    }
+    return null;
   } catch (e) {
     console.error('Failed to load tournament from localStorage:', e);
     return null;
@@ -37,30 +43,17 @@ const saveToLocalStorage = (state: TournamentState) => {
 };
 
 export function useTournament() {
-  const { user, isGuest } = useAuth();
   const [tournament, setTournament] = useState<TournamentState>(() => {
     return loadFromLocalStorage() || createEmptyTournament();
   });
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load from database for authenticated users
+  // Always save to localStorage when tournament changes
   useEffect(() => {
-    if (user && !isGuest) {
-      loadFromDatabase();
-    }
-  }, [user, isGuest]);
-
-  // Save to localStorage whenever tournament changes
-  useEffect(() => {
-    if (tournament.isActive) {
+    if (tournament.id) {
       saveToLocalStorage(tournament);
     }
   }, [tournament]);
-
-  const loadFromDatabase = async () => {
-    // Tournament data is stored in localStorage for now
-    // Database integration can be added later
-  };
 
   const startTournament = useCallback((name: string, teamName: string, players: { name: string; number: number | null }[]) => {
     const tournamentPlayers: TournamentPlayer[] = players.map(p => ({
@@ -74,7 +67,7 @@ export function useTournament() {
       matchesPlayed: 0,
     }));
 
-    setTournament({
+    const newTournament: TournamentState = {
       id: generateId(),
       name,
       teamName,
@@ -82,16 +75,16 @@ export function useTournament() {
       matches: [],
       isActive: true,
       createdAt: new Date().toISOString(),
-    });
+    };
 
+    setTournament(newTournament);
+    saveToLocalStorage(newTournament);
     toast.success('Torneo avviato!');
   }, []);
 
   const endTournament = useCallback(() => {
-    setTournament(prev => ({
-      ...prev,
-      isActive: false,
-    }));
+    const emptyTournament = createEmptyTournament();
+    setTournament(emptyTournament);
     localStorage.removeItem(TOURNAMENT_STORAGE_KEY);
     toast.success('Torneo terminato');
   }, []);
@@ -101,7 +94,9 @@ export function useTournament() {
     awayTeamName: string,
     homeScore: number,
     awayScore: number,
-    playerStats: TournamentPlayerMatchStats[]
+    playerStats: TournamentPlayerMatchStats[],
+    events: MatchEvent[],
+    periodScores: PeriodScore[]
   ) => {
     const match: TournamentMatch = {
       id: generateId(),
@@ -111,6 +106,8 @@ export function useTournament() {
       homeScore,
       awayScore,
       playerStats,
+      events,
+      periodScores,
     };
 
     setTournament(prev => {
@@ -130,11 +127,14 @@ export function useTournament() {
         return player;
       });
 
-      return {
+      const newState = {
         ...prev,
         players: updatedPlayers,
         matches: [...prev.matches, match],
       };
+
+      saveToLocalStorage(newState);
+      return newState;
     });
 
     toast.success('Partita aggiunta al torneo');
@@ -144,6 +144,10 @@ export function useTournament() {
     return tournament.players;
   }, [tournament.players]);
 
+  const getMatchById = useCallback((matchId: string): TournamentMatch | undefined => {
+    return tournament.matches.find(m => m.id === matchId);
+  }, [tournament.matches]);
+
   return {
     tournament,
     isLoading,
@@ -151,5 +155,6 @@ export function useTournament() {
     endTournament,
     addMatchToTournament,
     getTournamentPlayers,
+    getMatchById,
   };
 }
