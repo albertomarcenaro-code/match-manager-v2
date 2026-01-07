@@ -1,3 +1,5 @@
+import { MatchEvent, PeriodScore } from './match';
+
 export interface TournamentPlayer {
   id: string;
   name: string;
@@ -17,6 +19,8 @@ export interface TournamentMatch {
   homeScore: number;
   awayScore: number;
   playerStats: TournamentPlayerMatchStats[];
+  events: MatchEvent[];
+  periodScores: PeriodScore[];
 }
 
 export interface TournamentPlayerMatchStats {

@@ -4,10 +4,10 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Trophy, ArrowLeft, Users, Calendar, Target, Clock, AlertTriangle } from 'lucide-react';
+import { Trophy, ArrowLeft, Users, Calendar, Target, Clock, AlertTriangle, ChevronRight, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
+import { TournamentMatch } from '@/types/tournament';
 import {
   Table,
   TableBody,
@@ -27,11 +27,19 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const TournamentArchive = () => {
   const navigate = useNavigate();
-  const { tournament, endTournament } = useTournament();
+  const { tournament, endTournament, getMatchById } = useTournament();
   const [sortBy, setSortBy] = useState<'goals' | 'minutes' | 'matches'>('goals');
+  const [selectedMatch, setSelectedMatch] = useState<TournamentMatch | null>(null);
 
   const sortedPlayers = [...tournament.players].sort((a, b) => {
     switch (sortBy) {
@@ -48,6 +56,23 @@ const TournamentArchive = () => {
 
   const totalGoals = tournament.players.reduce((sum, p) => sum + p.totalGoals, 0);
   const totalMinutes = tournament.players.reduce((sum, p) => sum + p.totalMinutes, 0);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getEventIcon = (type: string) => {
+    switch (type) {
+      case 'goal': return '⚽';
+      case 'own_goal': return '⚽ AG';
+      case 'substitution': return '🔄';
+      case 'yellow_card': return '🟨';
+      case 'red_card': return '🟥';
+      default: return '';
+    }
+  };
 
   if (!tournament.isActive) {
     return (
@@ -91,7 +116,7 @@ const TournamentArchive = () => {
       <main className="flex-1 bg-background p-4 pb-8">
         <div className="max-w-6xl mx-auto space-y-6">
           {/* Header */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-4">
               <Button variant="ghost" onClick={() => navigate('/app')}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
@@ -189,12 +214,12 @@ const TournamentArchive = () => {
                   <TableHead className="text-center">Presenze</TableHead>
                   <TableHead className="text-center">Minuti</TableHead>
                   <TableHead className="text-center">Gol</TableHead>
-                  <TableHead className="text-center">🟨</TableHead>
-                  <TableHead className="text-center">🟥</TableHead>
+                  <TableHead className="text-center">Amm</TableHead>
+                  <TableHead className="text-center">Esp</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedPlayers.map((player, index) => (
+                {sortedPlayers.map((player) => (
                   <TableRow key={player.id}>
                     <TableCell className="font-medium">{player.number || '-'}</TableCell>
                     <TableCell className="font-medium">{player.name}</TableCell>
@@ -224,7 +249,11 @@ const TournamentArchive = () => {
               </h3>
               <div className="space-y-2">
                 {tournament.matches.map(match => (
-                  <div key={match.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <button
+                    key={match.id}
+                    onClick={() => setSelectedMatch(match)}
+                    className="w-full flex items-center justify-between p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors text-left"
+                  >
                     <div className="flex-1">
                       <span className="font-medium">{match.homeTeamName}</span>
                       <span className="mx-2 text-muted-foreground">vs</span>
@@ -233,16 +262,156 @@ const TournamentArchive = () => {
                     <div className="font-bold text-lg">
                       {match.homeScore} - {match.awayScore}
                     </div>
-                    <div className="text-sm text-muted-foreground ml-4">
+                    <div className="text-sm text-muted-foreground ml-4 flex items-center gap-2">
                       {new Date(match.date).toLocaleDateString('it-IT')}
+                      <ChevronRight className="h-4 w-4" />
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </Card>
           )}
         </div>
       </main>
+
+      {/* Match Detail Dialog */}
+      <Dialog open={!!selectedMatch} onOpenChange={() => setSelectedMatch(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span>Riepilogo Partita</span>
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedMatch && (
+            <ScrollArea className="max-h-[70vh]">
+              <div className="space-y-4 p-1">
+                {/* Score Header */}
+                <div className="text-center p-4 bg-muted rounded-lg">
+                  <div className="text-sm text-muted-foreground mb-2">
+                    {new Date(selectedMatch.date).toLocaleDateString('it-IT', {
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric'
+                    })}
+                  </div>
+                  <div className="flex items-center justify-center gap-4">
+                    <span className="text-lg font-bold">{selectedMatch.homeTeamName}</span>
+                    <span className="text-3xl font-bold">
+                      {selectedMatch.homeScore} - {selectedMatch.awayScore}
+                    </span>
+                    <span className="text-lg font-bold">{selectedMatch.awayTeamName}</span>
+                  </div>
+                  
+                  {/* Period Scores */}
+                  {selectedMatch.periodScores && selectedMatch.periodScores.length > 0 && (
+                    <div className="mt-2 text-sm text-muted-foreground">
+                      {selectedMatch.periodScores.map(ps => (
+                        <span key={ps.period} className="mx-2">
+                          {ps.period}°T: {ps.homeScore}-{ps.awayScore}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Goal Scorers */}
+                {selectedMatch.events && selectedMatch.events.filter(e => e.type === 'goal').length > 0 && (
+                  <div>
+                    <h4 className="font-semibold mb-2">Marcatori</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        {selectedMatch.events
+                          .filter(e => e.type === 'goal' && e.team === 'home')
+                          .map((e, i) => (
+                            <div key={i} className="text-sm flex items-center gap-2">
+                              <span>⚽</span>
+                              <span>{e.playerName}</span>
+                              <span className="text-muted-foreground">({formatTime(e.timestamp)})</span>
+                            </div>
+                          ))}
+                      </div>
+                      <div className="text-right">
+                        {selectedMatch.events
+                          .filter(e => e.type === 'goal' && e.team === 'away')
+                          .map((e, i) => (
+                            <div key={i} className="text-sm flex items-center gap-2 justify-end">
+                              <span className="text-muted-foreground">({formatTime(e.timestamp)})</span>
+                              <span>{e.playerName}</span>
+                              <span>⚽</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Player Stats */}
+                {selectedMatch.playerStats && selectedMatch.playerStats.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold mb-2">Statistiche Giocatori</h4>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>#</TableHead>
+                          <TableHead>Nome</TableHead>
+                          <TableHead className="text-center">Min</TableHead>
+                          <TableHead className="text-center">Gol</TableHead>
+                          <TableHead className="text-center">Amm</TableHead>
+                          <TableHead className="text-center">Esp</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedMatch.playerStats
+                          .filter(ps => ps.minutes > 0)
+                          .sort((a, b) => b.minutes - a.minutes)
+                          .map((ps, i) => (
+                            <TableRow key={i}>
+                              <TableCell>{ps.playerNumber || '-'}</TableCell>
+                              <TableCell>{ps.playerName}</TableCell>
+                              <TableCell className="text-center">{ps.minutes}</TableCell>
+                              <TableCell className="text-center font-bold text-secondary">
+                                {ps.goals > 0 ? ps.goals : '-'}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {ps.yellowCards > 0 ? ps.yellowCards : '-'}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {ps.redCards > 0 ? ps.redCards : '-'}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+
+                {/* Full Event Timeline */}
+                {selectedMatch.events && selectedMatch.events.filter(e => 
+                  e.type !== 'period_start' && e.type !== 'period_end'
+                ).length > 0 && (
+                  <div>
+                    <h4 className="font-semibold mb-2">Cronaca</h4>
+                    <div className="space-y-1 text-sm">
+                      {selectedMatch.events
+                        .filter(e => e.type !== 'period_start' && e.type !== 'period_end')
+                        .map((e, i) => (
+                          <div key={i} className="flex items-center gap-2 p-2 bg-muted/50 rounded">
+                            <span className="font-mono text-xs">{e.period}T {formatTime(e.timestamp)}</span>
+                            <span>{getEventIcon(e.type)}</span>
+                            <span className="flex-1">{e.description.replace(/[⚽🔄🟨🟥➡️]/g, '').trim()}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Footer />
     </div>
   );
