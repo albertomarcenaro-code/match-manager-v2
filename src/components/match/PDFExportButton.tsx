@@ -218,13 +218,12 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
 
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 8;
+    const margin = 6;
     
-    // Clean header - no colored background
-    let y = 10;
+    let y = 8;
     
-    // Date (small, top right)
-    doc.setFontSize(7);
+    // Date small top right
+    doc.setFontSize(6);
     doc.setTextColor(120, 120, 120);
     doc.text(new Date().toLocaleDateString('it-IT', { 
       weekday: 'short', 
@@ -233,76 +232,59 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
       day: 'numeric' 
     }), pageWidth - margin, y, { align: 'right' });
 
-    // Main score line: HOME  SCORE  AWAY
-    y = 18;
+    // Main score line
+    y = 14;
     doc.setTextColor(0, 0, 0);
-    doc.setFontSize(12);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     
     const scoreText = `${state.homeTeam.score} - ${state.awayTeam.score}`;
-    const homeNameWidth = doc.getTextWidth(state.homeTeam.name);
-    const awayNameWidth = doc.getTextWidth(state.awayTeam.name);
-    const scoreWidth = doc.getTextWidth(scoreText);
-    
-    // Center alignment
     const centerX = pageWidth / 2;
-    const scoreX = centerX;
-    const homeX = centerX - scoreWidth / 2 - 8;
-    const awayX = centerX + scoreWidth / 2 + 8;
 
-    doc.text(state.homeTeam.name, homeX, y, { align: 'right' });
-    doc.setFontSize(16);
-    doc.text(scoreText, scoreX, y, { align: 'center' });
-    doc.setFontSize(12);
-    doc.text(state.awayTeam.name, awayX, y, { align: 'left' });
+    doc.text(state.homeTeam.name, centerX - 25, y, { align: 'right' });
+    doc.setFontSize(14);
+    doc.text(scoreText, centerX, y, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text(state.awayTeam.name, centerX + 25, y, { align: 'left' });
 
     // Period scores with scorers
-    y = 26;
-    doc.setFontSize(7);
+    y = 20;
+    doc.setFontSize(6);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(80, 80, 80);
 
-    state.periodScores.forEach((ps, index) => {
+    const periodTexts: string[] = [];
+    state.periodScores.forEach((ps) => {
       const homeScorers = getGoalScorers('home', ps.period);
       const awayScorers = getGoalScorers('away', ps.period);
       
-      const periodLabel = `${ps.period}T: ${ps.homeScore}-${ps.awayScore}`;
-      let scorersText = '';
+      let text = `${ps.period}T: ${ps.homeScore}-${ps.awayScore}`;
+      const scorers: string[] = [];
+      if (homeScorers.length > 0) scorers.push(homeScorers.join(', '));
+      if (awayScorers.length > 0) scorers.push(awayScorers.join(', '));
+      if (scorers.length > 0) text += ` (${scorers.join(' | ')})`;
       
-      if (homeScorers.length > 0 || awayScorers.length > 0) {
-        const homePart = homeScorers.length > 0 ? homeScorers.join(', ') : '';
-        const awayPart = awayScorers.length > 0 ? awayScorers.join(', ') : '';
-        if (homePart && awayPart) {
-          scorersText = ` (${homePart} | ${awayPart})`;
-        } else if (homePart) {
-          scorersText = ` (${homePart})`;
-        } else {
-          scorersText = ` (${awayPart})`;
-        }
-      }
-      
-      doc.text(`${periodLabel}${scorersText}`, centerX, y, { align: 'center' });
-      y += 4;
+      periodTexts.push(text);
     });
+    
+    doc.text(periodTexts.join('  -  '), centerX, y, { align: 'center' });
+    y += 4;
 
-    y += 2;
-
-    // Separator line
+    // Separator
     doc.setDrawColor(200, 200, 200);
     doc.line(margin, y, pageWidth - margin, y);
-    y += 4;
+    y += 3;
 
     // Team tables side by side
     const tableWidth = (pageWidth - margin * 3) / 2;
     
-    // Generate period headers
-    const periodHeaders = [];
+    const periodHeaders: string[] = [];
     for (let i = 1; i <= periodsPlayed; i++) {
       periodHeaders.push(`T${i}`);
     }
 
     // HOME TEAM TABLE
-    doc.setFontSize(8);
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(39, 70, 63);
     doc.text(state.homeTeam.name.toUpperCase(), margin, y);
@@ -316,10 +298,9 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         
         const row: string[] = [
           p.number?.toString() || '',
-          p.name.length > 12 ? p.name.substring(0, 11) + '.' : p.name,
+          p.name.length > 10 ? p.name.substring(0, 9) + '.' : p.name,
         ];
         
-        // Add period minutes
         for (let i = 1; i <= periodsPlayed; i++) {
           row.push((mins[i] || 0).toString());
         }
@@ -327,7 +308,6 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         row.push(mins.total.toString());
         row.push(pStats.goals > 0 ? pStats.goals.toString() : '');
         
-        // Cards as text
         let cards = '';
         if (pStats.yellowCards > 0) cards += 'A';
         if (pStats.redCards > 0) cards += 'E';
@@ -336,36 +316,36 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         return row;
       });
 
-    const homeHeaders = ['#', 'Giocatore', ...periodHeaders, 'Tot', 'G', 'C'];
+    const tableHeaders = ['#', 'Nome', ...periodHeaders, 'Tot', 'G', 'C'];
 
     autoTable(doc, {
-      startY: y + 2,
-      head: [homeHeaders],
+      startY: y + 1,
+      head: [tableHeaders],
       body: homeRosterData,
       theme: 'plain',
       headStyles: { 
-        fillColor: [240, 240, 240], 
+        fillColor: [245, 245, 245], 
         textColor: [39, 70, 63],
-        fontSize: 6,
+        fontSize: 5,
         fontStyle: 'bold',
-        cellPadding: 1,
+        cellPadding: 0.8,
       },
       bodyStyles: { 
-        fontSize: 6,
-        cellPadding: 1,
+        fontSize: 5,
+        cellPadding: 0.8,
       },
       columnStyles: {
-        0: { cellWidth: 6 },
-        1: { cellWidth: 22 },
+        0: { cellWidth: 5 },
+        1: { cellWidth: 18 },
       },
       tableWidth: tableWidth,
       margin: { left: margin },
     });
 
-    const homeTableEndY = (doc as any).lastAutoTable?.finalY || y + 40;
+    const homeTableEndY = (doc as any).lastAutoTable?.finalY || y + 30;
 
     // AWAY TEAM TABLE
-    doc.setFontSize(8);
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(75, 85, 99);
     doc.text(state.awayTeam.name.toUpperCase(), pageWidth / 2 + margin / 2, y);
@@ -380,7 +360,7 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         const displayName = p.name || `#${p.number}`;
         const row: string[] = [
           p.number?.toString() || '',
-          displayName.length > 12 ? displayName.substring(0, 11) + '.' : displayName,
+          displayName.length > 10 ? displayName.substring(0, 9) + '.' : displayName,
         ];
         
         for (let i = 1; i <= periodsPlayed; i++) {
@@ -399,38 +379,38 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
       });
 
     autoTable(doc, {
-      startY: y + 2,
-      head: [homeHeaders],
+      startY: y + 1,
+      head: [tableHeaders],
       body: awayRosterData,
       theme: 'plain',
       headStyles: { 
-        fillColor: [240, 240, 240], 
+        fillColor: [245, 245, 245], 
         textColor: [75, 85, 99],
-        fontSize: 6,
+        fontSize: 5,
         fontStyle: 'bold',
-        cellPadding: 1,
+        cellPadding: 0.8,
       },
       bodyStyles: { 
-        fontSize: 6,
-        cellPadding: 1,
+        fontSize: 5,
+        cellPadding: 0.8,
       },
       columnStyles: {
-        0: { cellWidth: 6 },
-        1: { cellWidth: 22 },
+        0: { cellWidth: 5 },
+        1: { cellWidth: 18 },
       },
       tableWidth: tableWidth,
       margin: { left: pageWidth / 2 + margin / 2 },
     });
 
-    const awayTableEndY = (doc as any).lastAutoTable?.finalY || y + 40;
-    y = Math.max(homeTableEndY, awayTableEndY) + 4;
+    const awayTableEndY = (doc as any).lastAutoTable?.finalY || y + 30;
+    y = Math.max(homeTableEndY, awayTableEndY) + 3;
 
     // EVENTS TIMELINE
-    doc.setFontSize(8);
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(0, 0, 0);
     doc.text('CRONACA', margin, y);
-    y += 3;
+    y += 2;
 
     const significantEvents = state.events.filter(
       e => e.type !== 'period_start' && e.type !== 'period_end'
@@ -438,54 +418,57 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
 
     if (significantEvents.length > 0) {
       const eventData = significantEvents.map(e => {
-        // Use simple text symbols that render correctly in PDF
-        let icon = '';
+        // Text labels only - no emojis
+        let tipo = '';
         switch (e.type) {
-          case 'goal': icon = 'GOL'; break;
-          case 'own_goal': icon = 'AG'; break;
-          case 'substitution': icon = 'S'; break;
-          case 'yellow_card': icon = 'A'; break;
-          case 'red_card': icon = 'E'; break;
+          case 'goal': tipo = 'GOL'; break;
+          case 'own_goal': tipo = 'AUTOG'; break;
+          case 'substitution': tipo = 'SOST'; break;
+          case 'yellow_card': tipo = 'AMM'; break;
+          case 'red_card': tipo = 'ESP'; break;
         }
         
-        // Clean description - remove emojis
-        const cleanDesc = e.description
+        // Clean description - remove all emojis and symbols
+        let cleanDesc = e.description
           .replace(/[⚽🔄🟨🟥➡️]/g, '')
-          .replace(/GOL!/, '')
-          .replace(/AUTOGOL/, 'AG')
-          .replace(/Cartellino giallo per/, 'Amm.')
-          .replace(/Cartellino rosso per/, 'Esp.')
+          .replace(/GOL!/g, '')
+          .replace(/AUTOGOL/g, 'Autogol')
+          .replace(/Cartellino giallo per/g, '')
+          .replace(/Cartellino rosso per/g, '')
+          .replace(/Sostituzione:/g, '')
           .trim();
+        
+        if (cleanDesc.length > 40) cleanDesc = cleanDesc.substring(0, 39) + '...';
         
         return [
           `${e.period}T`,
           formatTime(e.timestamp),
-          icon,
+          tipo,
           e.team === 'home' ? 'C' : 'O',
-          cleanDesc.length > 45 ? cleanDesc.substring(0, 44) + '...' : cleanDesc
+          cleanDesc
         ];
       });
 
       autoTable(doc, {
         startY: y,
-        head: [['T', 'Min', 'Tipo', '', 'Evento']],
+        head: [['T', 'Min', 'Tipo', '', 'Descrizione']],
         body: eventData,
         theme: 'plain',
         headStyles: { 
-          fillColor: [240, 240, 240],
-          fontSize: 6,
+          fillColor: [245, 245, 245],
+          fontSize: 5,
           fontStyle: 'bold',
-          cellPadding: 1,
+          cellPadding: 0.8,
         },
         bodyStyles: { 
-          fontSize: 6,
-          cellPadding: 1,
+          fontSize: 5,
+          cellPadding: 0.8,
         },
         columnStyles: {
-          0: { cellWidth: 8 },
-          1: { cellWidth: 12 },
+          0: { cellWidth: 6 },
+          1: { cellWidth: 10 },
           2: { cellWidth: 10 },
-          3: { cellWidth: 6 },
+          3: { cellWidth: 5 },
           4: { cellWidth: 'auto' },
         },
         margin: { left: margin, right: margin },
@@ -494,28 +477,18 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
 
     // Footer
     const pageHeight = doc.internal.pageSize.getHeight();
-    doc.setFontSize(6);
-    doc.setTextColor(150);
-    doc.text('Match Manager Live', pageWidth / 2, pageHeight - 5, { align: 'center' });
-
-    // Legend
     doc.setFontSize(5);
-    doc.text('G=Gol | A=Ammonizione | E=Espulsione | C=Casa | O=Ospite | S=Sostituzione | AG=Autogol', pageWidth / 2, pageHeight - 2, { align: 'center' });
+    doc.setTextColor(150);
+    doc.text('Match Manager Live', pageWidth / 2, pageHeight - 4, { align: 'center' });
 
-    // Download
-    const date = new Date().toISOString().split('T')[0];
-    const filename = `referto_${state.homeTeam.name.replace(/\s+/g, '_')}_vs_${state.awayTeam.name.replace(/\s+/g, '_')}_${date}.pdf`;
-    doc.save(filename);
+    // Save
+    const fileName = `${state.homeTeam.name}_vs_${state.awayTeam.name}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName.replace(/\s+/g, '_'));
   };
 
   return (
-    <Button
-      onClick={handleExport}
-      className="gap-2"
-      variant="outline"
-      size="lg"
-    >
-      <FileText className="h-5 w-5" />
+    <Button onClick={handleExport} variant="outline" className="gap-2">
+      <FileText className="h-4 w-4" />
       Esporta PDF
     </Button>
   );

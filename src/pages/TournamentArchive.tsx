@@ -63,13 +63,13 @@ const TournamentArchive = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const getEventIcon = (type: string) => {
+  const getEventLabel = (type: string) => {
     switch (type) {
-      case 'goal': return '⚽';
-      case 'own_goal': return '⚽ AG';
-      case 'substitution': return '🔄';
-      case 'yellow_card': return '🟨';
-      case 'red_card': return '🟥';
+      case 'goal': return 'GOL';
+      case 'own_goal': return 'AUTOG';
+      case 'substitution': return 'SOST';
+      case 'yellow_card': return 'AMM';
+      case 'red_card': return 'ESP';
       default: return '';
     }
   };
@@ -399,7 +399,7 @@ const TournamentArchive = () => {
                         .map((e, i) => (
                           <div key={i} className="flex items-center gap-2 p-2 bg-muted/50 rounded">
                             <span className="font-mono text-xs">{e.period}T {formatTime(e.timestamp)}</span>
-                            <span>{getEventIcon(e.type)}</span>
+                            <span className="font-medium text-xs">{getEventLabel(e.type)}</span>
                             <span className="flex-1">{e.description.replace(/[⚽🔄🟨🟥➡️]/g, '').trim()}</span>
                           </div>
                         ))}
