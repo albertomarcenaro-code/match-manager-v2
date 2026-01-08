@@ -98,6 +98,92 @@ export type Database = {
         }
         Relationships: []
       }
+      tournament_matches: {
+        Row: {
+          away_score: number
+          away_team_name: string
+          created_at: string
+          events: Json
+          home_score: number
+          home_team_name: string
+          id: string
+          match_date: string
+          period_scores: Json
+          player_stats: Json
+          tournament_id: string
+          user_id: string
+        }
+        Insert: {
+          away_score?: number
+          away_team_name: string
+          created_at?: string
+          events?: Json
+          home_score?: number
+          home_team_name: string
+          id?: string
+          match_date?: string
+          period_scores?: Json
+          player_stats?: Json
+          tournament_id: string
+          user_id: string
+        }
+        Update: {
+          away_score?: number
+          away_team_name?: string
+          created_at?: string
+          events?: Json
+          home_score?: number
+          home_team_name?: string
+          id?: string
+          match_date?: string
+          period_scores?: Json
+          player_stats?: Json
+          tournament_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_matches_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tournaments: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          players: Json
+          team_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          players?: Json
+          team_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          players?: Json
+          team_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
