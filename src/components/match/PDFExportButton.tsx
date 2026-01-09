@@ -247,32 +247,35 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
     doc.setFontSize(10);
     doc.text(state.awayTeam.name, centerX + 25, y, { align: 'left' });
 
-    // Period scores with scorers
+    // Period scores with scorers - centered and on new lines
     y = 20;
     doc.setFontSize(6);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(80, 80, 80);
 
-    const periodTexts: string[] = [];
     state.periodScores.forEach((ps) => {
       const homeScorers = getGoalScorers('home', ps.period);
       const awayScorers = getGoalScorers('away', ps.period);
       
-      let text = `${ps.period}T: ${ps.homeScore}-${ps.awayScore}`;
-      const scorers: string[] = [];
-      if (homeScorers.length > 0) scorers.push(homeScorers.join(', '));
-      if (awayScorers.length > 0) scorers.push(awayScorers.join(', '));
-      if (scorers.length > 0) text += ` (${scorers.join(' | ')})`;
+      let text = `${ps.period}° TEMPO: ${ps.homeScore} - ${ps.awayScore}`;
+      doc.text(text, centerX, y, { align: 'center' });
+      y += 3;
       
-      periodTexts.push(text);
+      if (homeScorers.length > 0 || awayScorers.length > 0) {
+        const scorersText: string[] = [];
+        if (homeScorers.length > 0) scorersText.push(`Casa: ${homeScorers.join(', ')}`);
+        if (awayScorers.length > 0) scorersText.push(`Ospiti: ${awayScorers.join(', ')}`);
+        doc.setFontSize(5);
+        doc.text(scorersText.join('  |  '), centerX, y, { align: 'center' });
+        doc.setFontSize(6);
+        y += 3;
+      }
     });
-    
-    doc.text(periodTexts.join('  -  '), centerX, y, { align: 'center' });
-    y += 4;
-
     // Separator
+    y += 1;
     doc.setDrawColor(200, 200, 200);
     doc.line(margin, y, pageWidth - margin, y);
+    y += 3;
     y += 3;
 
     // Team tables side by side
@@ -421,24 +424,26 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         // Text labels only - no emojis
         let tipo = '';
         switch (e.type) {
-          case 'goal': tipo = 'GOL'; break;
-          case 'own_goal': tipo = 'AUTOG'; break;
-          case 'substitution': tipo = 'SOST'; break;
-          case 'yellow_card': tipo = 'AMM'; break;
-          case 'red_card': tipo = 'ESP'; break;
+          case 'goal': tipo = 'GOAL'; break;
+          case 'own_goal': tipo = 'AUTOGOL'; break;
+          case 'substitution': tipo = 'CAMBIO'; break;
+          case 'yellow_card': tipo = 'AMMONIZIONE'; break;
+          case 'red_card': tipo = 'ESPULSIONE'; break;
         }
         
-        // Clean description - remove all emojis and symbols
+        // Clean description - remove all emojis and unicode symbols
         let cleanDesc = e.description
-          .replace(/[⚽🔄🟨🟥➡️]/g, '')
-          .replace(/GOL!/g, '')
-          .replace(/AUTOGOL/g, 'Autogol')
-          .replace(/Cartellino giallo per/g, '')
-          .replace(/Cartellino rosso per/g, '')
-          .replace(/Sostituzione:/g, '')
+          .replace(/[\u{1F300}-\u{1F9FF}]/gu, '') // Remove all emojis
+          .replace(/[⚽🔄🟨🟥➡️⬅️↔️]/g, '') // Remove specific symbols
+          .replace(/GOL!/gi, '')
+          .replace(/AUTOGOL/gi, '')
+          .replace(/Cartellino giallo per/gi, '')
+          .replace(/Cartellino rosso per/gi, '')
+          .replace(/Sostituzione:/gi, '')
+          .replace(/\s+/g, ' ')
           .trim();
         
-        if (cleanDesc.length > 40) cleanDesc = cleanDesc.substring(0, 39) + '...';
+        if (cleanDesc.length > 50) cleanDesc = cleanDesc.substring(0, 49) + '...';
         
         return [
           `${e.period}T`,
@@ -451,7 +456,7 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
 
       autoTable(doc, {
         startY: y,
-        head: [['T', 'Min', 'Tipo', '', 'Descrizione']],
+        head: [['Tempo', 'Minuto', 'Evento', 'Sq', 'Descrizione']],
         body: eventData,
         theme: 'plain',
         headStyles: { 
@@ -465,12 +470,13 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
           cellPadding: 0.8,
         },
         columnStyles: {
-          0: { cellWidth: 6 },
-          1: { cellWidth: 10 },
-          2: { cellWidth: 10 },
-          3: { cellWidth: 5 },
+          0: { cellWidth: 8 },
+          1: { cellWidth: 12 },
+          2: { cellWidth: 18 },
+          3: { cellWidth: 6 },
           4: { cellWidth: 'auto' },
         },
+        tableWidth: pageWidth - margin * 2,
         margin: { left: margin, right: margin },
       });
     }

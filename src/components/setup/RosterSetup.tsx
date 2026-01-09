@@ -346,22 +346,22 @@ export function RosterSetup({
               <AlertDialogTrigger asChild>
                 <Button variant="outline" className="gap-2">
                   <ArrowLeftRight className="h-4 w-4" />
-                  Scambia Squadre
+                  Scambia Squadre (Gioco in trasferta)
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Scambiare le squadre?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    I dati della squadra di casa e della squadra ospite verranno invertiti. 
-                    Utile quando la tua squadra gioca in trasferta.
+                    I dati della squadra di casa e della squadra ospite verranno invertiti completamente. 
+                    La TUA SQUADRA diventerà ospite e la squadra avversaria diventerà casa.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Annulla</AlertDialogCancel>
                   <AlertDialogAction onClick={() => {
                     onSwapTeams();
-                    toast.success('Squadre scambiate');
+                    toast.success('Squadre scambiate - la tua squadra è ora ospite');
                   }}>
                     Scambia
                   </AlertDialogAction>
@@ -379,6 +379,11 @@ export function RosterSetup({
                 <div className="flex items-center gap-2">
                   <Users className="h-5 w-5" />
                   <span className="font-bold">Squadra di casa</span>
+                  {homePlayers.length > 0 && homePlayers.some(p => p.number !== null) && (
+                    <span className="text-xs px-2 py-0.5 bg-team-home-foreground/20 rounded-full">
+                      MIA SQUADRA
+                    </span>
+                  )}
                 </div>
                 {user && !isGuest && (
                   <Button 

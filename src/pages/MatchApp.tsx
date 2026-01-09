@@ -173,45 +173,49 @@ const MatchApp = () => {
               <div className="text-sm text-muted-foreground">
                 {isGuest ? (
                   <span className="flex items-center gap-1">
-                    🎭 Modalità Ospite
+                    Modalità Ospite
                   </span>
                 ) : (
                   <span className="flex items-center gap-1">
-                    👤 {user?.email}
+                    {user?.email}
                   </span>
                 )}
               </div>
-              <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-1">
-                <LogOut className="h-4 w-4" />
-                Esci
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => navigate('/tournament')} className="gap-1">
-                <Trophy className="h-4 w-4" />
-                <span className="hidden sm:inline">Torneo</span>
-              </Button>
-            </div>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="secondary" size="sm" className="gap-1">
-                  <Plus className="h-4 w-4" />
-                  Nuova Partita
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => navigate('/tournament')} className="gap-1">
+                  <Trophy className="h-4 w-4" />
+                  <span className="hidden sm:inline">Torneo</span>
                 </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Iniziare nuova partita?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    I dati della partita corrente verranno conservati. Procedi alla selezione titolari.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Annulla</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleRosterComplete}>
-                    Continua
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="secondary" size="sm" className="gap-1">
+                      <Plus className="h-4 w-4" />
+                      Nuova Partita
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Iniziare nuova partita?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {state.isMatchStarted 
+                          ? "C'è una partita in corso. Vuoi resettare tutto e perdere i dati correnti?"
+                          : "I dati della partita corrente verranno conservati. Procedi alla selezione titolari."}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annulla</AlertDialogCancel>
+                      <AlertDialogAction onClick={state.isMatchStarted ? handleNewMatch : handleRosterComplete}>
+                        {state.isMatchStarted ? "Reset e Nuova Partita" : "Continua"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-1">
+                  <LogOut className="h-4 w-4" />
+                  Esci
+                </Button>
+              </div>
+            </div>
           </div>
           <RosterSetup
             homeTeamName={state.homeTeam.name}
