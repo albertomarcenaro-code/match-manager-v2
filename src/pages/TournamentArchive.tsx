@@ -326,7 +326,7 @@ const TournamentArchive = () => {
                           .filter(e => e.type === 'goal' && e.team === 'home')
                           .map((e, i) => (
                             <div key={i} className="text-sm flex items-center gap-2">
-                              <span>⚽</span>
+                              <span className="font-bold text-secondary">GOL</span>
                               <span>{e.playerName}</span>
                               <span className="text-muted-foreground">({formatTime(e.timestamp)})</span>
                             </div>
@@ -339,7 +339,7 @@ const TournamentArchive = () => {
                             <div key={i} className="text-sm flex items-center gap-2 justify-end">
                               <span className="text-muted-foreground">({formatTime(e.timestamp)})</span>
                               <span>{e.playerName}</span>
-                              <span>⚽</span>
+                              <span className="font-bold text-secondary">GOL</span>
                             </div>
                           ))}
                       </div>
@@ -399,8 +399,13 @@ const TournamentArchive = () => {
                         .map((e, i) => (
                           <div key={i} className="flex items-center gap-2 p-2 bg-muted/50 rounded">
                             <span className="font-mono text-xs">{e.period}T {formatTime(e.timestamp)}</span>
-                            <span className="font-medium text-xs">{getEventLabel(e.type)}</span>
-                            <span className="flex-1">{e.description.replace(/[⚽🔄🟨🟥➡️]/g, '').trim()}</span>
+                            <span className="font-medium text-xs px-1 bg-secondary/20 rounded">{getEventLabel(e.type)}</span>
+                            <span className="flex-1">
+                              {e.description
+                                .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
+                                .replace(/[⚽🔄🟨🟥➡️⬅️↔️]/g, '')
+                                .trim()}
+                            </span>
                           </div>
                         ))}
                     </div>
