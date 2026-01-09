@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -78,20 +78,49 @@ export function RosterSetup({
   const [tournamentName, setTournamentName] = useState(tournament.name || '');
   const [showTournamentDialog, setShowTournamentDialog] = useState(false);
 
-  // Load saved data for logged-in users
+  // Priorità: se esiste una rosa già salvata localmente (es. chiusura app / reload), NON sovrascrivere con dati dal backend.
+  const hasLocalRoster = useMemo(() => {
+    try {
+      const saved = localStorage.getItem('match-manager-state');
+      if (!saved) return false;
+      const parsed = JSON.parse(saved) as any;
+      return (
+        (parsed?.homeTeam?.players?.length ?? 0) > 0 ||
+        (parsed?.awayTeam?.players?.length ?? 0) > 0
+      );
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const [saveStatusByPlayerId, setSaveStatusByPlayerId] = useState<
+    Record<string, 'idle' | 'saving' | 'saved' | 'error'>
+  >({});
+  const [dbPlayerIdsByName, setDbPlayerIdsByName] = useState<Record<string, string>>({});
+  const [pendingDbNumbersByName, setPendingDbNumbersByName] = useState<Record<string, number | null> | null>(null);
+  const saveTimerRef = useRef<number | null>(null);
+  const saveQueueRef = useRef<Record<string, { id: string; name: string; number: number | null }>>({});
+
+  // Load saved data for logged-in users (solo se NON c'è già una rosa localmente)
   useEffect(() => {
-    if (user && !isGuest) {
+    if (user && !isGuest && !hasLocalRoster) {
       loadUserData();
     }
-  }, [user, isGuest]);
+  }, [user, isGuest, hasLocalRoster]);
 
-  // Sync tournament mode with tournament state
+  // Applica i numeri caricati dal backend quando l'array homePlayers è stato popolato
   useEffect(() => {
-    setTournamentMode(tournament.isActive);
-    if (tournament.isActive) {
-      setTournamentName(tournament.name);
-    }
-  }, [tournament.isActive, tournament.name]);
+    if (!pendingDbNumbersByName) return;
+
+    homePlayers.forEach(p => {
+      const n = pendingDbNumbersByName[p.name];
+      if (typeof n === 'number' && p.number !== n) {
+        onUpdatePlayerNumber(p.id, n);
+      }
+    });
+
+    setPendingDbNumbersByName(null);
+  }, [pendingDbNumbersByName, homePlayers, onUpdatePlayerNumber]);
 
   const loadUserData = async () => {
     if (!user) return;
@@ -112,26 +141,31 @@ export function RosterSetup({
       // Load players
       const { data: players } = await supabase
         .from('players')
-        .select('name, number')
+        .select('id, name, number')
         .eq('user_id', user.id)
         .order('name');
+
+      if (players && players.length > 0) {
+        setDbPlayerIdsByName(
+          players.reduce<Record<string, string>>((acc, p) => {
+            if (p.name && p.id) acc[p.name] = p.id;
+            return acc;
+          }, {})
+        );
+      }
 
       if (players && players.length > 0 && onBulkAddPlayers) {
         // Clear existing and load from DB
         const playerNames = players.map(p => p.name);
         onBulkAddPlayers(playerNames);
-        
-        // After a small delay, assign numbers
-        setTimeout(() => {
-          players.forEach(p => {
-            if (p.number) {
-              const matchingPlayer = homePlayers.find(hp => hp.name === p.name);
-              if (matchingPlayer) {
-                onUpdatePlayerNumber(matchingPlayer.id, p.number);
-              }
-            }
-          });
-        }, 100);
+
+        // Numeri applicati in un useEffect dedicato quando homePlayers è pronto
+        setPendingDbNumbersByName(
+          players.reduce<Record<string, number | null>>((acc, p) => {
+            acc[p.name] = p.number ?? null;
+            return acc;
+          }, {})
+        );
       }
     } catch (error) {
       console.error('Error loading user data:', error);
@@ -139,6 +173,81 @@ export function RosterSetup({
       setIsLoading(false);
     }
   };
+
+  const flushRosterNumberSaves = async () => {
+    const entries = Object.values(saveQueueRef.current);
+    if (entries.length === 0) return;
+
+    // svuota subito la coda per evitare doppie scritture
+    saveQueueRef.current = {};
+
+    // In modalità ospite (o se non autenticato) consideriamo "salvato" perché è già persistito in localStorage da useMatch.
+    if (!user || isGuest) {
+      setSaveStatusByPlayerId(prev => {
+        const next = { ...prev };
+        entries.forEach(e => (next[e.id] = 'saved'));
+        return next;
+      });
+      return;
+    }
+
+    try {
+      for (const e of entries) {
+        const dbId = dbPlayerIdsByName[e.name];
+
+        if (dbId) {
+          const { error } = await supabase
+            .from('players')
+            .update({ number: e.number })
+            .eq('id', dbId);
+          if (error) throw error;
+        } else {
+          const { data, error } = await supabase
+            .from('players')
+            .insert({ user_id: user.id, name: e.name, number: e.number })
+            .select('id, name');
+
+          if (error) throw error;
+
+          const row = Array.isArray(data) ? data[0] : null;
+          if (row?.id && row?.name) {
+            setDbPlayerIdsByName(prev => ({ ...prev, [row.name]: row.id }));
+          }
+        }
+
+        setSaveStatusByPlayerId(prev => ({ ...prev, [e.id]: 'saved' }));
+      }
+    } catch (err) {
+      console.error('Autosave roster failed:', err);
+      setSaveStatusByPlayerId(prev => {
+        const next = { ...prev };
+        entries.forEach(e => (next[e.id] = 'error'));
+        return next;
+      });
+    }
+  };
+
+  const queueRosterNumberSave = (player: Player, number: number | null) => {
+    saveQueueRef.current[player.id] = { id: player.id, name: player.name, number };
+
+    // feedback immediato
+    setSaveStatusByPlayerId(prev => ({
+      ...prev,
+      [player.id]: user && !isGuest ? 'saving' : 'saved',
+    }));
+
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(() => {
+      flushRosterNumberSaves();
+    }, 350);
+  };
+
+  // cleanup timer
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    };
+  }, []);
 
   const handleAddPlayer = () => {
     if (newPlayerName.trim()) {
@@ -150,7 +259,13 @@ export function RosterSetup({
   const handleUpdateNumber = (playerId: string, value: string) => {
     const numValue = value === '' ? null : parseInt(value, 10);
     if (numValue !== null && isNaN(numValue)) return;
+
     onUpdatePlayerNumber(playerId, numValue);
+
+    const player = homePlayers.find(p => p.id === playerId);
+    if (player) {
+      queueRosterNumberSave(player, numValue);
+    }
   };
 
   const handleAddOpponent = () => {
@@ -443,35 +558,54 @@ export function RosterSetup({
 
               {/* Players List */}
               <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                {homePlayers.map((player) => (
-                  <div
-                    key={player.id}
-                    className={cn(
-                      "flex items-center gap-2 p-2 rounded-lg border",
-                      player.number !== null
-                        ? "bg-on-field/5 border-on-field/30"
-                        : "bg-muted/50 border-border"
-                    )}
-                  >
-                    <Input
-                      type="number"
-                      min="1"
-                      value={player.number ?? ''}
-                      onChange={(e) => handleUpdateNumber(player.id, e.target.value)}
-                      placeholder="#"
-                      className="w-16 text-center"
-                    />
-                    <span className="flex-1 font-medium truncate">{player.name}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => onRemovePlayer(player.id)}
-                      className="text-muted-foreground hover:text-destructive"
+                {homePlayers.map((player) => {
+                  const status = saveStatusByPlayerId[player.id] ?? 'idle';
+
+                  return (
+                    <div
+                      key={player.id}
+                      className={cn(
+                        "flex items-center gap-2 p-2 rounded-lg border",
+                        player.number !== null
+                          ? "bg-on-field/5 border-on-field/30"
+                          : "bg-muted/50 border-border"
+                      )}
                     >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+                      <Input
+                        type="number"
+                        min="1"
+                        value={player.number ?? ''}
+                        onChange={(e) => handleUpdateNumber(player.id, e.target.value)}
+                        onBlur={() => queueRosterNumberSave(player, player.number ?? null)}
+                        placeholder="#"
+                        className="w-16 text-center"
+                      />
+
+                      <div className="min-w-[76px] text-[11px] leading-tight">
+                        {status === 'saving' ? (
+                          <span className="text-muted-foreground">Salvo…</span>
+                        ) : status === 'saved' ? (
+                          <span className="inline-flex items-center gap-1 text-primary">
+                            <Check className="h-3 w-3" />
+                            Salvato
+                          </span>
+                        ) : status === 'error' ? (
+                          <span className="text-destructive">Errore</span>
+                        ) : null}
+                      </div>
+
+                      <span className="flex-1 font-medium truncate">{player.name}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onRemovePlayer(player.id)}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
                 {homePlayers.length === 0 && (
                   <p className="text-center text-sm text-muted-foreground py-4">
                     Nessun giocatore inserito
