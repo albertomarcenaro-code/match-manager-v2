@@ -84,9 +84,9 @@ const TournamentArchive = () => {
         <main className="flex-1 bg-background p-4">
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center gap-4 mb-6">
-              <Button variant="ghost" onClick={() => navigate('/app')}>
+              <Button variant="ghost" onClick={() => navigate('/dashboard')}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Torna all'app
+                Torna alla Dashboard
               </Button>
             </div>
 
@@ -96,8 +96,8 @@ const TournamentArchive = () => {
               <p className="text-muted-foreground mb-4">
                 Attiva la modalità torneo nella schermata di setup per iniziare a tracciare le statistiche cumulative.
               </p>
-              <Button onClick={() => navigate('/app')}>
-                Vai al Setup
+              <Button onClick={() => navigate('/dashboard')}>
+                Vai alla Dashboard
               </Button>
             </Card>
           </div>
@@ -118,9 +118,9 @@ const TournamentArchive = () => {
           {/* Header */}
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" onClick={() => navigate('/app')}>
+              <Button variant="ghost" onClick={() => navigate('/dashboard')}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Torna
+                Home
               </Button>
               <div>
                 <h1 className="text-2xl font-bold flex items-center gap-2">

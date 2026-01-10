@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Landing from "./pages/Landing";
+import Dashboard from "./pages/Dashboard";
 import MatchApp from "./pages/MatchApp";
 import TournamentArchive from "./pages/TournamentArchive";
 import NotFound from "./pages/NotFound";
@@ -44,15 +45,27 @@ function AppRoutes() {
     <Routes>
       <Route 
         path="/" 
-        element={user || isGuest ? <Navigate to="/app" replace /> : <Landing />} 
+        element={user || isGuest ? <Navigate to="/dashboard" replace /> : <Landing />} 
       />
       <Route 
-        path="/app" 
+        path="/dashboard" 
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/match" 
         element={
           <ProtectedRoute>
             <MatchApp />
           </ProtectedRoute>
         } 
+      />
+      <Route 
+        path="/app" 
+        element={<Navigate to="/dashboard" replace />} 
       />
       <Route 
         path="/tournament" 
