@@ -319,7 +319,7 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         return row;
       });
 
-    const tableHeaders = ['#', 'Nome', ...periodHeaders, 'Tot', 'G', 'C'];
+    const tableHeaders = ['#', 'Nome', ...periodHeaders, 'Tot', 'GOAL', 'CART.'];
 
     autoTable(doc, {
       startY: y + 1,
@@ -445,18 +445,22 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         
         if (cleanDesc.length > 50) cleanDesc = cleanDesc.substring(0, 49) + '...';
         
+        // Show full team name instead of abbreviation
+        const teamName = e.team === 'home' ? state.homeTeam.name : state.awayTeam.name;
+        const shortTeamName = teamName.length > 12 ? teamName.substring(0, 11) + '.' : teamName;
+        
         return [
           `${e.period}T`,
           formatTime(e.timestamp),
           tipo,
-          e.team === 'home' ? 'C' : 'O',
+          shortTeamName,
           cleanDesc
         ];
       });
 
       autoTable(doc, {
         startY: y,
-        head: [['Tempo', 'Minuto', 'Evento', 'Sq', 'Descrizione']],
+        head: [['Tempo', 'Minuto', 'Evento', 'SQUADRA', 'Descrizione']],
         body: eventData,
         theme: 'plain',
         headStyles: { 
@@ -472,8 +476,8 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         columnStyles: {
           0: { cellWidth: 8 },
           1: { cellWidth: 12 },
-          2: { cellWidth: 18 },
-          3: { cellWidth: 6 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 25 },
           4: { cellWidth: 'auto' },
         },
         tableWidth: pageWidth - margin * 2,

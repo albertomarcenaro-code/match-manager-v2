@@ -15,7 +15,7 @@ import { MatchSettings } from '@/components/match/MatchSettings';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
-import { RotateCcw, Edit, LogOut, Trophy, Plus } from 'lucide-react';
+import { RotateCcw, Edit, LogOut, Home, Trophy, Plus } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,13 +29,14 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Helmet } from 'react-helmet';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { TournamentPlayerMatchStats } from '@/types/tournament';
 
 type AppPhase = 'setup' | 'starterSelection' | 'match';
 
 const MatchApp = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, isGuest, signOut, exitGuest } = useAuth();
   const { tournament, addMatchToTournament } = useTournament();
   const [phase, setPhase] = useState<AppPhase>('setup');
@@ -68,6 +69,19 @@ const MatchApp = () => {
     forceStarterSelection,
     swapTeams,
   } = useMatch();
+
+  // Handle navigation state from Dashboard
+  useEffect(() => {
+    const navState = location.state as { mode?: string; resume?: boolean } | null;
+    
+    if (navState?.resume && state.isMatchStarted && !state.isMatchEnded) {
+      // Resume existing match
+      setPhase('match');
+    } else if (navState?.mode === 'tournament' && !tournament.isActive) {
+      // Tournament mode - will show tournament setup in RosterSetup
+      setPhase('setup');
+    }
+  }, [location.state, state.isMatchStarted, state.isMatchEnded, tournament.isActive]);
 
   // Calculate player stats for tournament
   const calculatePlayerStats = useCallback((): TournamentPlayerMatchStats[] => {
@@ -149,6 +163,17 @@ const MatchApp = () => {
     toast.success('Nuova partita iniziata');
   };
 
+  const handleGoHome = () => {
+    navigate('/dashboard');
+  };
+
+  const handleExitMatch = () => {
+    // Reset match and go to dashboard
+    resetMatch();
+    setMatchSavedToTournament(false);
+    navigate('/dashboard');
+  };
+
   const handleLogout = async () => {
     if (isGuest) {
       exitGuest();
@@ -182,6 +207,10 @@ const MatchApp = () => {
                 )}
               </div>
               <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleGoHome} className="gap-1">
+                  <Home className="h-4 w-4" />
+                  <span className="hidden sm:inline">Home</span>
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => navigate('/tournament')} className="gap-1">
                   <Trophy className="h-4 w-4" />
                   <span className="hidden sm:inline">Torneo</span>
@@ -359,11 +388,22 @@ const MatchApp = () => {
                 awayTeamName={state.awayTeam.name}
               />
 
-              {/* Export Buttons */}
+              {/* Export Buttons and Exit */}
               {state.isMatchEnded && (
-                <div className="flex justify-center gap-4 pt-4">
-                  <ExportButton state={state} />
-                  <PDFExportButton state={state} />
+                <div className="flex flex-col items-center gap-4 pt-4">
+                  <div className="flex justify-center gap-4">
+                    <ExportButton state={state} />
+                    <PDFExportButton state={state} />
+                  </div>
+                  <Button 
+                    variant="default" 
+                    size="lg" 
+                    onClick={handleExitMatch}
+                    className="gap-2"
+                  >
+                    <Home className="h-5 w-5" />
+                    Torna alla Dashboard
+                  </Button>
                 </div>
               )}
             </>
