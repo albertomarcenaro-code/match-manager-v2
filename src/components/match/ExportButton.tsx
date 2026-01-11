@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { MatchState, MatchEvent } from '@/types/match';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 interface ExportButtonProps {
   state: MatchState;
@@ -50,21 +50,8 @@ export function ExportButton({ state }: ExportButtonProps) {
       const playerEntryTime: { [id: string]: number } = {};
       const playerExpelled: { [id: string]: boolean } = {};
 
-      // Helper to check if player is a starter
-      const isPlayerStarter = (player: typeof players[0]): boolean => {
-        if (team === 'home') {
-          return 'isStarter' in player && (player as any).isStarter === true;
-        } else {
-          // Away team: isOnField at the start indicates they were selected as starters
-          // We check the initial state by looking at period_start events
-          return player.isOnField || false;
-        }
-      };
-
-      // Find starters at period start (players who were on field when period started)
-      // We need to track who was on field based on previous period end state
+      // Find starters at period start
       if (period === 1) {
-        // First period: use isStarter for home, isOnField initial state for away
         if (team === 'home') {
           players.forEach(p => {
             if ('isStarter' in p && (p as any).isStarter) {
@@ -73,8 +60,6 @@ export function ExportButton({ state }: ExportButtonProps) {
             }
           });
         } else {
-          // For away team, we need to determine who started by checking substitution events
-          // If a player was never subbed in but is currently on field or was subbed out, they started
           const subbedInPlayers = new Set<string>();
           const subbedOutPlayers = new Set<string>();
           
@@ -84,8 +69,6 @@ export function ExportButton({ state }: ExportButtonProps) {
           });
           
           players.forEach(p => {
-            // A player started if they were subbed out but never subbed in,
-            // or if they're currently on field and were never subbed in
             const wasSubbedOut = subbedOutPlayers.has(p.id);
             const wasSubbedIn = subbedInPlayers.has(p.id);
             const isCurrentlyOnField = p.isOnField;
@@ -97,12 +80,9 @@ export function ExportButton({ state }: ExportButtonProps) {
           });
         }
       } else {
-        // Subsequent periods: check who was on field at end of previous period
-        // by replaying events up to that point
         const previousPeriodEvents = state.events.filter(e => e.period < period);
         const onFieldAtStart: { [id: string]: boolean } = {};
         
-        // Start with original starters
         if (team === 'home') {
           players.forEach(p => {
             if ('isStarter' in p && (p as any).isStarter) {
@@ -110,19 +90,6 @@ export function ExportButton({ state }: ExportButtonProps) {
             }
           });
         } else {
-          // For away team, determine starters from first period
-          const firstPeriodSubs = state.events.filter(
-            e => e.period === 1 && e.type === 'substitution' && e.team === 'away'
-          );
-          const subbedInP1 = new Set<string>();
-          const subbedOutP1 = new Set<string>();
-          
-          firstPeriodSubs.forEach(e => {
-            if (e.playerInId) subbedInP1.add(e.playerInId);
-            if (e.playerOutId) subbedOutP1.add(e.playerOutId);
-          });
-          
-          // Also check all substitutions to find who started
           const allSubsAway = state.events.filter(
             e => e.type === 'substitution' && e.team === 'away'
           );
@@ -145,7 +112,6 @@ export function ExportButton({ state }: ExportButtonProps) {
           });
         }
 
-        // Apply substitutions and red cards from previous periods
         previousPeriodEvents.forEach(event => {
           if (event.type === 'substitution' && event.team === team) {
             if (event.playerOutId) onFieldAtStart[event.playerOutId] = false;
@@ -168,14 +134,12 @@ export function ExportButton({ state }: ExportButtonProps) {
       // Process events in this period
       periodEvents.forEach(event => {
         if (event.type === 'substitution' && event.team === team) {
-          // Player out: calculate their minutes
           if (event.playerOutId && playerOnField[event.playerOutId]) {
             const entryTime = playerEntryTime[event.playerOutId] || 0;
             const minutesPlayed = Math.floor((event.timestamp - entryTime) / 60);
             minutes[event.playerOutId][period] += minutesPlayed;
             playerOnField[event.playerOutId] = false;
           }
-          // Player in: mark entry time
           if (event.playerInId) {
             playerOnField[event.playerInId] = true;
             playerEntryTime[event.playerInId] = event.timestamp;
@@ -183,7 +147,6 @@ export function ExportButton({ state }: ExportButtonProps) {
         }
         
         if (event.type === 'red_card' && event.team === team && event.playerId) {
-          // Red card: calculate minutes until expulsion
           if (playerOnField[event.playerId]) {
             const entryTime = playerEntryTime[event.playerId] || 0;
             const minutesPlayed = Math.floor((event.timestamp - entryTime) / 60);
@@ -230,14 +193,11 @@ export function ExportButton({ state }: ExportButtonProps) {
           awayGoals[scorerName] = (awayGoals[scorerName] || 0) + 1;
         }
       }
-      // Own goals count for the opposing team
       if (event.type === 'own_goal') {
         const scorerName = `Autogol (${event.playerName || `#${event.playerNumber}`})`;
         if (event.team === 'home') {
-          // Own goal by home team = goal for away
           awayGoals[scorerName] = (awayGoals[scorerName] || 0) + 1;
         } else {
-          // Own goal by away team = goal for home
           homeGoals[scorerName] = (homeGoals[scorerName] || 0) + 1;
         }
       }
@@ -255,8 +215,7 @@ export function ExportButton({ state }: ExportButtonProps) {
     };
   };
 
-  const handleExport = () => {
-    // Determine how many periods were actually played
+  const handleExport = async () => {
     const periodsPlayed = state.periodScores.length > 0 
       ? Math.max(...state.periodScores.map(ps => ps.period))
       : state.currentPeriod;
@@ -264,30 +223,45 @@ export function ExportButton({ state }: ExportButtonProps) {
     const homeMinutes = calculatePlayerMinutes('home', periodsPlayed);
     const awayMinutes = calculatePlayerMinutes('away', periodsPlayed);
 
-    // Prepare match info sheet with scorers
-    const matchInfo = [
-      ['RIEPILOGO PARTITA'],
-      [],
-      ['Squadra Casa', state.homeTeam.name],
-      ['Squadra Ospite', state.awayTeam.name],
-      ['Risultato Finale', `${state.homeTeam.score} - ${state.awayTeam.score}`],
-      [],
-      ['PUNTEGGI PARZIALI'],
-      ['Tempo', 'Punteggio', `Marcatori ${state.homeTeam.name}`, `Marcatori ${state.awayTeam.name}`],
-      ...state.periodScores.map(ps => {
-        const scorers = getScorersForPeriod(ps.period);
-        return [
-          `${ps.period}° Tempo`,
-          `${ps.homeScore} - ${ps.awayScore}`,
-          scorers.home,
-          scorers.away
-        ];
-      }),
-    ];
+    // Create workbook
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Match Tracker';
+    workbook.created = new Date();
 
-    // Prepare events sheet
-    const eventsHeader = ['Tempo', 'Minuto', 'Tipo Evento', 'Squadra', 'Giocatore', 'Numero', 'Dettagli'];
-    const eventsData = state.events.map(event => {
+    // === Sheet 1: Match Summary ===
+    const summarySheet = workbook.addWorksheet('Riepilogo');
+    summarySheet.addRow(['RIEPILOGO PARTITA']);
+    summarySheet.addRow([]);
+    summarySheet.addRow(['Squadra Casa', state.homeTeam.name]);
+    summarySheet.addRow(['Squadra Ospite', state.awayTeam.name]);
+    summarySheet.addRow(['Risultato Finale', `${state.homeTeam.score} - ${state.awayTeam.score}`]);
+    summarySheet.addRow([]);
+    summarySheet.addRow(['PUNTEGGI PARZIALI']);
+    summarySheet.addRow(['Tempo', 'Punteggio', `Marcatori ${state.homeTeam.name}`, `Marcatori ${state.awayTeam.name}`]);
+    
+    state.periodScores.forEach(ps => {
+      const scorers = getScorersForPeriod(ps.period);
+      summarySheet.addRow([
+        `${ps.period}° Tempo`,
+        `${ps.homeScore} - ${ps.awayScore}`,
+        scorers.home,
+        scorers.away
+      ]);
+    });
+
+    // Style the header
+    summarySheet.getRow(1).font = { bold: true, size: 14 };
+    summarySheet.getColumn(1).width = 20;
+    summarySheet.getColumn(2).width = 25;
+    summarySheet.getColumn(3).width = 30;
+    summarySheet.getColumn(4).width = 30;
+
+    // === Sheet 2: Events ===
+    const eventsSheet = workbook.addWorksheet('Cronaca');
+    eventsSheet.addRow(['Tempo', 'Minuto', 'Tipo Evento', 'Squadra', 'Giocatore', 'Numero', 'Dettagli']);
+    eventsSheet.getRow(1).font = { bold: true };
+
+    state.events.forEach(event => {
       let eventType = '';
       switch (event.type) {
         case 'period_start': eventType = 'Inizio Tempo'; break;
@@ -308,7 +282,7 @@ export function ExportButton({ state }: ExportButtonProps) {
         details = `Punteggio: ${event.homeScore} - ${event.awayScore}`;
       }
 
-      return [
+      eventsSheet.addRow([
         `${event.period}°`,
         formatTime(event.timestamp),
         eventType,
@@ -316,84 +290,83 @@ export function ExportButton({ state }: ExportButtonProps) {
         event.playerName || '',
         event.playerNumber || '',
         details,
-      ];
+      ]);
     });
 
-    // Build period columns headers dynamically based on periods played
+    eventsSheet.columns.forEach(col => { col.width = 18; });
+
+    // === Sheet 3: Home Roster ===
+    const homeSheet = workbook.addWorksheet('Rosa Casa');
     const periodHeaders = [];
     for (let i = 1; i <= periodsPlayed; i++) {
       periodHeaders.push(`T${i}`);
     }
     periodHeaders.push('Minuti Totali');
 
-    // Prepare rosters sheet with minutes
-    const homeRoster = state.homeTeam.players
+    homeSheet.addRow([state.homeTeam.name]);
+    homeSheet.getRow(1).font = { bold: true, size: 12 };
+    homeSheet.addRow(['Numero', 'Nome', 'Stato', ...periodHeaders]);
+    homeSheet.getRow(2).font = { bold: true };
+
+    state.homeTeam.players
       .filter(p => p.number !== null)
-      .map(p => {
+      .forEach(p => {
         const mins = homeMinutes[p.id] || { total: 0 };
         const periodMins = [];
         for (let i = 1; i <= periodsPlayed; i++) {
           periodMins.push(mins[i] || 0);
         }
-        return [
+        homeSheet.addRow([
           p.number,
           p.name,
           p.isExpelled ? 'Espulso' : (p.isOnField ? 'In Campo' : 'Panchina'),
           ...periodMins,
           mins.total
-        ];
+        ]);
       });
-    
-    const awayRoster = state.awayTeam.players
+
+    homeSheet.columns.forEach(col => { col.width = 15; });
+
+    // === Sheet 4: Away Roster ===
+    const awaySheet = workbook.addWorksheet('Rosa Ospiti');
+    awaySheet.addRow([state.awayTeam.name]);
+    awaySheet.getRow(1).font = { bold: true, size: 12 };
+    awaySheet.addRow(['Numero', 'Giocatore', 'Stato', ...periodHeaders]);
+    awaySheet.getRow(2).font = { bold: true };
+
+    state.awayTeam.players
       .filter(p => p.number !== null)
-      .map(p => {
+      .forEach(p => {
         const mins = awayMinutes[p.id] || { total: 0 };
         const periodMins = [];
         for (let i = 1; i <= periodsPlayed; i++) {
           periodMins.push(mins[i] || 0);
         }
-        return [
+        awaySheet.addRow([
           p.number,
           p.name || `#${p.number}`,
           p.isExpelled ? 'Espulso' : (p.isOnField ? 'In Campo' : 'Panchina'),
           ...periodMins,
           mins.total
-        ];
+        ]);
       });
 
-    // Create workbook
-    const wb = XLSX.utils.book_new();
+    awaySheet.columns.forEach(col => { col.width = 15; });
 
-    // Match info sheet
-    const ws1 = XLSX.utils.aoa_to_sheet(matchInfo);
-    XLSX.utils.book_append_sheet(wb, ws1, 'Riepilogo');
-
-    // Events sheet
-    const ws2 = XLSX.utils.aoa_to_sheet([eventsHeader, ...eventsData]);
-    XLSX.utils.book_append_sheet(wb, ws2, 'Cronaca');
-
-    // Home roster sheet with minutes
-    const ws3 = XLSX.utils.aoa_to_sheet([
-      [state.homeTeam.name],
-      ['Numero', 'Nome', 'Stato', ...periodHeaders],
-      ...homeRoster
-    ]);
-    XLSX.utils.book_append_sheet(wb, ws3, 'Rosa Casa');
-
-    // Away roster sheet with minutes
-    const ws4 = XLSX.utils.aoa_to_sheet([
-      [state.awayTeam.name],
-      ['Numero', 'Giocatore', 'Stato', ...periodHeaders],
-      ...awayRoster
-    ]);
-    XLSX.utils.book_append_sheet(wb, ws4, 'Rosa Ospiti');
-
-    // Generate filename with date
+    // Generate and download file
     const date = new Date().toISOString().split('T')[0];
     const filename = `partita_${state.homeTeam.name.replace(/\s+/g, '_')}_vs_${state.awayTeam.name.replace(/\s+/g, '_')}_${date}.xlsx`;
 
-    // Download
-    XLSX.writeFile(wb, filename);
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
