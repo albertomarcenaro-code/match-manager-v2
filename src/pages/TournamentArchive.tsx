@@ -4,10 +4,11 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Trophy, ArrowLeft, Users, Calendar, Target, Clock, AlertTriangle, ChevronRight, X } from 'lucide-react';
+import { Trophy, ArrowLeft, Users, Calendar, Target, Clock, AlertTriangle, ChevronRight, X, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { TournamentMatch } from '@/types/tournament';
+import { toast } from 'sonner';
 import {
   Table,
   TableBody,
@@ -127,9 +128,21 @@ const TournamentArchive = () => {
                   <Trophy className="h-6 w-6 text-secondary" />
                   {tournament.name || 'Torneo'}
                 </h1>
-                <p className="text-muted-foreground">{tournament.teamName}</p>
-              </div>
+              <p className="text-muted-foreground">{tournament.teamName}</p>
             </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button 
+              onClick={() => {
+                navigate('/match', { state: { mode: 'tournament' } });
+                toast.success('Nuova partita del torneo');
+              }}
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Nuova Partita
+            </Button>
             
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -154,6 +167,7 @@ const TournamentArchive = () => {
               </AlertDialogContent>
             </AlertDialog>
           </div>
+        </div>
 
           {/* Stats Summary */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

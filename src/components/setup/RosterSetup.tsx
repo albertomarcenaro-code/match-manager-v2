@@ -2,15 +2,15 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Player } from '@/types/match';
-import { Plus, Trash2, Users, Shield, Check, Hash, Upload, Save, ArrowLeftRight, Trophy } from 'lucide-react';
+import { Plus, Trash2, Users, Shield, Check, Hash, Upload, Save, ArrowLeftRight, Trophy, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTournament } from '@/hooks/useTournament';
 import { supabase } from '@/integrations/supabase/client';
+import { useLocation } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
@@ -65,6 +65,10 @@ export function RosterSetup({
 }: RosterSetupProps) {
   const { user, isGuest } = useAuth();
   const { tournament, startTournament } = useTournament();
+  const location = useLocation();
+  const navState = location.state as { mode?: string } | null;
+  const isSingleMatchMode = navState?.mode === 'single';
+  
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newOpponentNumber, setNewOpponentNumber] = useState('');
   const [autoNumberDialogOpen, setAutoNumberDialogOpen] = useState(false);
@@ -74,7 +78,7 @@ export function RosterSetup({
   const [bulkImportText, setBulkImportText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [tournamentMode, setTournamentMode] = useState(tournament.isActive);
+  const [tournamentMode, setTournamentMode] = useState(tournament.isActive && !isSingleMatchMode);
   const [tournamentName, setTournamentName] = useState(tournament.name || '');
   const [showTournamentDialog, setShowTournamentDialog] = useState(false);
 
@@ -268,6 +272,24 @@ export function RosterSetup({
     }
   };
 
+  // Auto-increment: trova il massimo numero nella squadra e assegna max+1
+  const handleQuickNumber = (playerId: string) => {
+    const usedNumbers = homePlayers
+      .filter(p => p.number !== null)
+      .map(p => p.number as number);
+    
+    const nextNumber = usedNumbers.length > 0 ? Math.max(...usedNumbers) + 1 : 1;
+    
+    onUpdatePlayerNumber(playerId, nextNumber);
+    
+    const player = homePlayers.find(p => p.id === playerId);
+    if (player) {
+      queueRosterNumberSave({ ...player, number: nextNumber }, nextNumber);
+    }
+    
+    toast.success(`Numero ${nextNumber} assegnato`);
+  };
+
   const handleAddOpponent = () => {
     const num = parseInt(newOpponentNumber, 10);
     if (!isNaN(num) && num > 0) {
@@ -434,19 +456,25 @@ export function RosterSetup({
           )}
         </div>
 
-        {/* Tournament Mode Toggle */}
+        {/* Tournament/Single Match Mode Label */}
         <div className="flex items-center justify-center gap-4 p-4 bg-card rounded-xl shadow-card">
           <div className="flex items-center gap-3">
             <Trophy className={cn("h-5 w-5", tournamentMode ? "text-secondary" : "text-muted-foreground")} />
-            <Label htmlFor="tournament-mode" className="font-medium">
-              Modalità Torneo
-            </Label>
+            <span className={cn("font-semibold text-sm", tournamentMode ? "text-secondary" : "text-muted-foreground")}>
+              {tournamentMode ? "MODALITÀ: NUOVO TORNEO" : "MODALITÀ: PARTITA SINGOLA"}
+            </span>
           </div>
-          <Switch
-            id="tournament-mode"
-            checked={tournamentMode}
-            onCheckedChange={handleTournamentToggle}
-          />
+          {!isGuest && !tournamentMode && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowTournamentDialog(true)}
+              className="gap-1"
+            >
+              <Trophy className="h-4 w-4" />
+              Avvia Torneo
+            </Button>
+          )}
           {tournamentMode && (
             <span className="text-sm text-secondary font-medium">
               {tournament.name} - {tournament.matches.length} partite
@@ -533,15 +561,17 @@ export function RosterSetup({
                 <Button onClick={handleAddPlayer} size="icon" className="flex-shrink-0">
                   <Plus className="h-5 w-5" />
                 </Button>
-                <Button 
-                  onClick={() => setBulkImportDialogOpen(true)} 
-                  size="icon" 
-                  variant="outline"
-                  className="flex-shrink-0"
-                  title="Importa da Excel"
-                >
-                  <Upload className="h-5 w-5" />
-                </Button>
+                {!isGuest && (
+                  <Button 
+                    onClick={() => setBulkImportDialogOpen(true)} 
+                    size="icon" 
+                    variant="outline"
+                    className="flex-shrink-0"
+                    title="Importa da Excel"
+                  >
+                    <Upload className="h-5 w-5" />
+                  </Button>
+                )}
                 <Button 
                   onClick={() => {
                     setAutoNumberTeam('home');
@@ -571,17 +601,28 @@ export function RosterSetup({
                           : "bg-muted/50 border-border"
                       )}
                     >
-                      <Input
-                        type="number"
-                        min="1"
-                        value={player.number ?? ''}
-                        onChange={(e) => handleUpdateNumber(player.id, e.target.value)}
-                        onBlur={() => queueRosterNumberSave(player, player.number ?? null)}
-                        placeholder="#"
-                        className="w-16 text-center"
-                      />
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          min="1"
+                          value={player.number ?? ''}
+                          onChange={(e) => handleUpdateNumber(player.id, e.target.value)}
+                          onBlur={() => queueRosterNumberSave(player, player.number ?? null)}
+                          placeholder="#"
+                          className="w-14 text-center"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary"
+                          onClick={() => handleQuickNumber(player.id)}
+                          title="Assegna numero successivo"
+                        >
+                          <ChevronUp className="h-4 w-4" />
+                        </Button>
+                      </div>
 
-                      <div className="min-w-[76px] text-[11px] leading-tight">
+                      <div className="min-w-[60px] text-[11px] leading-tight">
                         {status === 'saving' ? (
                           <span className="text-muted-foreground">Salvo…</span>
                         ) : status === 'saved' ? (
