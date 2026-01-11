@@ -83,7 +83,7 @@ const MatchApp = () => {
     }
   }, [location.state, state.isMatchStarted, state.isMatchEnded, tournament.isActive]);
 
-  // Calculate player stats for tournament
+  // Calculate player stats for tournament with proper minutes per period
   const calculatePlayerStats = useCallback((): TournamentPlayerMatchStats[] => {
     const playerStats: TournamentPlayerMatchStats[] = [];
     const periodsPlayed = state.periodScores.length > 0 
@@ -96,6 +96,7 @@ const MatchApp = () => {
       let yellowCards = 0;
       let redCards = 0;
 
+      // Count goals and cards
       state.events.forEach(e => {
         if (e.team === 'home' && e.playerId === player.id) {
           if (e.type === 'goal') goals++;
@@ -104,9 +105,68 @@ const MatchApp = () => {
         }
       });
 
-      // Calculate minutes (simplified - count if was starter or subbed in)
-      if (player.isStarter || state.events.some(e => e.type === 'substitution' && e.team === 'home' && e.playerInId === player.id)) {
-        minutes = periodsPlayed * state.periodDuration;
+      // Calculate minutes per period correctly
+      // For each period, check if player was starter OR entered via substitution
+      for (let period = 1; period <= periodsPlayed; period++) {
+        // Get period_start event to see if player was starter
+        const periodStartEvent = state.events.find(
+          e => e.type === 'period_start' && e.period === period
+        );
+        
+        // Check if player was starter for this specific period
+        // A player is starter for period 1 if isStarter is true
+        // For subsequent periods, check substitution events
+        let playedThisPeriod = false;
+        
+        if (period === 1) {
+          // First period: use isStarter flag
+          playedThisPeriod = player.isStarter;
+        } else {
+          // Subsequent periods: player played if they were on field at end of previous period
+          // Check by looking at substitution events
+          const subInEvents = state.events.filter(
+            e => e.type === 'substitution' && 
+                 e.team === 'home' && 
+                 e.playerInId === player.id &&
+                 e.period < period
+          );
+          const subOutEvents = state.events.filter(
+            e => e.type === 'substitution' && 
+                 e.team === 'home' && 
+                 e.playerOutId === player.id &&
+                 e.period < period
+          );
+          
+          // Player is on field for this period if:
+          // - Was starter and never subbed out, OR
+          // - Was subbed in more recently than subbed out
+          if (player.isStarter) {
+            const lastSubOut = subOutEvents.length > 0 ? 
+              Math.max(...subOutEvents.map(e => e.period * 10000 + e.timestamp)) : 0;
+            const lastSubIn = subInEvents.length > 0 ? 
+              Math.max(...subInEvents.map(e => e.period * 10000 + e.timestamp)) : 0;
+            playedThisPeriod = lastSubIn >= lastSubOut;
+          } else {
+            // Wasn't starter, check if subbed in
+            const lastSubIn = subInEvents.length > 0 ? 
+              Math.max(...subInEvents.map(e => e.period * 10000 + e.timestamp)) : 0;
+            const lastSubOut = subOutEvents.length > 0 ? 
+              Math.max(...subOutEvents.map(e => e.period * 10000 + e.timestamp)) : 0;
+            playedThisPeriod = lastSubIn > lastSubOut && lastSubIn > 0;
+          }
+        }
+        
+        // Also check if player was subbed in during THIS period
+        const subbedInThisPeriod = state.events.some(
+          e => e.type === 'substitution' && 
+               e.team === 'home' && 
+               e.playerInId === player.id &&
+               e.period === period
+        );
+        
+        if (playedThisPeriod || subbedInThisPeriod) {
+          minutes += state.periodDuration;
+        }
       }
 
       playerStats.push({

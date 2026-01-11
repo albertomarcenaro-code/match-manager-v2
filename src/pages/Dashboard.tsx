@@ -7,7 +7,7 @@ import { Footer } from '@/components/layout/Footer';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTournament } from '@/hooks/useTournament';
 import { Helmet } from 'react-helmet';
-import { Play, Trophy, LogOut, RefreshCw, History } from 'lucide-react';
+import { Play, Trophy, LogOut, RefreshCw, History, Lock } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -68,6 +68,22 @@ const Dashboard = () => {
       setPendingAction('single');
       setShowActiveSessionDialog(true);
     } else {
+      // Clear jersey numbers for single match mode
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.homeTeam?.players) {
+            parsed.homeTeam.players = parsed.homeTeam.players.map((p: any) => ({ ...p, number: null }));
+          }
+          if (parsed.awayTeam?.players) {
+            parsed.awayTeam.players = [];
+          }
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        }
+      } catch (e) {
+        console.error('Error clearing jersey numbers:', e);
+      }
       navigate('/match', { state: { mode: 'single' } });
     }
   };
@@ -172,17 +188,19 @@ const Dashboard = () => {
 
             {/* Tournament Mode */}
             <Card 
-              className="p-8 cursor-pointer hover:shadow-lg transition-all hover:border-secondary group"
-              onClick={handleTournamentMode}
+              className={`p-8 transition-all ${isGuest ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:shadow-lg hover:border-secondary'} group`}
+              onClick={isGuest ? undefined : handleTournamentMode}
             >
               <div className="flex items-center gap-6">
-                <div className="p-4 rounded-full bg-secondary/10 text-secondary group-hover:bg-secondary group-hover:text-secondary-foreground transition-colors">
-                  <Trophy className="h-8 w-8" />
+                <div className={`p-4 rounded-full ${isGuest ? 'bg-muted text-muted-foreground' : 'bg-secondary/10 text-secondary group-hover:bg-secondary group-hover:text-secondary-foreground'} transition-colors`}>
+                  {isGuest ? <Lock className="h-8 w-8" /> : <Trophy className="h-8 w-8" />}
                 </div>
                 <div className="flex-1">
                   <h2 className="text-xl font-bold mb-1">Modalità Torneo</h2>
                   <p className="text-muted-foreground">
-                    {tournament.isActive 
+                    {isGuest ? (
+                      'Effettua il login per creare tornei e salvare statistiche'
+                    ) : tournament.isActive 
                       ? `Continua "${tournament.name}" - ${tournament.matches.length} partite giocate`
                       : 'Crea un nuovo torneo o visualizza quelli salvati'
                     }
