@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Player } from '@/types/match';
-import { Plus, Trash2, Users, Shield, Check, Hash, Upload, Save, ArrowLeftRight, Trophy, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, Users, Shield, Check, Hash, Upload, Save, ArrowLeftRight, Trophy, ChevronUp, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -362,6 +362,66 @@ export function RosterSetup({
     }
   };
 
+  // Reset roster: reload from database (logged in) or clear numbers (guest)
+  const handleResetRoster = async () => {
+    if (user && !isGuest) {
+      // Reload from database
+      setIsLoading(true);
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('team_name')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (profile?.team_name) {
+          onHomeTeamNameChange(profile.team_name);
+        }
+
+        const { data: players } = await supabase
+          .from('players')
+          .select('id, name, number')
+          .eq('user_id', user.id)
+          .order('name');
+
+        if (players && players.length > 0 && onBulkAddPlayers) {
+          // Deduplicate by name
+          const uniqueNames = [...new Set(players.map(p => p.name))];
+          onBulkAddPlayers(uniqueNames);
+
+          // Build mapping for numbers
+          const numbersByName: Record<string, number | null> = {};
+          players.forEach(p => {
+            numbersByName[p.name] = p.number ?? null;
+          });
+          setPendingDbNumbersByName(numbersByName);
+          
+          setDbPlayerIdsByName(
+            players.reduce<Record<string, string>>((acc, p) => {
+              if (p.name && p.id) acc[p.name] = p.id;
+              return acc;
+            }, {})
+          );
+        }
+
+        toast.success('Rosa ripristinata dal database');
+      } catch (error) {
+        console.error('Error resetting roster:', error);
+        toast.error('Errore nel ripristino');
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // Guest mode: just clear all jersey numbers
+      homePlayers.forEach(p => {
+        if (p.number !== null) {
+          onUpdatePlayerNumber(p.id, null);
+        }
+      });
+      toast.success('Numeri di maglia azzerati');
+    }
+  };
+
   const handleAutoNumber = () => {
     const count = parseInt(autoNumberCount, 10);
     if (isNaN(count) || count <= 0) {
@@ -394,7 +454,9 @@ export function RosterSetup({
 
       toast.success(`Assegnati numeri a ${toAssign} giocatori`);
     } else {
-      const usedNumbers = new Set(awayPlayers.map(p => p.number));
+      // Away team: create opponent players with progressive numbers
+      // Base the sequence on existing away players (NOT on home players)
+      const usedNumbers = new Set(awayPlayers.map(p => p.number).filter(n => n !== null));
       let nextNumber = 1;
       let created = 0;
       
@@ -456,31 +518,15 @@ export function RosterSetup({
           )}
         </div>
 
-        {/* Tournament/Single Match Mode Label */}
-        <div className="flex items-center justify-center gap-4 p-4 bg-card rounded-xl shadow-card">
-          <div className="flex items-center gap-3">
-            <Trophy className={cn("h-5 w-5", tournamentMode ? "text-secondary" : "text-muted-foreground")} />
-            <span className={cn("font-semibold text-sm", tournamentMode ? "text-secondary" : "text-muted-foreground")}>
-              {tournamentMode ? "MODALITÀ: NUOVO TORNEO" : "MODALITÀ: PARTITA SINGOLA"}
-            </span>
-          </div>
-          {!isGuest && !tournamentMode && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowTournamentDialog(true)}
-              className="gap-1"
-            >
-              <Trophy className="h-4 w-4" />
-              Avvia Torneo
-            </Button>
-          )}
-          {tournamentMode && (
+        {/* Tournament Mode Banner - only shown when in tournament */}
+        {tournamentMode && (
+          <div className="flex items-center justify-center gap-4 p-3 bg-secondary/10 rounded-xl border border-secondary/20">
+            <Trophy className="h-5 w-5 text-secondary" />
             <span className="text-sm text-secondary font-medium">
               {tournament.name} - {tournament.matches.length} partite
             </span>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Swap Teams Button */}
         {onSwapTeams && (
@@ -528,6 +574,18 @@ export function RosterSetup({
                     </span>
                   )}
                 </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleResetRoster}
+                  disabled={isLoading}
+                  className="gap-1 h-8"
+                  title="Ripristina la rosa salvata dal database"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Reset
+                </Button>
                 {user && !isGuest && (
                   <Button 
                     size="sm" 
@@ -540,6 +598,7 @@ export function RosterSetup({
                     {isSaving ? 'Salvo...' : 'Salva'}
                   </Button>
                 )}
+              </div>
               </div>
               <Input
                 value={homeTeamName}

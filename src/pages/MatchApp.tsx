@@ -84,6 +84,7 @@ const MatchApp = () => {
   }, [location.state, state.isMatchStarted, state.isMatchEnded, tournament.isActive]);
 
   // Calculate player stats for tournament with proper minutes per period
+  // Each period is tracked independently - if player plays only T1, they get T1 minutes and 0 for T2
   const calculatePlayerStats = useCallback((): TournamentPlayerMatchStats[] => {
     const playerStats: TournamentPlayerMatchStats[] = [];
     const periodsPlayed = state.periodScores.length > 0 
@@ -105,67 +106,84 @@ const MatchApp = () => {
         }
       });
 
-      // Calculate minutes per period correctly
-      // For each period, check if player was starter OR entered via substitution
+      // Calculate minutes per period independently
       for (let period = 1; period <= periodsPlayed; period++) {
-        // Get period_start event to see if player was starter
-        const periodStartEvent = state.events.find(
-          e => e.type === 'period_start' && e.period === period
-        );
+        const periodEvents = state.events.filter(e => e.period === period);
+        const periodStart = periodEvents.find(e => e.type === 'period_start');
+        const periodEnd = periodEvents.find(e => e.type === 'period_end');
         
-        // Check if player was starter for this specific period
-        // A player is starter for period 1 if isStarter is true
-        // For subsequent periods, check substitution events
-        let playedThisPeriod = false;
+        if (!periodStart) continue;
+        
+        const periodDurationSeconds = periodEnd 
+          ? periodEnd.timestamp 
+          : (period === state.currentPeriod ? state.elapsedTime : state.periodDuration * 60);
+
+        // Determine if player was on field at start of this period
+        let onFieldAtStart = false;
+        let entryTime = 0;
         
         if (period === 1) {
-          // First period: use isStarter flag
-          playedThisPeriod = player.isStarter;
+          onFieldAtStart = player.isStarter;
         } else {
-          // Subsequent periods: player played if they were on field at end of previous period
-          // Check by looking at substitution events
-          const subInEvents = state.events.filter(
-            e => e.type === 'substitution' && 
-                 e.team === 'home' && 
-                 e.playerInId === player.id &&
-                 e.period < period
-          );
-          const subOutEvents = state.events.filter(
-            e => e.type === 'substitution' && 
-                 e.team === 'home' && 
-                 e.playerOutId === player.id &&
-                 e.period < period
-          );
+          // Check if player was on field at end of previous period
+          // Start with isStarter status
+          let onField = player.isStarter;
           
-          // Player is on field for this period if:
-          // - Was starter and never subbed out, OR
-          // - Was subbed in more recently than subbed out
-          if (player.isStarter) {
-            const lastSubOut = subOutEvents.length > 0 ? 
-              Math.max(...subOutEvents.map(e => e.period * 10000 + e.timestamp)) : 0;
-            const lastSubIn = subInEvents.length > 0 ? 
-              Math.max(...subInEvents.map(e => e.period * 10000 + e.timestamp)) : 0;
-            playedThisPeriod = lastSubIn >= lastSubOut;
-          } else {
-            // Wasn't starter, check if subbed in
-            const lastSubIn = subInEvents.length > 0 ? 
-              Math.max(...subInEvents.map(e => e.period * 10000 + e.timestamp)) : 0;
-            const lastSubOut = subOutEvents.length > 0 ? 
-              Math.max(...subOutEvents.map(e => e.period * 10000 + e.timestamp)) : 0;
-            playedThisPeriod = lastSubIn > lastSubOut && lastSubIn > 0;
-          }
+          // Apply all substitutions from previous periods
+          const prevEvents = state.events.filter(e => e.period < period);
+          prevEvents.forEach(event => {
+            if (event.type === 'substitution' && event.team === 'home') {
+              if (event.playerOutId === player.id) onField = false;
+              if (event.playerInId === player.id) onField = true;
+            }
+            if (event.type === 'red_card' && event.team === 'home' && event.playerId === player.id) {
+              onField = false;
+            }
+          });
+          
+          onFieldAtStart = onField;
         }
-        
-        // Also check if player was subbed in during THIS period
-        const subbedInThisPeriod = state.events.some(
-          e => e.type === 'substitution' && 
-               e.team === 'home' && 
-               e.playerInId === player.id &&
-               e.period === period
-        );
-        
-        if (playedThisPeriod || subbedInThisPeriod) {
-          minutes += state.periodDuration;
+
+        let wasOnFieldThisPeriod = onFieldAtStart;
+        let exitTime = periodDurationSeconds;
+        let effectiveEntryTime = 0;
+
+        // Process this period's events
+        periodEvents.forEach(event => {
+          if (event.type === 'substitution' && event.team === 'home') {
+            if (event.playerOutId === player.id) {
+              if (wasOnFieldThisPeriod) {
+                // Player left field
+                exitTime = event.timestamp;
+              }
+              wasOnFieldThisPeriod = false;
+            }
+            if (event.playerInId === player.id) {
+              // Player entered field
+              wasOnFieldThisPeriod = true;
+              effectiveEntryTime = event.timestamp;
+            }
+          }
+          if (event.type === 'red_card' && event.team === 'home' && event.playerId === player.id) {
+            if (wasOnFieldThisPeriod) {
+              exitTime = event.timestamp;
+            }
+            wasOnFieldThisPeriod = false;
+          }
+        });
+
+        // Calculate minutes for this period
+        if (onFieldAtStart) {
+          // Started the period
+          const played = Math.floor((exitTime - entryTime) / 60);
+          minutes += played;
+        } else if (wasOnFieldThisPeriod || periodEvents.some(e => e.type === 'substitution' && e.team === 'home' && e.playerInId === player.id)) {
+          // Entered during the period
+          const subbedInEvent = periodEvents.find(e => e.type === 'substitution' && e.team === 'home' && e.playerInId === player.id);
+          if (subbedInEvent) {
+            const played = Math.floor((exitTime - subbedInEvent.timestamp) / 60);
+            minutes += played;
+          }
         }
       }
 
