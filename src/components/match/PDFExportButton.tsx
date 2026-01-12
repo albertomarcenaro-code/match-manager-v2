@@ -22,10 +22,15 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  /**
+   * Calculate minutes played per period with exact allocation.
+   * Each period is tracked independently.
+   */
   const calculatePlayerMinutes = (team: 'home' | 'away', periodsPlayed: number): PlayerMinutes => {
     const minutes: PlayerMinutes = {};
     const players = team === 'home' ? state.homeTeam.players : state.awayTeam.players;
     
+    // Initialize all players with 0 for each period
     players.forEach(p => {
       minutes[p.id] = { total: 0 };
       for (let i = 1; i <= periodsPlayed; i++) {
@@ -33,6 +38,7 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
       }
     });
 
+    // Process each period independently
     for (let period = 1; period <= periodsPlayed; period++) {
       const periodEvents = state.events.filter(e => e.period === period);
       const periodStart = periodEvents.find(e => e.type === 'period_start');
@@ -40,6 +46,7 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
       
       if (!periodStart) continue;
       
+      // Period duration in seconds
       const periodDurationSeconds = periodEnd 
         ? periodEnd.timestamp 
         : (period === state.currentPeriod ? state.elapsedTime : state.periodDuration * 60);
@@ -48,6 +55,7 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
       const playerEntryTime: { [id: string]: number } = {};
       const playerExpelled: { [id: string]: boolean } = {};
 
+      // Determine starters for this period
       if (period === 1) {
         if (team === 'home') {
           players.forEach(p => {
@@ -77,19 +85,16 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
           });
         }
       } else {
-        const previousPeriodEvents = state.events.filter(e => e.period < period);
-        const onFieldAtStart: { [id: string]: boolean } = {};
+        const onFieldAtPeriodStart: { [id: string]: boolean } = {};
         
         if (team === 'home') {
           players.forEach(p => {
             if ('isStarter' in p && (p as any).isStarter) {
-              onFieldAtStart[p.id] = true;
+              onFieldAtPeriodStart[p.id] = true;
             }
           });
         } else {
-          const allSubsAway = state.events.filter(
-            e => e.type === 'substitution' && e.team === 'away'
-          );
+          const allSubsAway = state.events.filter(e => e.type === 'substitution' && e.team === 'away');
           const allSubbedIn = new Set<string>();
           const allSubbedOut = new Set<string>();
           
@@ -104,30 +109,32 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
             const isCurrentlyOnField = p.isOnField;
             
             if ((wasSubbedOut && !wasSubbedIn) || (isCurrentlyOnField && !wasSubbedIn)) {
-              onFieldAtStart[p.id] = true;
+              onFieldAtPeriodStart[p.id] = true;
             }
           });
         }
 
+        const previousPeriodEvents = state.events.filter(e => e.period < period);
         previousPeriodEvents.forEach(event => {
           if (event.type === 'substitution' && event.team === team) {
-            if (event.playerOutId) onFieldAtStart[event.playerOutId] = false;
-            if (event.playerInId) onFieldAtStart[event.playerInId] = true;
+            if (event.playerOutId) onFieldAtPeriodStart[event.playerOutId] = false;
+            if (event.playerInId) onFieldAtPeriodStart[event.playerInId] = true;
           }
           if (event.type === 'red_card' && event.team === team && event.playerId) {
-            onFieldAtStart[event.playerId] = false;
+            onFieldAtPeriodStart[event.playerId] = false;
             playerExpelled[event.playerId] = true;
           }
         });
 
-        Object.keys(onFieldAtStart).forEach(id => {
-          if (onFieldAtStart[id] && !playerExpelled[id]) {
+        Object.keys(onFieldAtPeriodStart).forEach(id => {
+          if (onFieldAtPeriodStart[id] && !playerExpelled[id]) {
             playerOnField[id] = true;
             playerEntryTime[id] = 0;
           }
         });
       }
 
+      // Process events within this period
       periodEvents.forEach(event => {
         if (event.type === 'substitution' && event.team === team) {
           if (event.playerOutId && playerOnField[event.playerOutId]) {
@@ -153,6 +160,7 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         }
       });
 
+      // At period end, calculate remaining time for players still on field
       Object.keys(playerOnField).forEach(id => {
         if (playerOnField[id] && !playerExpelled[id]) {
           const entryTime = playerEntryTime[id] || 0;
@@ -162,6 +170,7 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
       });
     }
 
+    // Calculate totals
     Object.keys(minutes).forEach(id => {
       let total = 0;
       for (let i = 1; i <= periodsPlayed; i++) {
@@ -247,30 +256,45 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
     doc.setFontSize(10);
     doc.text(state.awayTeam.name, centerX + 25, y, { align: 'left' });
 
-    // Period scores with scorers - centered and on new lines
+    // Period scores with scorers - centered
     y = 20;
     doc.setFontSize(6);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(80, 80, 80);
 
-    state.periodScores.forEach((ps) => {
-      const homeScorers = getGoalScorers('home', ps.period);
-      const awayScorers = getGoalScorers('away', ps.period);
-      
-      let text = `${ps.period}° TEMPO: ${ps.homeScore} - ${ps.awayScore}`;
-      doc.text(text, centerX, y, { align: 'center' });
-      y += 3;
-      
-      if (homeScorers.length > 0 || awayScorers.length > 0) {
-        const scorersText: string[] = [];
-        if (homeScorers.length > 0) scorersText.push(`Casa: ${homeScorers.join(', ')}`);
-        if (awayScorers.length > 0) scorersText.push(`Ospiti: ${awayScorers.join(', ')}`);
-        doc.setFontSize(5);
-        doc.text(scorersText.join('  |  '), centerX, y, { align: 'center' });
-        doc.setFontSize(6);
+    if (state.periodScores.length === 0) {
+      doc.setFont('helvetica', 'italic');
+      doc.text('Nessun tempo completato', centerX, y, { align: 'center' });
+      y += 4;
+    } else {
+      state.periodScores.forEach((ps) => {
+        const homeScorers = getGoalScorers('home', ps.period);
+        const awayScorers = getGoalScorers('away', ps.period);
+        
+        // Period score centered
+        let text = `${ps.period}° TEMPO: ${ps.homeScore} - ${ps.awayScore}`;
+        doc.text(text, centerX, y, { align: 'center' });
         y += 3;
-      }
-    });
+        
+        // Scorers or "Nessun gol"
+        if (homeScorers.length > 0 || awayScorers.length > 0) {
+          const scorersText: string[] = [];
+          if (homeScorers.length > 0) scorersText.push(`Casa: ${homeScorers.join(', ')}`);
+          if (awayScorers.length > 0) scorersText.push(`Ospiti: ${awayScorers.join(', ')}`);
+          doc.setFontSize(5);
+          doc.text(scorersText.join('  |  '), centerX, y, { align: 'center' });
+          doc.setFontSize(6);
+          y += 3;
+        } else if (ps.homeScore === 0 && ps.awayScore === 0) {
+          doc.setFontSize(5);
+          doc.setFont('helvetica', 'italic');
+          doc.text('Nessun gol', centerX, y, { align: 'center' });
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(6);
+          y += 3;
+        }
+      });
+    }
     // Separator
     y += 1;
     doc.setDrawColor(200, 200, 200);
@@ -421,7 +445,7 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
 
     if (significantEvents.length > 0) {
       const eventData = significantEvents.map(e => {
-        // Text labels only - no emojis
+        // Clear text labels
         let tipo = '';
         switch (e.type) {
           case 'goal': tipo = 'GOAL'; break;
@@ -431,10 +455,10 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
           case 'red_card': tipo = 'ESPULSIONE'; break;
         }
         
-        // Clean description - remove all emojis and unicode symbols
+        // Clean description - remove emojis and redundant text
         let cleanDesc = e.description
-          .replace(/[\u{1F300}-\u{1F9FF}]/gu, '') // Remove all emojis
-          .replace(/[⚽🔄🟨🟥➡️⬅️↔️]/g, '') // Remove specific symbols
+          .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
+          .replace(/[⚽🔄🟨🟥➡️⬅️↔️]/g, '')
           .replace(/GOL!/gi, '')
           .replace(/AUTOGOL/gi, '')
           .replace(/Cartellino giallo per/gi, '')
@@ -443,9 +467,12 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
           .replace(/\s+/g, ' ')
           .trim();
         
+        // Remove team name in parentheses from player names
+        cleanDesc = cleanDesc.replace(/\s*\([^)]+\)\s*/g, ' ').trim();
+        
         if (cleanDesc.length > 50) cleanDesc = cleanDesc.substring(0, 49) + '...';
         
-        // Show full team name instead of abbreviation
+        // Full team name
         const teamName = e.team === 'home' ? state.homeTeam.name : state.awayTeam.name;
         const shortTeamName = teamName.length > 12 ? teamName.substring(0, 11) + '.' : teamName;
         
@@ -460,7 +487,7 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
 
       autoTable(doc, {
         startY: y,
-        head: [['Tempo', 'Minuto', 'Evento', 'SQUADRA', 'Descrizione']],
+        head: [['Tempo', 'Minuto', 'Evento', 'Squadra', 'Descrizione']],
         body: eventData,
         theme: 'plain',
         headStyles: { 
@@ -483,6 +510,12 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         tableWidth: pageWidth - margin * 2,
         margin: { left: margin, right: margin },
       });
+    } else {
+      // No events - show message
+      doc.setFontSize(6);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(120, 120, 120);
+      doc.text('Nessun evento registrato', centerX, y + 3, { align: 'center' });
     }
 
     // Footer
