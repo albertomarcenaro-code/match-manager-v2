@@ -20,7 +20,9 @@ export type EventType =
   | 'own_goal'
   | 'substitution'
   | 'yellow_card'
-  | 'red_card';
+  | 'red_card'
+  | 'player_in'
+  | 'player_out';
 
 export interface MatchEvent {
   id: string;

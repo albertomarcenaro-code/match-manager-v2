@@ -225,7 +225,9 @@ export function useMatch() {
 
   const bulkAddPlayers = useCallback((names: string[]) => {
     setState(prev => {
-      const newPlayers: Player[] = names.map(name => ({
+      // Deduplicate names to prevent roster duplication
+      const uniqueNames = [...new Set(names)];
+      const newPlayers: Player[] = uniqueNames.map(name => ({
         id: generateId(),
         name,
         number: null,
@@ -405,7 +407,11 @@ export function useMatch() {
     setState(prev => {
       const newPeriod = prev.currentPeriod + 1;
       const periodDuration = duration !== undefined ? duration : prev.periodDuration;
-      const event: MatchEvent = {
+      
+      const newEvents: MatchEvent[] = [];
+      
+      // Period start event
+      const periodStartEvent: MatchEvent = {
         id: generateId(),
         type: 'period_start',
         timestamp: 0,
@@ -413,6 +419,37 @@ export function useMatch() {
         team: 'home',
         description: `Inizio ${newPeriod}° tempo (${periodDuration} min)`,
       };
+      newEvents.push(periodStartEvent);
+      
+      // Register player_in events for all players currently on field
+      // This creates a clear record of who started each period
+      prev.homeTeam.players.filter(p => p.isOnField && !p.isExpelled).forEach(p => {
+        newEvents.push({
+          id: generateId(),
+          type: 'player_in',
+          timestamp: 0,
+          period: newPeriod,
+          team: 'home',
+          playerId: p.id,
+          playerName: p.name,
+          playerNumber: p.number ?? undefined,
+          description: `IN: ${p.name} (#${p.number})`,
+        });
+      });
+      
+      prev.awayTeam.players.filter(p => p.isOnField && !p.isExpelled).forEach(p => {
+        newEvents.push({
+          id: generateId(),
+          type: 'player_in',
+          timestamp: 0,
+          period: newPeriod,
+          team: 'away',
+          playerId: p.id,
+          playerName: p.name || `#${p.number}`,
+          playerNumber: p.number ?? undefined,
+          description: `IN: ${p.name || `#${p.number}`}`,
+        });
+      });
       
       // Save timer state immediately
       saveTimerState(Date.now(), null, true, false);
@@ -426,7 +463,7 @@ export function useMatch() {
         isPaused: false,
         isMatchStarted: true,
         needsStarterSelection: false,
-        events: [...prev.events, event],
+        events: [...prev.events, ...newEvents],
       };
     });
   }, []);
@@ -459,7 +496,39 @@ export function useMatch() {
         awayScore: prev.awayTeam.score - previousPeriodScore.away,
       };
 
-      const event: MatchEvent = {
+      const newEvents: MatchEvent[] = [];
+      
+      // Register player_out events for all players currently on field
+      // This closes all intervals for this period
+      prev.homeTeam.players.filter(p => p.isOnField && !p.isExpelled).forEach(p => {
+        newEvents.push({
+          id: generateId(),
+          type: 'player_out',
+          timestamp: prev.elapsedTime,
+          period: prev.currentPeriod,
+          team: 'home',
+          playerId: p.id,
+          playerName: p.name,
+          playerNumber: p.number ?? undefined,
+          description: `OUT: ${p.name} (#${p.number})`,
+        });
+      });
+      
+      prev.awayTeam.players.filter(p => p.isOnField && !p.isExpelled).forEach(p => {
+        newEvents.push({
+          id: generateId(),
+          type: 'player_out',
+          timestamp: prev.elapsedTime,
+          period: prev.currentPeriod,
+          team: 'away',
+          playerId: p.id,
+          playerName: p.name || `#${p.number}`,
+          playerNumber: p.number ?? undefined,
+          description: `OUT: ${p.name || `#${p.number}`}`,
+        });
+      });
+
+      const periodEndEvent: MatchEvent = {
         id: generateId(),
         type: 'period_end',
         timestamp: prev.elapsedTime,
@@ -469,6 +538,7 @@ export function useMatch() {
         awayScore: prev.awayTeam.score,
         description: `Fine ${prev.currentPeriod}° tempo - ${prev.homeTeam.name} ${prev.homeTeam.score} - ${prev.awayTeam.score} ${prev.awayTeam.name}`,
       };
+      newEvents.push(periodEndEvent);
 
       return {
         ...prev,
@@ -477,7 +547,7 @@ export function useMatch() {
         isMatchEnded: false,
         needsStarterSelection: true,
         periodScores: [...prev.periodScores, periodScore],
-        events: [...prev.events, event],
+        events: [...prev.events, ...newEvents],
       };
     });
   }, []);
@@ -729,7 +799,30 @@ export function useMatch() {
 
   const resetMatch = useCallback(() => {
     clearStorage();
-    setState(createInitialState());
+    // Clear all jersey numbers and reset roster state
+    // Keep player names if in tournament mode (handled by caller)
+    // but always reset numbers, events, and match state
+    setState(prev => {
+      const resetPlayers = (players: Player[]) => 
+        players.map(p => ({
+          ...p,
+          number: null,
+          isOnField: false,
+          isStarter: false,
+          isExpelled: false,
+        }));
+      
+      return {
+        ...createInitialState(),
+        // Preserve home team names but reset numbers
+        homeTeam: {
+          ...createInitialState().homeTeam,
+          players: resetPlayers(prev.homeTeam.players),
+        },
+        // Clear away team completely
+        awayTeam: createInitialState().awayTeam,
+      };
+    });
   }, []);
 
   const forceStarterSelection = useCallback(() => {
