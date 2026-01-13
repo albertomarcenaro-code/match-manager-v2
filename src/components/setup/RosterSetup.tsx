@@ -422,6 +422,8 @@ export function RosterSetup({
     }
   };
 
+  // Auto-numbering logic: completely independent from team_id/team_name
+  // Works on local state only, no validation requiring team name
   const handleAutoNumber = () => {
     const count = parseInt(autoNumberCount, 10);
     if (isNaN(count) || count <= 0) {
@@ -431,15 +433,26 @@ export function RosterSetup({
     
     if (autoNumberTeam === 'home') {
       const playersWithoutNumbers = homePlayers.filter(p => p.number === null);
-      const toAssign = Math.min(count, playersWithoutNumbers.length);
       
-      if (toAssign === 0) {
+      // If no players exist yet but count is specified, we still allow it
+      // This handles guest mode where roster might be empty
+      if (homePlayers.length > 0 && playersWithoutNumbers.length === 0) {
         toast.info('Tutti i giocatori hanno già un numero assegnato');
         setAutoNumberDialogOpen(false);
         setAutoNumberCount('');
         return;
       }
 
+      const toAssign = Math.min(count, playersWithoutNumbers.length);
+      
+      if (toAssign === 0 && homePlayers.length === 0) {
+        toast.info('Aggiungi prima dei giocatori alla lista');
+        setAutoNumberDialogOpen(false);
+        setAutoNumberCount('');
+        return;
+      }
+
+      // Calculate used numbers from current players (local state only)
       const usedNumbers = new Set(homePlayers.filter(p => p.number !== null).map(p => p.number));
       let nextNumber = 1;
       
@@ -447,7 +460,10 @@ export function RosterSetup({
         while (usedNumbers.has(nextNumber)) {
           nextNumber++;
         }
-        onUpdatePlayerNumber(playersWithoutNumbers[i].id, nextNumber);
+        const player = playersWithoutNumbers[i];
+        onUpdatePlayerNumber(player.id, nextNumber);
+        // Queue save for guest mode (will just mark as saved in localStorage)
+        queueRosterNumberSave({ ...player, number: nextNumber }, nextNumber);
         usedNumbers.add(nextNumber);
         nextNumber++;
       }
@@ -516,17 +532,14 @@ export function RosterSetup({
           {isLoading && (
             <p className="text-sm text-primary mt-2">Caricamento dati salvati...</p>
           )}
+          {/* Tournament indicator - minimal, inline with header */}
+          {tournamentMode && (
+            <p className="text-sm text-secondary font-medium mt-2 flex items-center justify-center gap-2">
+              <Trophy className="h-4 w-4" />
+              {tournament.name} ({tournament.matches.length} partite)
+            </p>
+          )}
         </div>
-
-        {/* Tournament Mode Banner - only shown when in tournament */}
-        {tournamentMode && (
-          <div className="flex items-center justify-center gap-4 p-3 bg-secondary/10 rounded-xl border border-secondary/20">
-            <Trophy className="h-5 w-5 text-secondary" />
-            <span className="text-sm text-secondary font-medium">
-              {tournament.name} - {tournament.matches.length} partite
-            </span>
-          </div>
-        )}
 
         {/* Swap Teams Button */}
         {onSwapTeams && (
