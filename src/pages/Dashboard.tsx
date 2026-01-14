@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTournament } from '@/hooks/useTournament';
 import { Helmet } from 'react-helmet';
-import { Play, Trophy, LogOut, RefreshCw, History, Lock } from 'lucide-react';
+import { Play, Trophy, LogOut, RefreshCw, History, Lock, Plus, FolderOpen } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +20,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 const STORAGE_KEY = 'match-manager-state';
 
@@ -30,13 +41,29 @@ interface SavedMatchState {
   currentPeriod: number;
 }
 
+interface SavedTournament {
+  id: string;
+  name: string;
+  team_name: string;
+  created_at: string;
+  is_active: boolean;
+}
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, isGuest, signOut, exitGuest } = useAuth();
-  const { tournament } = useTournament();
+  const { tournament, loadTournamentById } = useTournament();
   const [activeSession, setActiveSession] = useState<SavedMatchState | null>(null);
   const [showActiveSessionDialog, setShowActiveSessionDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState<'single' | 'tournament' | null>(null);
+  
+  // Tournament selection state
+  const [showTournamentChoiceDialog, setShowTournamentChoiceDialog] = useState(false);
+  const [showNewTournamentDialog, setShowNewTournamentDialog] = useState(false);
+  const [showLoadTournamentDialog, setShowLoadTournamentDialog] = useState(false);
+  const [savedTournaments, setSavedTournaments] = useState<SavedTournament[]>([]);
+  const [newTournamentName, setNewTournamentName] = useState('');
+  const [isLoadingTournaments, setIsLoadingTournaments] = useState(false);
 
   // Check for active match session
   useEffect(() => {
@@ -52,6 +79,27 @@ const Dashboard = () => {
       console.error('Error checking active session:', e);
     }
   }, []);
+
+  const loadSavedTournaments = async () => {
+    if (!user) return;
+    
+    setIsLoadingTournaments(true);
+    try {
+      const { data, error } = await supabase
+        .from('tournaments')
+        .select('id, name, team_name, created_at, is_active')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setSavedTournaments(data || []);
+    } catch (error) {
+      console.error('Error loading tournaments:', error);
+      toast.error('Errore nel caricamento dei tornei');
+    } finally {
+      setIsLoadingTournaments(false);
+    }
+  };
 
   const handleLogout = async () => {
     if (isGuest) {
@@ -92,8 +140,45 @@ const Dashboard = () => {
     if (activeSession) {
       setPendingAction('tournament');
       setShowActiveSessionDialog(true);
-    } else {
+    } else if (tournament.isActive) {
+      // Continue existing tournament
       navigate('/match', { state: { mode: 'tournament' } });
+    } else {
+      // Show choice dialog: Create New or Load Existing
+      setShowTournamentChoiceDialog(true);
+    }
+  };
+
+  const handleCreateNewTournament = () => {
+    setShowTournamentChoiceDialog(false);
+    setNewTournamentName('');
+    setShowNewTournamentDialog(true);
+  };
+
+  const handleLoadExistingTournament = async () => {
+    setShowTournamentChoiceDialog(false);
+    await loadSavedTournaments();
+    setShowLoadTournamentDialog(true);
+  };
+
+  const handleConfirmNewTournament = () => {
+    if (!newTournamentName.trim()) {
+      toast.error('Inserisci un nome per il torneo (es. "Campionato 2025")');
+      return;
+    }
+    setShowNewTournamentDialog(false);
+    navigate('/match', { state: { mode: 'tournament', createTournament: true, tournamentName: newTournamentName.trim() } });
+  };
+
+  const handleSelectTournament = async (tournamentId: string) => {
+    try {
+      await loadTournamentById(tournamentId);
+      setShowLoadTournamentDialog(false);
+      toast.success('Torneo caricato');
+      navigate('/match', { state: { mode: 'tournament' } });
+    } catch (error) {
+      console.error('Error loading tournament:', error);
+      toast.error('Errore nel caricamento del torneo');
     }
   };
 
@@ -111,7 +196,7 @@ const Dashboard = () => {
     if (pendingAction === 'single') {
       navigate('/match', { state: { mode: 'single' } });
     } else if (pendingAction === 'tournament') {
-      navigate('/match', { state: { mode: 'tournament' } });
+      setShowTournamentChoiceDialog(true);
     }
     setPendingAction(null);
   };
@@ -202,7 +287,7 @@ const Dashboard = () => {
                       'Effettua il login per creare tornei e salvare statistiche'
                     ) : tournament.isActive 
                       ? `Continua "${tournament.name}" - ${tournament.matches.length} partite giocate`
-                      : 'Crea un nuovo torneo o visualizza quelli salvati'
+                      : 'Crea un nuovo torneo o carica uno esistente'
                     }
                   </p>
                 </div>
@@ -254,6 +339,121 @@ const Dashboard = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Tournament Choice Dialog */}
+      <Dialog open={showTournamentChoiceDialog} onOpenChange={setShowTournamentChoiceDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-secondary" />
+              Modalità Torneo
+            </DialogTitle>
+            <DialogDescription>
+              Cosa vuoi fare?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Button 
+              onClick={handleCreateNewTournament}
+              className="gap-2 h-14"
+              variant="default"
+            >
+              <Plus className="h-5 w-5" />
+              Crea Nuovo Torneo
+            </Button>
+            <Button 
+              onClick={handleLoadExistingTournament}
+              className="gap-2 h-14"
+              variant="outline"
+            >
+              <FolderOpen className="h-5 w-5" />
+              Carica Torneo Esistente
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Tournament Name Dialog */}
+      <Dialog open={showNewTournamentDialog} onOpenChange={setShowNewTournamentDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-secondary" />
+              Nuovo Torneo
+            </DialogTitle>
+            <DialogDescription>
+              Inserisci un nome per il torneo
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="tournamentName">Nome del Torneo</Label>
+            <Input
+              id="tournamentName"
+              value={newTournamentName}
+              onChange={(e) => setNewTournamentName(e.target.value)}
+              placeholder="Es. Campionato 2025"
+              className="mt-2"
+              onKeyDown={(e) => e.key === 'Enter' && handleConfirmNewTournament()}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNewTournamentDialog(false)}>
+              Annulla
+            </Button>
+            <Button onClick={handleConfirmNewTournament} className="gap-2">
+              <Trophy className="h-4 w-4" />
+              Crea Torneo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Load Existing Tournament Dialog */}
+      <Dialog open={showLoadTournamentDialog} onOpenChange={setShowLoadTournamentDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FolderOpen className="h-5 w-5 text-secondary" />
+              Carica Torneo
+            </DialogTitle>
+            <DialogDescription>
+              Seleziona un torneo da caricare
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-2 max-h-[300px] overflow-y-auto">
+            {isLoadingTournaments ? (
+              <p className="text-center text-muted-foreground py-4">Caricamento...</p>
+            ) : savedTournaments.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">Nessun torneo salvato</p>
+            ) : (
+              savedTournaments.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => handleSelectTournament(t.id)}
+                  className="w-full flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted transition-colors text-left"
+                >
+                  <div>
+                    <p className="font-medium">{t.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t.team_name} • {new Date(t.created_at).toLocaleDateString('it-IT')}
+                    </p>
+                  </div>
+                  {t.is_active && (
+                    <span className="text-xs px-2 py-1 rounded-full bg-secondary/20 text-secondary">
+                      Attivo
+                    </span>
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLoadTournamentDialog(false)}>
+              Annulla
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

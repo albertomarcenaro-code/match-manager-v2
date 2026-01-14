@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Player, MatchEvent } from '@/types/match';
-import { Target, RefreshCw, Square } from 'lucide-react';
+import { Target, RefreshCw, Square, Plus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface TeamPanelProps {
   teamName: string;
@@ -21,6 +24,7 @@ interface TeamPanelProps {
   onSubstitution: (outId: string, inId: string) => void;
   onYellowCard: (playerId: string) => void;
   onRedCard: (playerId: string) => void;
+  onAddPlayer?: (name: string, number: number) => void;
 }
 
 type ActionType = 'goal' | 'ownGoal' | 'substitution' | 'yellowCard' | 'redCard';
@@ -36,9 +40,13 @@ export function TeamPanel({
   onSubstitution,
   onYellowCard,
   onRedCard,
+  onAddPlayer,
 }: TeamPanelProps) {
   const [actionType, setActionType] = useState<ActionType | null>(null);
   const [selectedPlayerOut, setSelectedPlayerOut] = useState<string>('');
+  const [showAddPlayerDialog, setShowAddPlayerDialog] = useState(false);
+  const [newPlayerName, setNewPlayerName] = useState('');
+  const [newPlayerNumber, setNewPlayerNumber] = useState('');
 
   const onFieldPlayers = players.filter(p => p.isOnField && !p.isExpelled);
   const benchPlayers = players.filter(p => !p.isOnField && !p.isExpelled);
@@ -83,6 +91,31 @@ export function TeamPanel({
       setSelectedPlayerOut('');
       setActionType(null);
     }
+  };
+
+  const handleAddPlayer = () => {
+    const num = parseInt(newPlayerNumber, 10);
+    if (!newPlayerNumber || isNaN(num) || num <= 0) {
+      toast.error('Inserisci un numero di maglia valido');
+      return;
+    }
+    
+    // Check if number already exists
+    if (players.some(p => p.number === num)) {
+      toast.error('Numero di maglia già utilizzato');
+      return;
+    }
+    
+    const name = newPlayerName.trim() || `Giocatore #${num}`;
+    
+    if (onAddPlayer) {
+      onAddPlayer(name, num);
+      toast.success(`Giocatore ${name} aggiunto alla panchina`);
+    }
+    
+    setNewPlayerName('');
+    setNewPlayerNumber('');
+    setShowAddPlayerDialog(false);
   };
 
   // Render performance badges for a player
@@ -185,7 +218,8 @@ export function TeamPanel({
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           In campo ({onFieldPlayers.length})
         </p>
-        <div className="space-y-1 max-h-[180px] overflow-y-auto">
+        {/* Show 5 players before scroll */}
+        <div className="space-y-1 max-h-[220px] overflow-y-auto">
           {onFieldPlayers.map(player => (
             <div
               key={player.id}
@@ -202,28 +236,40 @@ export function TeamPanel({
           ))}
         </div>
 
+        {/* Bench with Add Player button */}
+        <div className="flex items-center justify-between pt-2">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Panchina ({benchPlayers.length})
+          </p>
+          {onAddPlayer && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-xs gap-1"
+              onClick={() => setShowAddPlayerDialog(true)}
+            >
+              <Plus className="h-3 w-3" />
+              Aggiungi
+            </Button>
+          )}
+        </div>
         {benchPlayers.length > 0 && (
-          <>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider pt-2">
-              Panchina ({benchPlayers.length})
-            </p>
-            <div className="space-y-1 max-h-[120px] overflow-y-auto">
-              {benchPlayers.map(player => (
-                <div
-                  key={player.id}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-on-bench/10 border border-on-bench/20"
-                >
-                  <span className="w-7 h-7 flex items-center justify-center rounded-full bg-on-bench text-on-bench-foreground text-xs font-bold flex-shrink-0">
-                    {player.number}
-                  </span>
-                  <span className="flex-1 text-xs font-medium truncate">
-                    {player.name}
-                  </span>
-                  {renderBadges(player.id)}
-                </div>
-              ))}
-            </div>
-          </>
+          <div className="space-y-1 max-h-[120px] overflow-y-auto">
+            {benchPlayers.map(player => (
+              <div
+                key={player.id}
+                className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-on-bench/10 border border-on-bench/20"
+              >
+                <span className="w-7 h-7 flex items-center justify-center rounded-full bg-on-bench text-on-bench-foreground text-xs font-bold flex-shrink-0">
+                  {player.number}
+                </span>
+                <span className="flex-1 text-xs font-medium truncate">
+                  {player.name}
+                </span>
+                {renderBadges(player.id)}
+              </div>
+            ))}
+          </div>
         )}
 
         {expelledPlayers.length > 0 && (
@@ -314,6 +360,46 @@ export function TeamPanel({
               ))
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Player Dialog */}
+      <Dialog open={showAddPlayerDialog} onOpenChange={setShowAddPlayerDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Aggiungi Giocatore</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium">Nome (opzionale)</label>
+              <Input
+                value={newPlayerName}
+                onChange={(e) => setNewPlayerName(e.target.value)}
+                placeholder="Es. Mario Rossi"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Numero di maglia *</label>
+              <Input
+                type="number"
+                min="1"
+                value={newPlayerNumber}
+                onChange={(e) => setNewPlayerNumber(e.target.value)}
+                placeholder="Es. 10"
+                className="mt-1"
+                onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddPlayerDialog(false)}>
+              Annulla
+            </Button>
+            <Button onClick={handleAddPlayer}>
+              Aggiungi
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
