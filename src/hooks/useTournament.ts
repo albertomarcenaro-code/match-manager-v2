@@ -124,6 +124,76 @@ export function useTournament() {
     }
   };
 
+  // Load a specific tournament by ID
+  const loadTournamentById = useCallback(async (tournamentId: string) => {
+    if (!user) throw new Error('User not authenticated');
+    
+    setIsLoading(true);
+    try {
+      const { data: tournamentData, error: tournamentError } = await supabase
+        .from('tournaments')
+        .select('*')
+        .eq('id', tournamentId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (tournamentError) throw tournamentError;
+
+      // Mark this tournament as active (and deactivate others)
+      await supabase
+        .from('tournaments')
+        .update({ is_active: false })
+        .eq('user_id', user.id)
+        .neq('id', tournamentId);
+
+      await supabase
+        .from('tournaments')
+        .update({ is_active: true })
+        .eq('id', tournamentId);
+
+      setDbTournamentId(tournamentData.id);
+      
+      const { data: matchesData, error: matchesError } = await supabase
+        .from('tournament_matches')
+        .select('*')
+        .eq('tournament_id', tournamentData.id)
+        .order('match_date', { ascending: true });
+
+      if (matchesError) throw matchesError;
+
+      const players = (tournamentData.players as unknown as TournamentPlayer[]) || [];
+      const matches: TournamentMatch[] = (matchesData || []).map(m => ({
+        id: m.id,
+        date: m.match_date,
+        homeTeamName: m.home_team_name,
+        awayTeamName: m.away_team_name,
+        homeScore: m.home_score,
+        awayScore: m.away_score,
+        playerStats: (m.player_stats as unknown as TournamentPlayerMatchStats[]) || [],
+        events: (m.events as unknown as MatchEvent[]) || [],
+        periodScores: (m.period_scores as unknown as PeriodScore[]) || [],
+      }));
+
+      const loadedTournament: TournamentState = {
+        id: tournamentData.id,
+        name: tournamentData.name,
+        teamName: tournamentData.team_name,
+        players,
+        matches,
+        isActive: true,
+        createdAt: tournamentData.created_at,
+      };
+
+      setTournament(loadedTournament);
+      saveToLocalStorage(loadedTournament);
+    } catch (error) {
+      console.error('Failed to load tournament by ID:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
   const startTournament = useCallback(async (name: string, teamName: string, players: { name: string; number: number | null }[]) => {
     const tournamentPlayers: TournamentPlayer[] = players.map(p => ({
       id: generateId(),
@@ -151,6 +221,12 @@ export function useTournament() {
 
     if (user && !isGuest) {
       try {
+        // Deactivate all other tournaments for this user
+        await supabase
+          .from('tournaments')
+          .update({ is_active: false })
+          .eq('user_id', user.id);
+
         const { data, error } = await supabase
           .from('tournaments')
           .insert({
@@ -308,5 +384,6 @@ export function useTournament() {
     getTournamentPlayers,
     getMatchById,
     loadFromDatabase,
+    loadTournamentById,
   };
 }

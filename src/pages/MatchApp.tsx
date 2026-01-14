@@ -38,9 +38,10 @@ const MatchApp = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isGuest, signOut, exitGuest } = useAuth();
-  const { tournament, addMatchToTournament } = useTournament();
+  const { tournament, addMatchToTournament, startTournament } = useTournament();
   const [phase, setPhase] = useState<AppPhase>('setup');
   const [matchSavedToTournament, setMatchSavedToTournament] = useState(false);
+  const [pendingTournamentName, setPendingTournamentName] = useState<string | null>(null);
   const {
     state,
     setHomeTeamName,
@@ -51,6 +52,8 @@ const MatchApp = () => {
     updatePlayerNumber,
     removePlayer,
     addOpponentPlayer,
+    addHomePlayerWithNumber,
+    addAwayPlayerWithNumber,
     removeOpponentPlayer,
     setStarters,
     confirmStarters,
@@ -73,16 +76,19 @@ const MatchApp = () => {
 
   // Handle navigation state from Dashboard
   useEffect(() => {
-    const navState = location.state as { mode?: string; resume?: boolean } | null;
+    const navState = location.state as { mode?: string; resume?: boolean; createTournament?: boolean; tournamentName?: string } | null;
     
     if (navState?.resume && state.isMatchStarted && !state.isMatchEnded) {
       // Resume existing match
       setPhase('match');
-    } else if (navState?.mode === 'tournament' && !tournament.isActive) {
-      // Tournament mode - will show tournament setup in RosterSetup
+    } else if (navState?.mode === 'tournament') {
+      if (navState.createTournament && navState.tournamentName) {
+        // Store the tournament name to be used after roster setup
+        setPendingTournamentName(navState.tournamentName);
+      }
       setPhase('setup');
     }
-  }, [location.state, state.isMatchStarted, state.isMatchEnded, tournament.isActive]);
+  }, [location.state, state.isMatchStarted, state.isMatchEnded]);
 
   // Calculate player stats for tournament with proper minutes per period
   // Each period is tracked independently - if player plays only T1, they get T1 minutes and 0 for T2
@@ -223,6 +229,13 @@ const MatchApp = () => {
   useBeforeUnload(state.isRunning && !state.isPaused, 'Hai una partita in corso. Sei sicuro di voler uscire?');
 
   const handleRosterComplete = () => {
+    // If we have a pending tournament name, create the tournament first
+    if (pendingTournamentName) {
+      const players = state.homeTeam.players.map(p => ({ name: p.name, number: p.number }));
+      startTournament(pendingTournamentName, state.homeTeam.name, players);
+      setPendingTournamentName(null);
+    }
+    
     forceStarterSelection();
     setPhase('match');
     toast.success('Configurazione completata');
@@ -341,6 +354,7 @@ const MatchApp = () => {
             onBulkAddPlayers={bulkAddPlayers}
             onSwapTeams={swapTeams}
             onCreatePlayersWithNumbers={createPlayersWithNumbers}
+            pendingTournamentName={pendingTournamentName}
           />
         </div>
         <Footer />
@@ -445,6 +459,7 @@ const MatchApp = () => {
                   onSubstitution={(outId, inId) => recordSubstitution('home', outId, inId)}
                   onYellowCard={(id) => recordCard('home', id, 'yellow')}
                   onRedCard={(id) => recordCard('home', id, 'red')}
+                  onAddPlayer={addHomePlayerWithNumber}
                 />
 
                 <TeamPanel
@@ -458,6 +473,7 @@ const MatchApp = () => {
                   onSubstitution={(outId, inId) => recordSubstitution('away', outId, inId)}
                   onYellowCard={(id) => recordCard('away', id, 'yellow')}
                   onRedCard={(id) => recordCard('away', id, 'red')}
+                  onAddPlayer={addAwayPlayerWithNumber}
                 />
               </div>
 

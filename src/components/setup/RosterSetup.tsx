@@ -46,6 +46,7 @@ interface RosterSetupProps {
   onBulkAddPlayers?: (names: string[]) => void;
   onSwapTeams?: () => void;
   onCreatePlayersWithNumbers?: (count: number) => void;
+  pendingTournamentName?: string | null;
 }
 
 export function RosterSetup({
@@ -64,6 +65,7 @@ export function RosterSetup({
   onBulkAddPlayers,
   onSwapTeams,
   onCreatePlayersWithNumbers,
+  pendingTournamentName,
 }: RosterSetupProps) {
   const { user, isGuest } = useAuth();
   const { tournament, startTournament } = useTournament();

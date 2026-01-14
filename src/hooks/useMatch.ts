@@ -298,10 +298,46 @@ export function useMatch() {
     }));
   }, []);
 
-  const addOpponentPlayer = useCallback((number: number) => {
+  const addOpponentPlayer = useCallback((number: number, name?: string) => {
     const player: Player = {
       id: generateId(),
-      name: `Giocatore #${number}`,
+      name: name || `Giocatore #${number}`,
+      number,
+      isOnField: false,
+      isStarter: false,
+    };
+    setState(prev => ({
+      ...prev,
+      awayTeam: {
+        ...prev.awayTeam,
+        players: [...prev.awayTeam.players, player],
+      },
+    }));
+  }, []);
+
+  // Add a player to home team with name and number (for bench additions during match)
+  const addHomePlayerWithNumber = useCallback((name: string, number: number) => {
+    const player: Player = {
+      id: generateId(),
+      name,
+      number,
+      isOnField: false,
+      isStarter: false,
+    };
+    setState(prev => ({
+      ...prev,
+      homeTeam: {
+        ...prev.homeTeam,
+        players: [...prev.homeTeam.players, player],
+      },
+    }));
+  }, []);
+
+  // Add a player to away team with name and number (for bench additions during match)
+  const addAwayPlayerWithNumber = useCallback((name: string, number: number) => {
+    const player: Player = {
+      id: generateId(),
+      name,
       number,
       isOnField: false,
       isStarter: false,
@@ -885,6 +921,8 @@ export function useMatch() {
     updatePlayerNumber,
     removePlayer,
     addOpponentPlayer,
+    addHomePlayerWithNumber,
+    addAwayPlayerWithNumber,
     removeOpponentPlayer,
     setStarters,
     confirmStarters,
