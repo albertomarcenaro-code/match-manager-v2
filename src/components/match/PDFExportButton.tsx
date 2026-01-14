@@ -142,10 +142,29 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
     return stats;
   };
 
+  // Get goal scorers including own goals (with AG prefix)
   const getGoalScorers = (team: 'home' | 'away', period?: number) => {
-    return state.events
+    const goals: string[] = [];
+    
+    // Regular goals for this team
+    state.events
       .filter(e => e.team === team && e.type === 'goal' && (period === undefined || e.period === period))
-      .map(e => e.playerName || 'N/D');
+      .forEach(e => {
+        const name = e.playerName?.split('(')[0].trim() || 'N/D';
+        goals.push(name);
+      });
+    
+    // Own goals: when the OTHER team scores an own goal, it counts for THIS team
+    // An own goal by 'home' team counts as a goal for 'away' team and vice versa
+    const oppositeTeam = team === 'home' ? 'away' : 'home';
+    state.events
+      .filter(e => e.team === oppositeTeam && e.type === 'own_goal' && (period === undefined || e.period === period))
+      .forEach(e => {
+        const name = e.playerName?.split('(')[0].trim() || '';
+        goals.push(`AG ${name}`.trim());
+      });
+    
+    return goals;
   };
 
   const handleExport = () => {
@@ -276,7 +295,7 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         return row;
       });
 
-    const tableHeaders = ['#', 'Nome', ...periodHeaders, 'Tot', 'GOAL', 'CART.'];
+    const tableHeaders = ['#', 'Nome', ...periodHeaders, 'Tot', 'GOAL', 'CARTELLINO'];
 
     autoTable(doc, {
       startY: y + 1,
