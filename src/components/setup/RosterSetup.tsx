@@ -45,6 +45,7 @@ interface RosterSetupProps {
   onComplete: () => void;
   onBulkAddPlayers?: (names: string[]) => void;
   onSwapTeams?: () => void;
+  onCreatePlayersWithNumbers?: (count: number) => void;
 }
 
 export function RosterSetup({
@@ -62,6 +63,7 @@ export function RosterSetup({
   onComplete,
   onBulkAddPlayers,
   onSwapTeams,
+  onCreatePlayersWithNumbers,
 }: RosterSetupProps) {
   const { user, isGuest } = useAuth();
   const { tournament, startTournament } = useTournament();
@@ -424,6 +426,7 @@ export function RosterSetup({
 
   // Auto-numbering logic: completely independent from team_id/team_name
   // Works on local state only, no validation requiring team name
+  // SMART MODE: Creates players automatically if list is empty (Guest mode)
   const handleAutoNumber = () => {
     const count = parseInt(autoNumberCount, 10);
     if (isNaN(count) || count <= 0) {
@@ -432,11 +435,28 @@ export function RosterSetup({
     }
     
     if (autoNumberTeam === 'home') {
+      // SMART: If no players exist, create them automatically with generic names and numbers
+      if (homePlayers.length === 0) {
+        if (onCreatePlayersWithNumbers) {
+          onCreatePlayersWithNumbers(count);
+          toast.success(`Creati ${count} giocatori con numeri progressivi`);
+        } else {
+          // Fallback: create players one by one (less ideal)
+          for (let i = 1; i <= count; i++) {
+            onAddPlayer(`Giocatore ${i}`);
+          }
+          toast.success(`Creati ${count} giocatori (assegna i numeri manualmente)`);
+        }
+        
+        setAutoNumberDialogOpen(false);
+        setAutoNumberCount('');
+        return;
+      }
+      
       const playersWithoutNumbers = homePlayers.filter(p => p.number === null);
       
-      // If no players exist yet but count is specified, we still allow it
-      // This handles guest mode where roster might be empty
-      if (homePlayers.length > 0 && playersWithoutNumbers.length === 0) {
+      // If all players already have numbers
+      if (playersWithoutNumbers.length === 0) {
         toast.info('Tutti i giocatori hanno già un numero assegnato');
         setAutoNumberDialogOpen(false);
         setAutoNumberCount('');
@@ -444,13 +464,6 @@ export function RosterSetup({
       }
 
       const toAssign = Math.min(count, playersWithoutNumbers.length);
-      
-      if (toAssign === 0 && homePlayers.length === 0) {
-        toast.info('Aggiungi prima dei giocatori alla lista');
-        setAutoNumberDialogOpen(false);
-        setAutoNumberCount('');
-        return;
-      }
 
       // Calculate used numbers from current players (local state only)
       const usedNumbers = new Set(homePlayers.filter(p => p.number !== null).map(p => p.number));
@@ -503,7 +516,7 @@ export function RosterSetup({
 
   const handleStartTournament = () => {
     if (!tournamentName.trim()) {
-      toast.error('Inserisci un nome per il torneo');
+      toast.error('Inserisci un nome per il torneo (es. "Campionato 2025")');
       return;
     }
     

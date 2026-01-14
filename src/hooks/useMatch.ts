@@ -27,7 +27,7 @@ const createInitialState = (): MatchState => ({
   },
   events: [],
   currentPeriod: 0,
-  periodDuration: 20,
+  periodDuration: 15, // Default 15 minuti
   totalPeriods: 99,
   elapsedTime: 0,
   isRunning: false,
@@ -239,6 +239,38 @@ export function useMatch() {
         homeTeam: {
           ...prev.homeTeam,
           players: newPlayers,
+        },
+      };
+    });
+  }, []);
+
+  // Create players with automatic numbering (for guest mode)
+  const createPlayersWithNumbers = useCallback((count: number) => {
+    setState(prev => {
+      const existingNumbers = new Set(prev.homeTeam.players.map(p => p.number).filter(n => n !== null));
+      let nextNumber = 1;
+      
+      const newPlayers: Player[] = [];
+      for (let i = 0; i < count; i++) {
+        while (existingNumbers.has(nextNumber)) {
+          nextNumber++;
+        }
+        newPlayers.push({
+          id: generateId(),
+          name: `Giocatore ${nextNumber}`,
+          number: nextNumber,
+          isOnField: false,
+          isStarter: false,
+        });
+        existingNumbers.add(nextNumber);
+        nextNumber++;
+      }
+      
+      return {
+        ...prev,
+        homeTeam: {
+          ...prev.homeTeam,
+          players: [...prev.homeTeam.players, ...newPlayers],
         },
       };
     });
@@ -849,6 +881,7 @@ export function useMatch() {
     setAwayTeamName,
     addPlayer,
     bulkAddPlayers,
+    createPlayersWithNumbers,
     updatePlayerNumber,
     removePlayer,
     addOpponentPlayer,

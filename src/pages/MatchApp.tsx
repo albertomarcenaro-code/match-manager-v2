@@ -47,6 +47,7 @@ const MatchApp = () => {
     setAwayTeamName,
     addPlayer,
     bulkAddPlayers,
+    createPlayersWithNumbers,
     updatePlayerNumber,
     removePlayer,
     addOpponentPlayer,
@@ -339,6 +340,7 @@ const MatchApp = () => {
             onComplete={handleRosterComplete}
             onBulkAddPlayers={bulkAddPlayers}
             onSwapTeams={swapTeams}
+            onCreatePlayersWithNumbers={createPlayersWithNumbers}
           />
         </div>
         <Footer />
