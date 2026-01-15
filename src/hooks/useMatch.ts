@@ -818,32 +818,70 @@ export function useMatch() {
     setState(prev => {
       let playerName = '';
       let playerNumber: number | undefined;
+      const teamPlayers = team === 'home' ? prev.homeTeam.players : prev.awayTeam.players;
+      const player = teamPlayers.find(p => p.id === playerId);
 
       if (team === 'home') {
-        const player = prev.homeTeam.players.find(p => p.id === playerId);
         playerName = player?.name || '';
         playerNumber = player?.number || undefined;
       } else {
-        const player = prev.awayTeam.players.find(p => p.id === playerId);
         playerNumber = player?.number;
-        playerName = `#${playerNumber}`;
+        playerName = player?.name || `#${playerNumber}`;
       }
 
-      const event: MatchEvent = {
-        id: generateId(),
-        type: cardType === 'yellow' ? 'yellow_card' : 'red_card',
-        timestamp: prev.elapsedTime,
-        period: prev.currentPeriod,
-        team,
-        playerId,
-        playerName,
-        playerNumber,
-        description: `${cardType === 'yellow' ? '🟨' : '🟥'} Cartellino ${cardType === 'yellow' ? 'giallo' : 'rosso'} per ${playerName}`,
-      };
+      // Check for double yellow (automatic red)
+      const existingYellows = prev.events.filter(
+        e => e.type === 'yellow_card' && e.team === team && e.playerId === playerId
+      );
+      const isDoubleYellow = cardType === 'yellow' && existingYellows.length >= 1;
+      const effectiveCardType = isDoubleYellow ? 'red' : cardType;
 
-      let newState = { ...prev, events: [...prev.events, event] };
+      // Create yellow card event first if this is a double yellow
+      const newEvents: MatchEvent[] = [];
+      
+      if (isDoubleYellow) {
+        // Add the second yellow card event
+        newEvents.push({
+          id: generateId(),
+          type: 'yellow_card',
+          timestamp: prev.elapsedTime,
+          period: prev.currentPeriod,
+          team,
+          playerId,
+          playerName,
+          playerNumber,
+          description: `🟨 Secondo giallo per ${playerName}`,
+        });
+        // Then add the red card
+        newEvents.push({
+          id: generateId(),
+          type: 'red_card',
+          timestamp: prev.elapsedTime,
+          period: prev.currentPeriod,
+          team,
+          playerId,
+          playerName,
+          playerNumber,
+          description: `🟥 Espulsione per doppia ammonizione: ${playerName}`,
+        });
+      } else {
+        newEvents.push({
+          id: generateId(),
+          type: effectiveCardType === 'yellow' ? 'yellow_card' : 'red_card',
+          timestamp: prev.elapsedTime,
+          period: prev.currentPeriod,
+          team,
+          playerId,
+          playerName,
+          playerNumber,
+          description: `${effectiveCardType === 'yellow' ? '🟨' : '🟥'} Cartellino ${effectiveCardType === 'yellow' ? 'giallo' : 'rosso'} per ${playerName}`,
+        });
+      }
 
-      if (cardType === 'red') {
+      let newState = { ...prev, events: [...prev.events, ...newEvents] };
+
+      // Handle expulsion (red card or double yellow)
+      if (effectiveCardType === 'red') {
         if (team === 'home') {
           newState.homeTeam = {
             ...newState.homeTeam,

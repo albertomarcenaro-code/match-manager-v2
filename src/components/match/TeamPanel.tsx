@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Player, MatchEvent } from '@/types/match';
@@ -10,8 +10,20 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+
+// Haptic feedback utility
+const triggerHaptic = () => {
+  if ('vibrate' in navigator) {
+    navigator.vibrate(50);
+  }
+};
 
 interface TeamPanelProps {
   teamName: string;
@@ -93,7 +105,11 @@ export function TeamPanel({
     }
   };
 
-  const handleAddPlayer = () => {
+  const [showQuickAddPopover, setShowQuickAddPopover] = useState(false);
+  const [quickAddName, setQuickAddName] = useState('');
+  const [quickAddNumber, setQuickAddNumber] = useState('');
+
+  const handleAddPlayer = useCallback(() => {
     const num = parseInt(newPlayerNumber, 10);
     if (!newPlayerNumber || isNaN(num) || num <= 0) {
       toast.error('Inserisci un numero di maglia valido');
@@ -110,13 +126,39 @@ export function TeamPanel({
     
     if (onAddPlayer) {
       onAddPlayer(name, num);
+      triggerHaptic();
       toast.success(`Giocatore ${name} aggiunto alla panchina`);
     }
     
     setNewPlayerName('');
     setNewPlayerNumber('');
     setShowAddPlayerDialog(false);
-  };
+  }, [newPlayerNumber, newPlayerName, players, onAddPlayer]);
+
+  const handleQuickAddPlayer = useCallback(() => {
+    const num = parseInt(quickAddNumber, 10);
+    if (!quickAddNumber || isNaN(num) || num <= 0) {
+      toast.error('Inserisci un numero valido');
+      return;
+    }
+    
+    if (players.some(p => p.number === num)) {
+      toast.error('Numero già utilizzato');
+      return;
+    }
+    
+    const name = quickAddName.trim() || `Giocatore #${num}`;
+    
+    if (onAddPlayer) {
+      onAddPlayer(name, num);
+      triggerHaptic();
+      toast.success(`${name} aggiunto`);
+    }
+    
+    setQuickAddName('');
+    setQuickAddNumber('');
+    setShowQuickAddPopover(false);
+  }, [quickAddNumber, quickAddName, players, onAddPlayer]);
 
   // Render performance badges for a player
   const renderBadges = (playerId: string) => {
@@ -236,21 +278,48 @@ export function TeamPanel({
           ))}
         </div>
 
-        {/* Bench with Add Player button */}
+        {/* Bench with Quick Add Popover */}
         <div className="flex items-center justify-between pt-2">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Panchina ({benchPlayers.length})
           </p>
           {onAddPlayer && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 px-2 text-xs gap-1"
-              onClick={() => setShowAddPlayerDialog(true)}
-            >
-              <Plus className="h-3 w-3" />
-              Aggiungi
-            </Button>
+            <Popover open={showQuickAddPopover} onOpenChange={setShowQuickAddPopover}>
+              <PopoverTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2 text-xs gap-1"
+                >
+                  <Plus className="h-3 w-3" />
+                  Aggiungi
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-3" align="end">
+                <div className="space-y-2">
+                  <Input
+                    placeholder="Nome (opz.)"
+                    value={quickAddName}
+                    onChange={(e) => setQuickAddName(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      min="1"
+                      placeholder="#"
+                      value={quickAddNumber}
+                      onChange={(e) => setQuickAddNumber(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleQuickAddPlayer()}
+                      className="h-8 text-sm w-16"
+                    />
+                    <Button size="sm" className="h-8 flex-1" onClick={handleQuickAddPlayer}>
+                      Aggiungi
+                    </Button>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
           )}
         </div>
         {benchPlayers.length > 0 && (

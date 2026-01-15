@@ -16,10 +16,11 @@ interface PlayerMinutes {
 }
 
 export function PDFExportButton({ state }: PDFExportButtonProps) {
+  // Format time as mm'ss" always including seconds
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}'${secs.toString().padStart(2, '0')}"`;
   };
 
   /**
@@ -208,7 +209,7 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
     doc.setFontSize(10);
     doc.text(state.awayTeam.name, centerX + 25, y, { align: 'left' });
 
-    // Period scores with scorers - centered
+    // Period scores with scorers - home left, away right
     y = 20;
     doc.setFontSize(6);
     doc.setFont('helvetica', 'normal');
@@ -228,13 +229,15 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         doc.text(text, centerX, y, { align: 'center' });
         y += 3;
         
-        // Scorers or "Nessun gol"
+        // Scorers: home left-aligned, away right-aligned
         if (homeScorers.length > 0 || awayScorers.length > 0) {
-          const scorersText: string[] = [];
-          if (homeScorers.length > 0) scorersText.push(`Casa: ${homeScorers.join(', ')}`);
-          if (awayScorers.length > 0) scorersText.push(`Ospiti: ${awayScorers.join(', ')}`);
           doc.setFontSize(5);
-          doc.text(scorersText.join('  |  '), centerX, y, { align: 'center' });
+          if (homeScorers.length > 0) {
+            doc.text(homeScorers.join(', '), margin, y, { align: 'left' });
+          }
+          if (awayScorers.length > 0) {
+            doc.text(awayScorers.join(', '), pageWidth - margin, y, { align: 'right' });
+          }
           doc.setFontSize(6);
           y += 3;
         } else if (ps.homeScore === 0 && ps.awayScore === 0) {
@@ -275,9 +278,10 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         const mins = homeMinutes[p.id] || { total: 0 };
         const pStats = homeStats[p.id] || { goals: 0, yellowCards: 0, redCards: 0 };
         
+        // Full name without truncation
         const row: string[] = [
           p.number?.toString() || '',
-          p.name.length > 10 ? p.name.substring(0, 9) + '.' : p.name,
+          p.name,
         ];
         
         for (let i = 1; i <= periodsPlayed; i++) {
@@ -314,8 +318,8 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         cellPadding: 0.8,
       },
       columnStyles: {
-        0: { cellWidth: 5 },
-        1: { cellWidth: 18 },
+        0: { cellWidth: 6 },
+        1: { cellWidth: 'auto' },
       },
       tableWidth: tableWidth,
       margin: { left: margin },
@@ -336,10 +340,11 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         const mins = awayMinutes[p.id] || { total: 0 };
         const pStats = awayStats[p.id] || { goals: 0, yellowCards: 0, redCards: 0 };
         
+        // Full name without truncation
         const displayName = p.name || `#${p.number}`;
         const row: string[] = [
           p.number?.toString() || '',
-          displayName.length > 10 ? displayName.substring(0, 9) + '.' : displayName,
+          displayName,
         ];
         
         for (let i = 1; i <= periodsPlayed; i++) {
@@ -374,8 +379,8 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         cellPadding: 0.8,
       },
       columnStyles: {
-        0: { cellWidth: 5 },
-        1: { cellWidth: 18 },
+        0: { cellWidth: 6 },
+        1: { cellWidth: 'auto' },
       },
       tableWidth: tableWidth,
       margin: { left: pageWidth / 2 + margin / 2 },
@@ -391,9 +396,29 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
     doc.text('CRONACA', margin, y);
     y += 2;
 
+    // Filter out internal player_in/player_out events, keep significant events
     const significantEvents = state.events.filter(
-      e => e.type !== 'period_start' && e.type !== 'period_end'
+      e => e.type !== 'player_in' && e.type !== 'player_out' && e.type !== 'period_start' && e.type !== 'period_end'
     );
+
+    // Add grouped period starts
+    const periodStartEvents = state.events.filter(e => e.type === 'period_start');
+    periodStartEvents.forEach(pse => {
+      const starters = state.events.filter(
+        e => e.type === 'player_in' && e.period === pse.period && e.timestamp === 0
+      );
+      if (starters.length > 0) {
+        const homeStarters = starters.filter(e => e.team === 'home').map(e => e.playerName?.split('(')[0].trim()).filter(Boolean);
+        const awayStarters = starters.filter(e => e.team === 'away').map(e => e.playerName?.split('(')[0].trim()).filter(Boolean);
+        significantEvents.unshift({
+          ...pse,
+          description: `Inizio ${pse.period}° tempo - Casa: ${homeStarters.join(', ') || '-'} | Ospiti: ${awayStarters.join(', ') || '-'}`,
+        });
+      }
+    });
+
+    // Sort by period then timestamp
+    significantEvents.sort((a, b) => a.period - b.period || a.timestamp - b.timestamp);
 
     if (significantEvents.length > 0) {
       const eventData = significantEvents.map(e => {
@@ -405,6 +430,7 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
           case 'substitution': tipo = 'CAMBIO'; break;
           case 'yellow_card': tipo = 'AMMONIZIONE'; break;
           case 'red_card': tipo = 'ESPULSIONE'; break;
+          case 'period_start': tipo = 'INIZIO'; break;
         }
         
         // Clean description - remove emojis and redundant text
@@ -422,24 +448,21 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         // Remove team name in parentheses from player names
         cleanDesc = cleanDesc.replace(/\s*\([^)]+\)\s*/g, ' ').trim();
         
-        if (cleanDesc.length > 50) cleanDesc = cleanDesc.substring(0, 49) + '...';
-        
-        // Full team name
+        // Full team name - no truncation
         const teamName = e.team === 'home' ? state.homeTeam.name : state.awayTeam.name;
-        const shortTeamName = teamName.length > 12 ? teamName.substring(0, 11) + '.' : teamName;
         
         return [
           `${e.period}T`,
           formatTime(e.timestamp),
           tipo,
-          shortTeamName,
+          teamName,
           cleanDesc
         ];
       });
 
       autoTable(doc, {
         startY: y,
-        head: [['Tempo', 'Minuto', 'Evento', 'Squadra', 'Descrizione']],
+        head: [['Tempo', 'Minuto', 'Evento', 'SQUADRA', 'Descrizione']],
         body: eventData,
         theme: 'plain',
         headStyles: { 
@@ -455,8 +478,8 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         columnStyles: {
           0: { cellWidth: 8 },
           1: { cellWidth: 12 },
-          2: { cellWidth: 20 },
-          3: { cellWidth: 25 },
+          2: { cellWidth: 18 },
+          3: { cellWidth: 'auto' },
           4: { cellWidth: 'auto' },
         },
         tableWidth: pageWidth - margin * 2,

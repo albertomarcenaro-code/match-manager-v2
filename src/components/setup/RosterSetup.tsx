@@ -594,14 +594,9 @@ export function RosterSetup({
             <div className="p-4 gradient-home text-team-home-foreground">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  <span className="font-bold">Squadra di casa</span>
-                  {homePlayers.length > 0 && homePlayers.some(p => p.number !== null) && (
-                    <span className="text-xs px-2 py-0.5 bg-team-home-foreground/20 rounded-full">
-                      MIA SQUADRA
-                    </span>
-                  )}
-                </div>
+606:                   <Users className="h-5 w-5" />
+607:                   <span className="font-bold">Squadra di casa</span>
+608:                 </div>
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"

@@ -9,11 +9,48 @@ interface EventTimelineProps {
 }
 
 export function EventTimeline({ events, homeTeamName, awayTeamName }: EventTimelineProps) {
+  // Format time as mm'ss" always including seconds
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}'${secs > 0 ? secs.toString().padStart(2, '0') : ''}`;
+    return `${mins}'${secs.toString().padStart(2, '0')}"`;
   };
+
+  // Group period_start events into a single entry
+  const groupedEvents = events.reduce((acc, event, index) => {
+    if (event.type === 'period_start') {
+      // Find all player_in events for the same period immediately after
+      const periodInEvents = events.filter(
+        (e, i) => i > index && e.period === event.period && e.type === 'player_in'
+      );
+      
+      if (periodInEvents.length > 0) {
+        // Create grouped event with all starters
+        const homeStarters = periodInEvents
+          .filter(e => e.team === 'home')
+          .map(e => e.playerName?.split('(')[0].trim())
+          .filter(Boolean);
+        const awayStarters = periodInEvents
+          .filter(e => e.team === 'away')
+          .map(e => e.playerName?.split('(')[0].trim())
+          .filter(Boolean);
+        
+        acc.push({
+          ...event,
+          description: event.description,
+          _groupedStarters: { home: homeStarters, away: awayStarters },
+        });
+      } else {
+        acc.push(event);
+      }
+    } else if (event.type === 'player_in' || event.type === 'player_out') {
+      // Skip individual player_in/player_out events - they're grouped or internal
+      return acc;
+    } else {
+      acc.push(event);
+    }
+    return acc;
+  }, [] as (MatchEvent & { _groupedStarters?: { home: string[]; away: string[] } })[]);
 
   const getEventIcon = (type: MatchEvent['type'], team: 'home' | 'away') => {
     const borderColor = team === 'home' ? 'border-team-home' : 'border-team-away';
@@ -79,12 +116,12 @@ export function EventTimeline({ events, homeTeamName, awayTeamName }: EventTimel
       </div>
       
       <div className="divide-y divide-border max-h-[400px] overflow-y-auto">
-        {events.map((event, idx) => (
+        {groupedEvents.map((event, idx) => (
           <div
             key={event.id}
             className={cn(
               "flex items-start gap-3 p-3 animate-slide-up",
-              idx === events.length - 1 && event.type !== 'period_end' ? 'bg-accent/50' : ''
+              idx === groupedEvents.length - 1 && event.type !== 'period_end' ? 'bg-accent/50' : ''
             )}
             style={{ animationDelay: `${idx * 50}ms` }}
           >
@@ -106,6 +143,17 @@ export function EventTimeline({ events, homeTeamName, awayTeamName }: EventTimel
             {/* Description */}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium">{event.description}</p>
+              {/* Show grouped starters for period_start */}
+              {event.type === 'period_start' && (event as any)._groupedStarters && (
+                <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                  {(event as any)._groupedStarters.home.length > 0 && (
+                    <p><span className="font-medium">{homeTeamName}:</span> {(event as any)._groupedStarters.home.join(', ')}</p>
+                  )}
+                  {(event as any)._groupedStarters.away.length > 0 && (
+                    <p><span className="font-medium">{awayTeamName}:</span> {(event as any)._groupedStarters.away.join(', ')}</p>
+                  )}
+                </div>
+              )}
               {(event.type === 'period_end') && (
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {homeTeamName} {event.homeScore} - {event.awayScore} {awayTeamName}

@@ -249,13 +249,25 @@ const MatchApp = () => {
   };
 
   const handleNewMatch = () => {
-    resetMatch();
-    setMatchSavedToTournament(false);
-    setPhase('setup');
-    toast.success('Nuova partita iniziata');
+    // For tournament mode: keep home team players, clear away team
+    if (tournament.isActive) {
+      // Just reset match state but preserve home team roster
+      resetMatch();
+      setMatchSavedToTournament(false);
+      setPhase('setup');
+      toast.success('Nuova partita torneo - la tua squadra è pronta');
+    } else {
+      resetMatch();
+      setMatchSavedToTournament(false);
+      setPhase('setup');
+      toast.success('Nuova partita iniziata');
+    }
   };
 
   const handleGoHome = () => {
+    // Home button = exit current context completely
+    resetMatch();
+    setMatchSavedToTournament(false);
     navigate('/dashboard');
   };
 

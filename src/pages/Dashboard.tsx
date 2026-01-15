@@ -9,7 +9,7 @@ import { Footer } from '@/components/layout/Footer';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTournament } from '@/hooks/useTournament';
 import { Helmet } from 'react-helmet';
-import { Play, Trophy, LogOut, RefreshCw, History, Lock, Plus, FolderOpen } from 'lucide-react';
+import { Play, Trophy, LogOut, RefreshCw, History, Lock, Plus, FolderOpen, Wifi, WifiOff } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
 
 const STORAGE_KEY = 'match-manager-state';
 
@@ -64,6 +65,7 @@ const Dashboard = () => {
   const [savedTournaments, setSavedTournaments] = useState<SavedTournament[]>([]);
   const [newTournamentName, setNewTournamentName] = useState('');
   const [isLoadingTournaments, setIsLoadingTournaments] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
 
   // Check for active match session
   useEffect(() => {
@@ -79,6 +81,27 @@ const Dashboard = () => {
       console.error('Error checking active session:', e);
     }
   }, []);
+
+  // Check Supabase sync status
+  useEffect(() => {
+    const checkSync = async () => {
+      if (!user || isGuest) {
+        setSyncStatus('disconnected');
+        return;
+      }
+      
+      try {
+        const { error } = await supabase.from('profiles').select('id').limit(1);
+        setSyncStatus(error ? 'disconnected' : 'connected');
+      } catch {
+        setSyncStatus('disconnected');
+      }
+    };
+    
+    checkSync();
+    const interval = setInterval(checkSync, 30000); // Check every 30s
+    return () => clearInterval(interval);
+  }, [user, isGuest]);
 
   const loadSavedTournaments = async () => {
     if (!user) return;
@@ -211,13 +234,39 @@ const Dashboard = () => {
 
       <main className="flex-1 bg-background p-4">
         <div className="max-w-2xl mx-auto">
-          {/* User info */}
+          {/* User info with sync status */}
           <div className="flex justify-between items-center mb-8">
-            <div className="text-sm text-muted-foreground">
-              {isGuest ? (
-                <span className="flex items-center gap-1">Modalità Ospite</span>
-              ) : (
-                <span className="flex items-center gap-1">{user?.email}</span>
+            <div className="flex items-center gap-3">
+              <div className="text-sm text-muted-foreground">
+                {isGuest ? (
+                  <span className="flex items-center gap-1">Modalità Ospite</span>
+                ) : (
+                  <span className="flex items-center gap-1">{user?.email}</span>
+                )}
+              </div>
+              {/* Sync Status LED */}
+              {!isGuest && (
+                <div 
+                  className={cn(
+                    "flex items-center gap-1.5 px-2 py-1 rounded-full text-xs",
+                    syncStatus === 'connected' && "bg-green-500/10 text-green-600",
+                    syncStatus === 'disconnected' && "bg-red-500/10 text-red-600",
+                    syncStatus === 'checking' && "bg-yellow-500/10 text-yellow-600"
+                  )}
+                  title={syncStatus === 'connected' ? 'Sincronizzato con il cloud' : 'Non sincronizzato'}
+                >
+                  {syncStatus === 'connected' ? (
+                    <Wifi className="h-3 w-3" />
+                  ) : (
+                    <WifiOff className="h-3 w-3" />
+                  )}
+                  <span className={cn(
+                    "w-2 h-2 rounded-full",
+                    syncStatus === 'connected' && "bg-green-500",
+                    syncStatus === 'disconnected' && "bg-red-500",
+                    syncStatus === 'checking' && "bg-yellow-500 animate-pulse"
+                  )} />
+                </div>
               )}
             </div>
             <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-1">
