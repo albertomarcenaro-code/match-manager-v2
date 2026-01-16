@@ -15,7 +15,7 @@ import { MatchSettings } from '@/components/match/MatchSettings';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
-import { RotateCcw, Edit, LogOut, Home, Trophy, Plus } from 'lucide-react';
+import { RotateCcw, Edit, Home, Trophy, Plus } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,17 +31,19 @@ import { Helmet } from 'react-helmet';
 import { toast } from 'sonner';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { TournamentPlayerMatchStats } from '@/types/tournament';
+import { supabase } from '@/integrations/supabase/client';
 
 type AppPhase = 'setup' | 'starterSelection' | 'match';
 
 const MatchApp = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isGuest, signOut, exitGuest } = useAuth();
+  const { user, isGuest } = useAuth();
   const { tournament, addMatchToTournament, startTournament } = useTournament();
   const [phase, setPhase] = useState<AppPhase>('setup');
   const [matchSavedToTournament, setMatchSavedToTournament] = useState(false);
   const [pendingTournamentName, setPendingTournamentName] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
   const {
     state,
     setHomeTeamName,
@@ -73,6 +75,27 @@ const MatchApp = () => {
     forceStarterSelection,
     swapTeams,
   } = useMatch();
+
+  // Check sync status
+  useEffect(() => {
+    const checkSync = async () => {
+      if (!user || isGuest) {
+        setSyncStatus('disconnected');
+        return;
+      }
+      
+      try {
+        const { error } = await supabase.from('profiles').select('id').limit(1);
+        setSyncStatus(error ? 'disconnected' : 'connected');
+      } catch {
+        setSyncStatus('disconnected');
+      }
+    };
+    
+    checkSync();
+    const interval = setInterval(checkSync, 30000);
+    return () => clearInterval(interval);
+  }, [user, isGuest]);
 
   // Handle navigation state from Dashboard
   useEffect(() => {
@@ -249,15 +272,14 @@ const MatchApp = () => {
   };
 
   const handleNewMatch = () => {
-    // For tournament mode: keep home team players, clear away team
+    // For tournament mode: keep home team players (names only), clear away team
     if (tournament.isActive) {
-      // Just reset match state but preserve home team roster
-      resetMatch();
+      resetMatch(true); // Preserve home team
       setMatchSavedToTournament(false);
       setPhase('setup');
       toast.success('Nuova partita torneo - la tua squadra è pronta');
     } else {
-      resetMatch();
+      resetMatch(false); // Reset everything
       setMatchSavedToTournament(false);
       setPhase('setup');
       toast.success('Nuova partita iniziata');
@@ -266,32 +288,23 @@ const MatchApp = () => {
 
   const handleGoHome = () => {
     // Home button = exit current context completely
-    resetMatch();
+    resetMatch(false);
     setMatchSavedToTournament(false);
     navigate('/dashboard');
   };
 
   const handleExitMatch = () => {
     // Reset match and go to dashboard
-    resetMatch();
+    resetMatch(false);
     setMatchSavedToTournament(false);
     navigate('/dashboard');
   };
 
-  const handleLogout = async () => {
-    if (isGuest) {
-      exitGuest();
-    } else {
-      await signOut();
-    }
-    toast.success('Disconnesso');
-    navigate('/');
-  };
 
   if (phase === 'setup') {
     return (
       <div className="min-h-screen flex flex-col">
-        <Header />
+        <Header syncStatus={syncStatus} />
         <Helmet>
           <title>Gestione Partita - Match Manager Live</title>
           <meta name="description" content="Applicazione per la gestione in tempo reale degli eventi durante partite di calcio giovanile. Traccia gol, sostituzioni, cartellini e cronaca live." />
@@ -343,10 +356,6 @@ const MatchApp = () => {
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
-                <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-1">
-                  <LogOut className="h-4 w-4" />
-                  Esci
-                </Button>
               </div>
             </div>
           </div>
@@ -376,7 +385,7 @@ const MatchApp = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header />
+      <Header syncStatus={syncStatus} />
       <Helmet>
         <title>{state.homeTeam.name || 'Casa'} vs {state.awayTeam.name || 'Ospite'} - Partita in Corso</title>
         <meta name="description" content={`Segui la partita ${state.homeTeam.name} contro ${state.awayTeam.name}. Cronaca live e gestione eventi.`} />
@@ -395,9 +404,6 @@ const MatchApp = () => {
               >
                 <Edit className="h-4 w-4" />
                 <span className="hidden sm:inline">Modifica rose</span>
-              </Button>
-              <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-1">
-                <LogOut className="h-4 w-4" />
               </Button>
             </div>
 
