@@ -9,7 +9,7 @@ import { Footer } from '@/components/layout/Footer';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTournament } from '@/hooks/useTournament';
 import { Helmet } from 'react-helmet';
-import { Play, Trophy, LogOut, RefreshCw, History, Lock, Plus, FolderOpen, Wifi, WifiOff } from 'lucide-react';
+import { Play, Trophy, RefreshCw, History, Lock, Plus, FolderOpen, AlertTriangle } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,7 +30,6 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { cn } from '@/lib/utils';
 
 const STORAGE_KEY = 'match-manager-state';
 
@@ -52,7 +51,7 @@ interface SavedTournament {
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user, isGuest, signOut, exitGuest } = useAuth();
+  const { user, isGuest } = useAuth();
   const { tournament, loadTournamentById } = useTournament();
   const [activeSession, setActiveSession] = useState<SavedMatchState | null>(null);
   const [showActiveSessionDialog, setShowActiveSessionDialog] = useState(false);
@@ -122,16 +121,6 @@ const Dashboard = () => {
     } finally {
       setIsLoadingTournaments(false);
     }
-  };
-
-  const handleLogout = async () => {
-    if (isGuest) {
-      exitGuest();
-    } else {
-      await signOut();
-    }
-    toast.success('Disconnesso');
-    navigate('/');
   };
 
   const handleNewSingleMatch = () => {
@@ -225,66 +214,28 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
+    <div className="h-screen flex flex-col overflow-hidden">
+      <Header syncStatus={syncStatus} />
       <Helmet>
         <title>Dashboard - Match Manager Live</title>
         <meta name="description" content="Gestisci le tue partite di calcio. Scegli tra partita singola o modalità torneo." />
       </Helmet>
 
-      <main className="flex-1 bg-background p-4">
+      <main className="flex-1 bg-background p-4 overflow-y-auto">
         <div className="max-w-2xl mx-auto">
-          {/* User info with sync status */}
-          <div className="flex justify-between items-center mb-8">
-            <div className="flex items-center gap-3">
-              <div className="text-sm text-muted-foreground">
-                {isGuest ? (
-                  <span className="flex items-center gap-1">Modalità Ospite</span>
-                ) : (
-                  <span className="flex items-center gap-1">{user?.email}</span>
-                )}
-              </div>
-              {/* Sync Status LED */}
-              {!isGuest && (
-                <div 
-                  className={cn(
-                    "flex items-center gap-1.5 px-2 py-1 rounded-full text-xs",
-                    syncStatus === 'connected' && "bg-green-500/10 text-green-600",
-                    syncStatus === 'disconnected' && "bg-red-500/10 text-red-600",
-                    syncStatus === 'checking' && "bg-yellow-500/10 text-yellow-600"
-                  )}
-                  title={syncStatus === 'connected' ? 'Sincronizzato con il cloud' : 'Non sincronizzato'}
-                >
-                  {syncStatus === 'connected' ? (
-                    <Wifi className="h-3 w-3" />
-                  ) : (
-                    <WifiOff className="h-3 w-3" />
-                  )}
-                  <span className={cn(
-                    "w-2 h-2 rounded-full",
-                    syncStatus === 'connected' && "bg-green-500",
-                    syncStatus === 'disconnected' && "bg-red-500",
-                    syncStatus === 'checking' && "bg-yellow-500 animate-pulse"
-                  )} />
-                </div>
-              )}
-            </div>
-            <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-1">
-              <LogOut className="h-4 w-4" />
-              Esci
-            </Button>
-          </div>
-
           {/* Active session banner */}
           {activeSession && (
             <Card className="p-4 mb-6 border-secondary bg-secondary/10">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-secondary">Partita in corso</p>
-                  <p className="text-sm text-muted-foreground">
-                    {activeSession.homeTeam.name || 'Casa'} {activeSession.homeTeam.score} - {activeSession.awayTeam.score} {activeSession.awayTeam.name || 'Ospite'}
-                    {activeSession.currentPeriod > 0 && ` (${activeSession.currentPeriod}° tempo)`}
-                  </p>
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="h-5 w-5 text-secondary" />
+                  <div>
+                    <p className="font-semibold text-secondary">Partita in corso</p>
+                    <p className="text-sm text-muted-foreground">
+                      {activeSession.homeTeam.name || 'Casa'} {activeSession.homeTeam.score} - {activeSession.awayTeam.score} {activeSession.awayTeam.name || 'Ospite'}
+                      {activeSession.currentPeriod > 0 && ` (${activeSession.currentPeriod}° tempo)`}
+                    </p>
+                  </div>
                 </div>
                 <Button onClick={() => navigate('/match', { state: { resume: true } })} className="gap-2">
                   <RefreshCw className="h-4 w-4" />

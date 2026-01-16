@@ -621,6 +621,21 @@ export function useMatch() {
   }, []);
 
   const endMatch = useCallback(() => {
+    // Clear timer state immediately to prevent ghost timer
+    startTimestampRef.current = null;
+    pausedAtRef.current = null;
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    
+    // Clear localStorage timer state
+    try {
+      localStorage.removeItem(TIMER_STATE_KEY);
+    } catch (e) {
+      console.error('Failed to clear timer state:', e);
+    }
+    
     setState(prev => {
       let newState = { ...prev };
       
@@ -636,6 +651,36 @@ export function useMatch() {
           awayScore: prev.awayTeam.score - previousPeriodScore.away,
         };
 
+        // Add player_out events for all players on field
+        const newEvents: MatchEvent[] = [];
+        prev.homeTeam.players.filter(p => p.isOnField && !p.isExpelled).forEach(p => {
+          newEvents.push({
+            id: generateId(),
+            type: 'player_out',
+            timestamp: prev.elapsedTime,
+            period: prev.currentPeriod,
+            team: 'home',
+            playerId: p.id,
+            playerName: p.name,
+            playerNumber: p.number ?? undefined,
+            description: `OUT: ${p.name} (#${p.number})`,
+          });
+        });
+        
+        prev.awayTeam.players.filter(p => p.isOnField && !p.isExpelled).forEach(p => {
+          newEvents.push({
+            id: generateId(),
+            type: 'player_out',
+            timestamp: prev.elapsedTime,
+            period: prev.currentPeriod,
+            team: 'away',
+            playerId: p.id,
+            playerName: p.name || `#${p.number}`,
+            playerNumber: p.number ?? undefined,
+            description: `OUT: ${p.name || `#${p.number}`}`,
+          });
+        });
+
         const periodEndEvent: MatchEvent = {
           id: generateId(),
           type: 'period_end',
@@ -650,7 +695,7 @@ export function useMatch() {
         newState = {
           ...newState,
           periodScores: [...prev.periodScores, periodScore],
-          events: [...prev.events, periodEndEvent],
+          events: [...prev.events, ...newEvents, periodEndEvent],
         };
       }
 
@@ -903,31 +948,42 @@ export function useMatch() {
     });
   }, []);
 
-  const resetMatch = useCallback(() => {
+  const resetMatch = useCallback((preserveHomeTeam: boolean = false) => {
     clearStorage();
-    // Clear all jersey numbers and reset roster state
-    // Keep player names if in tournament mode (handled by caller)
-    // but always reset numbers, events, and match state
+    // Clear timer refs
+    startTimestampRef.current = null;
+    pausedAtRef.current = null;
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    
     setState(prev => {
-      const resetPlayers = (players: Player[]) => 
-        players.map(p => ({
-          ...p,
-          number: null,
-          isOnField: false,
-          isStarter: false,
-          isExpelled: false,
-        }));
-      
-      return {
-        ...createInitialState(),
-        // Preserve home team names but reset numbers
-        homeTeam: {
-          ...createInitialState().homeTeam,
-          players: resetPlayers(prev.homeTeam.players),
-        },
-        // Clear away team completely
-        awayTeam: createInitialState().awayTeam,
-      };
+      if (preserveHomeTeam) {
+        // Tournament mode: keep home team names, reset numbers
+        const resetPlayers = (players: Player[]) => 
+          players.map(p => ({
+            ...p,
+            number: null,
+            isOnField: false,
+            isStarter: false,
+            isExpelled: false,
+          }));
+        
+        return {
+          ...createInitialState(),
+          homeTeam: {
+            ...prev.homeTeam,
+            score: 0,
+            players: resetPlayers(prev.homeTeam.players),
+          },
+          // Clear away team completely
+          awayTeam: createInitialState().awayTeam,
+        };
+      } else {
+        // Single match mode: reset everything
+        return createInitialState();
+      }
     });
   }, []);
 
