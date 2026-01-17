@@ -31,6 +31,7 @@ interface TeamPanelProps {
   isHome: boolean;
   isRunning: boolean;
   events: MatchEvent[];
+  isMatchEnded?: boolean;
   onGoal: (playerId: string) => void;
   onOwnGoal: (playerId: string) => void;
   onSubstitution: (outId: string, inId: string) => void;
@@ -47,6 +48,7 @@ export function TeamPanel({
   isHome,
   isRunning,
   events,
+  isMatchEnded = false,
   onGoal,
   onOwnGoal,
   onSubstitution,
@@ -283,7 +285,7 @@ export function TeamPanel({
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Panchina ({benchPlayers.length})
           </p>
-          {onAddPlayer && (
+          {onAddPlayer && !isMatchEnded && (
             <Popover open={showQuickAddPopover} onOpenChange={setShowQuickAddPopover}>
               <PopoverTrigger asChild>
                 <Button

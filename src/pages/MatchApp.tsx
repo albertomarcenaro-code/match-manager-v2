@@ -15,7 +15,7 @@ import { MatchSettings } from '@/components/match/MatchSettings';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
-import { RotateCcw, Edit, Home, Trophy, Plus } from 'lucide-react';
+import { RotateCcw, Edit, Home, Trophy, Plus, Check } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -97,21 +97,39 @@ const MatchApp = () => {
     return () => clearInterval(interval);
   }, [user, isGuest]);
 
-  // Handle navigation state from Dashboard
+  // Handle navigation state from Dashboard - only run once on mount
   useEffect(() => {
     const navState = location.state as { mode?: string; resume?: boolean; createTournament?: boolean; tournamentName?: string } | null;
     
-    if (navState?.resume && state.isMatchStarted && !state.isMatchEnded) {
-      // Resume existing match
+    if (navState?.resume && state.isMatchStarted) {
+      // Resume existing match - go directly to match phase
       setPhase('match');
     } else if (navState?.mode === 'tournament') {
       if (navState.createTournament && navState.tournamentName) {
         // Store the tournament name to be used after roster setup
         setPendingTournamentName(navState.tournamentName);
       }
-      setPhase('setup');
+      // Only go to setup if match hasn't started yet
+      if (!state.isMatchStarted) {
+        setPhase('setup');
+      } else {
+        setPhase('match');
+      }
+    } else if (navState?.mode === 'single') {
+      // Single match mode
+      if (!state.isMatchStarted) {
+        setPhase('setup');
+      } else {
+        setPhase('match');
+      }
     }
-  }, [location.state, state.isMatchStarted, state.isMatchEnded]);
+    
+    // Clear navigation state to prevent re-triggering
+    if (navState) {
+      window.history.replaceState({}, document.title);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   // Calculate player stats for tournament with proper minutes per period
   // Each period is tracked independently - if player plays only T1, they get T1 minutes and 0 for T2
@@ -264,12 +282,12 @@ const MatchApp = () => {
     toast.success('Configurazione completata');
   };
 
-  const handleStartersConfirm = (homeStarters: string[], awayStarters: string[]) => {
+  const handleStartersConfirm = useCallback((homeStarters: string[], awayStarters: string[]) => {
     setStarters(homeStarters, true);
     setStarters(awayStarters, false);
     confirmStarters();
-    toast.success('Titolari confermati');
-  };
+    toast.success('Titolari confermati - Premi "Inizia Tempo" per partire');
+  }, [setStarters, confirmStarters]);
 
   const handleNewMatch = () => {
     // For tournament mode: keep home team players (names only), clear away team
@@ -392,53 +410,63 @@ const MatchApp = () => {
       </Helmet>
       <main className="flex-1 bg-background p-4 pb-8">
         <div className="max-w-6xl mx-auto space-y-4">
-          {/* Top Bar */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPhase('setup')}
-                disabled={state.isRunning}
-                className="gap-1"
-              >
-                <Edit className="h-4 w-4" />
-                <span className="hidden sm:inline">Modifica rose</span>
-              </Button>
-            </div>
+          {/* Top Bar - Hide edit controls when match is completed */}
+          {!state.isMatchEnded && (
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPhase('setup')}
+                  disabled={state.isRunning}
+                  className="gap-1"
+                >
+                  <Edit className="h-4 w-4" />
+                  <span className="hidden sm:inline">Modifica rose</span>
+                </Button>
+              </div>
 
-            <div className="flex items-center gap-2">
-              <MatchSettings
-                periodDuration={state.periodDuration}
-                totalPeriods={state.totalPeriods}
-                onPeriodDurationChange={setPeriodDuration}
-                onTotalPeriodsChange={setTotalPeriods}
-                disabled={state.isMatchStarted}
-              />
-              
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="outline" size="icon">
-                    <RotateCcw className="h-5 w-5" />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Nuova partita?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Tutti i dati della partita corrente verranno persi. Vuoi continuare?
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Annulla</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleNewMatch}>
-                      Nuova partita
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <div className="flex items-center gap-2">
+                <MatchSettings
+                  periodDuration={state.periodDuration}
+                  totalPeriods={state.totalPeriods}
+                  onPeriodDurationChange={setPeriodDuration}
+                  onTotalPeriodsChange={setTotalPeriods}
+                  disabled={state.isMatchStarted}
+                />
+                
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="icon">
+                      <RotateCcw className="h-5 w-5" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Nuova partita?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Tutti i dati della partita corrente verranno persi. Vuoi continuare?
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annulla</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleNewMatch}>
+                        Nuova partita
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             </div>
-          </div>
+          )}
+          
+          {/* Read-only indicator for completed matches */}
+          {state.isMatchEnded && (
+            <div className="flex items-center justify-center gap-2 py-2 px-4 bg-muted rounded-lg text-muted-foreground">
+              <Check className="h-4 w-4" />
+              <span className="text-sm font-medium">Partita completata - Visualizzazione in sola lettura</span>
+            </div>
+          )}
 
           {/* Match Header */}
           <MatchHeader state={state} />
@@ -472,6 +500,7 @@ const MatchApp = () => {
                   isHome={true}
                   isRunning={state.isRunning && !state.isPaused}
                   events={state.events}
+                  isMatchEnded={state.isMatchEnded}
                   onGoal={(id) => recordGoal('home', id)}
                   onOwnGoal={(id) => recordOwnGoal('home', id)}
                   onSubstitution={(outId, inId) => recordSubstitution('home', outId, inId)}
@@ -486,6 +515,7 @@ const MatchApp = () => {
                   isHome={false}
                   isRunning={state.isRunning && !state.isPaused}
                   events={state.events}
+                  isMatchEnded={state.isMatchEnded}
                   onGoal={(id) => recordGoal('away', id)}
                   onOwnGoal={(id) => recordOwnGoal('away', id)}
                   onSubstitution={(outId, inId) => recordSubstitution('away', outId, inId)}
