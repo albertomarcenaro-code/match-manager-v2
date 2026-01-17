@@ -47,6 +47,7 @@ interface RosterSetupProps {
   onSwapTeams?: () => void;
   onCreatePlayersWithNumbers?: (count: number) => void;
   pendingTournamentName?: string | null;
+  isTournamentMode?: boolean;
 }
 
 export function RosterSetup({
@@ -66,6 +67,7 @@ export function RosterSetup({
   onSwapTeams,
   onCreatePlayersWithNumbers,
   pendingTournamentName,
+  isTournamentMode = false,
 }: RosterSetupProps) {
   const { user, isGuest } = useAuth();
   const { tournament, startTournament } = useTournament();
@@ -109,9 +111,38 @@ export function RosterSetup({
   const saveTimerRef = useRef<number | null>(null);
   const saveQueueRef = useRef<Record<string, { id: string; name: string; number: number | null }>>({});
 
-  // Load saved data for logged-in users (solo se NON c'è già una rosa localmente)
+  // Compute duplicate numbers for validation
+  const duplicateHomeNumbers = useMemo(() => {
+    const numberCounts: Record<number, number> = {};
+    homePlayers.forEach(p => {
+      if (p.number !== null) {
+        numberCounts[p.number] = (numberCounts[p.number] || 0) + 1;
+      }
+    });
+    return new Set(Object.entries(numberCounts).filter(([_, count]) => count > 1).map(([num]) => parseInt(num)));
+  }, [homePlayers]);
+
+  const duplicateAwayNumbers = useMemo(() => {
+    const numberCounts: Record<number, number> = {};
+    awayPlayers.forEach(p => {
+      if (p.number !== null) {
+        numberCounts[p.number] = (numberCounts[p.number] || 0) + 1;
+      }
+    });
+    return new Set(Object.entries(numberCounts).filter(([_, count]) => count > 1).map(([num]) => parseInt(num)));
+  }, [awayPlayers]);
+
+  const hasDuplicates = duplicateHomeNumbers.size > 0 || duplicateAwayNumbers.size > 0;
+
+  // Load saved data for logged-in users
   useEffect(() => {
-    if (user && !isGuest && !hasLocalRoster) {
+    // GUEST: Always start with empty list
+    if (isGuest) {
+      return;
+    }
+    
+    // LOGGED IN: Only load if no local roster exists
+    if (user && !hasLocalRoster) {
       loadUserData();
     }
   }, [user, isGuest, hasLocalRoster]);
@@ -119,6 +150,14 @@ export function RosterSetup({
   // Applica i numeri caricati dal backend quando l'array homePlayers è stato popolato
   useEffect(() => {
     if (!pendingDbNumbersByName) return;
+
+    // For single match mode (logged in): DON'T apply saved numbers, only names
+    // For tournament mode: apply numbers from first match
+    if (!isTournamentMode && !tournament.isActive) {
+      // Clear pending - numbers should stay null for single matches
+      setPendingDbNumbersByName(null);
+      return;
+    }
 
     homePlayers.forEach(p => {
       const n = pendingDbNumbersByName[p.name];
@@ -128,7 +167,7 @@ export function RosterSetup({
     });
 
     setPendingDbNumbersByName(null);
-  }, [pendingDbNumbersByName, homePlayers, onUpdatePlayerNumber]);
+  }, [pendingDbNumbersByName, homePlayers, onUpdatePlayerNumber, isTournamentMode, tournament.isActive]);
 
   const loadUserData = async () => {
     if (!user) return;
@@ -146,7 +185,7 @@ export function RosterSetup({
         onHomeTeamNameChange(profile.team_name);
       }
 
-      // Load players
+      // Load players (names only - numbers are empty for single match)
       const { data: players } = await supabase
         .from('players')
         .select('id, name, number')
@@ -163,17 +202,28 @@ export function RosterSetup({
       }
 
       if (players && players.length > 0 && onBulkAddPlayers) {
-        // Clear existing and load from DB
         const playerNames = players.map(p => p.name);
         onBulkAddPlayers(playerNames);
 
-        // Numeri applicati in un useEffect dedicato quando homePlayers è pronto
-        setPendingDbNumbersByName(
-          players.reduce<Record<string, number | null>>((acc, p) => {
-            acc[p.name] = p.number ?? null;
-            return acc;
-          }, {})
-        );
+        // For tournament mode: check if we have previous matches and load numbers from there
+        if (isTournamentMode && tournament.isActive && tournament.matches.length > 0) {
+          // Get numbers from the first match of this tournament
+          const firstMatch = tournament.matches[0];
+          const numbersByName: Record<string, number | null> = {};
+          
+          if (firstMatch.playerStats) {
+            firstMatch.playerStats.forEach((stat: any) => {
+              if (stat.playerName && stat.playerNumber !== null && stat.playerNumber !== undefined) {
+                numbersByName[stat.playerName] = stat.playerNumber;
+              }
+            });
+          }
+          
+          if (Object.keys(numbersByName).length > 0) {
+            setPendingDbNumbersByName(numbersByName);
+          }
+        }
+        // For single match: numbers stay null (don't set pendingDbNumbersByName)
       }
     } catch (error) {
       console.error('Error loading user data:', error);
@@ -186,10 +236,8 @@ export function RosterSetup({
     const entries = Object.values(saveQueueRef.current);
     if (entries.length === 0) return;
 
-    // svuota subito la coda per evitare doppie scritture
     saveQueueRef.current = {};
 
-    // In modalità ospite (o se non autenticato) consideriamo "salvato" perché è già persistito in localStorage da useMatch.
     if (!user || isGuest) {
       setSaveStatusByPlayerId(prev => {
         const next = { ...prev };
@@ -238,7 +286,6 @@ export function RosterSetup({
   const queueRosterNumberSave = (player: Player, number: number | null) => {
     saveQueueRef.current[player.id] = { id: player.id, name: player.name, number };
 
-    // feedback immediato
     setSaveStatusByPlayerId(prev => ({
       ...prev,
       [player.id]: user && !isGuest ? 'saving' : 'saved',
@@ -250,7 +297,6 @@ export function RosterSetup({
     }, 350);
   };
 
-  // cleanup timer
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
@@ -276,7 +322,6 @@ export function RosterSetup({
     }
   };
 
-  // Auto-increment: trova il massimo numero nella squadra e assegna max+1
   const handleQuickNumber = (playerId: string) => {
     const usedNumbers = homePlayers
       .filter(p => p.number !== null)
@@ -332,23 +377,21 @@ export function RosterSetup({
     setIsSaving(true);
 
     try {
-      // Save team name to profile
       await supabase
         .from('profiles')
         .update({ team_name: homeTeamName })
         .eq('user_id', user.id);
 
-      // Delete existing players
       await supabase
         .from('players')
         .delete()
         .eq('user_id', user.id);
 
-      // Insert current players
+      // Save names only (numbers are match-specific for single matches)
       const playersToInsert = homePlayers.map(p => ({
         user_id: user.id,
         name: p.name,
-        number: p.number,
+        number: null, // Don't save numbers as defaults
       }));
 
       if (playersToInsert.length > 0) {
@@ -357,7 +400,7 @@ export function RosterSetup({
           .insert(playersToInsert);
       }
 
-      toast.success('Rosa salvata nel database!');
+      toast.success('Rosa salvata (solo nomi)!');
     } catch (error) {
       console.error('Error saving roster:', error);
       toast.error('Errore nel salvataggio');
@@ -366,10 +409,8 @@ export function RosterSetup({
     }
   };
 
-  // Reset roster: reload from database (logged in) or clear numbers (guest)
   const handleResetRoster = async () => {
     if (user && !isGuest) {
-      // Reload from database
       setIsLoading(true);
       try {
         const { data: profile } = await supabase
@@ -389,16 +430,24 @@ export function RosterSetup({
           .order('name');
 
         if (players && players.length > 0 && onBulkAddPlayers) {
-          // Deduplicate by name
           const uniqueNames = [...new Set(players.map(p => p.name))];
           onBulkAddPlayers(uniqueNames);
 
-          // Build mapping for numbers
-          const numbersByName: Record<string, number | null> = {};
-          players.forEach(p => {
-            numbersByName[p.name] = p.number ?? null;
-          });
-          setPendingDbNumbersByName(numbersByName);
+          // For tournament mode with existing matches: load numbers from first match
+          if (isTournamentMode && tournament.isActive && tournament.matches.length > 0) {
+            const firstMatch = tournament.matches[0];
+            const numbersByName: Record<string, number | null> = {};
+            
+            if (firstMatch.playerStats) {
+              firstMatch.playerStats.forEach((stat: any) => {
+                if (stat.playerName && stat.playerNumber !== null) {
+                  numbersByName[stat.playerName] = stat.playerNumber;
+                }
+              });
+            }
+            setPendingDbNumbersByName(numbersByName);
+          }
+          // Single match mode: numbers stay null
           
           setDbPlayerIdsByName(
             players.reduce<Record<string, string>>((acc, p) => {
@@ -416,7 +465,6 @@ export function RosterSetup({
         setIsLoading(false);
       }
     } else {
-      // Guest mode: just clear all jersey numbers
       homePlayers.forEach(p => {
         if (p.number !== null) {
           onUpdatePlayerNumber(p.id, null);
@@ -426,9 +474,6 @@ export function RosterSetup({
     }
   };
 
-  // Auto-numbering logic: completely independent from team_id/team_name
-  // Works on local state only, no validation requiring team name
-  // SMART MODE: Creates players automatically if list is empty (Guest mode)
   const handleAutoNumber = () => {
     const count = parseInt(autoNumberCount, 10);
     if (isNaN(count) || count <= 0) {
@@ -437,13 +482,11 @@ export function RosterSetup({
     }
     
     if (autoNumberTeam === 'home') {
-      // SMART: If no players exist, create them automatically with generic names and numbers
       if (homePlayers.length === 0) {
         if (onCreatePlayersWithNumbers) {
           onCreatePlayersWithNumbers(count);
           toast.success(`Creati ${count} giocatori con numeri progressivi`);
         } else {
-          // Fallback: create players one by one (less ideal)
           for (let i = 1; i <= count; i++) {
             onAddPlayer(`Giocatore ${i}`);
           }
@@ -457,7 +500,6 @@ export function RosterSetup({
       
       const playersWithoutNumbers = homePlayers.filter(p => p.number === null);
       
-      // If all players already have numbers
       if (playersWithoutNumbers.length === 0) {
         toast.info('Tutti i giocatori hanno già un numero assegnato');
         setAutoNumberDialogOpen(false);
@@ -466,8 +508,6 @@ export function RosterSetup({
       }
 
       const toAssign = Math.min(count, playersWithoutNumbers.length);
-
-      // Calculate used numbers from current players (local state only)
       const usedNumbers = new Set(homePlayers.filter(p => p.number !== null).map(p => p.number));
       let nextNumber = 1;
       
@@ -477,7 +517,6 @@ export function RosterSetup({
         }
         const player = playersWithoutNumbers[i];
         onUpdatePlayerNumber(player.id, nextNumber);
-        // Queue save for guest mode (will just mark as saved in localStorage)
         queueRosterNumberSave({ ...player, number: nextNumber }, nextNumber);
         usedNumbers.add(nextNumber);
         nextNumber++;
@@ -485,8 +524,6 @@ export function RosterSetup({
 
       toast.success(`Assegnati numeri a ${toAssign} giocatori`);
     } else {
-      // Away team: create opponent players with progressive numbers
-      // Base the sequence on existing away players (NOT on home players)
       const usedNumbers = new Set(awayPlayers.map(p => p.number).filter(n => n !== null));
       let nextNumber = 1;
       let created = 0;
@@ -529,7 +566,12 @@ export function RosterSetup({
   };
 
   const eligiblePlayers = homePlayers.filter(p => p.number !== null);
-  const canProceed = eligiblePlayers.length >= 1 && awayPlayers.length >= 1;
+  const canProceed = eligiblePlayers.length >= 1 && awayPlayers.length >= 1 && !hasDuplicates;
+
+  // Determine page title
+  const pageTitle = isTournamentMode && tournament.name 
+    ? tournament.name 
+    : 'Configurazione Partita';
 
   return (
     <div className="min-h-screen bg-background p-4 pb-24">
@@ -537,8 +579,8 @@ export function RosterSetup({
         {/* Header */}
         <div className="text-center py-6">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/10 text-secondary mb-4">
-            <Shield className="h-5 w-5" />
-            <span className="font-semibold">Configurazione Partita</span>
+            {isTournamentMode ? <Trophy className="h-5 w-5" /> : <Shield className="h-5 w-5" />}
+            <span className="font-semibold">{pageTitle}</span>
           </div>
           <h1 className="text-2xl font-bold text-foreground">Inserisci le rose</h1>
           <p className="text-muted-foreground mt-2">
@@ -547,11 +589,16 @@ export function RosterSetup({
           {isLoading && (
             <p className="text-sm text-primary mt-2">Caricamento dati salvati...</p>
           )}
-          {/* Tournament indicator - minimal, inline with header */}
-          {tournamentMode && (
-            <p className="text-sm text-secondary font-medium mt-2 flex items-center justify-center gap-2">
-              <Trophy className="h-4 w-4" />
-              {tournament.name} ({tournament.matches.length} partite)
+          {/* Tournament match count - only show if in tournament mode */}
+          {isTournamentMode && tournament.isActive && (
+            <p className="text-sm text-secondary font-medium mt-2">
+              {tournament.matches.length} partite giocate
+            </p>
+          )}
+          {/* Duplicate warning */}
+          {hasDuplicates && (
+            <p className="text-sm text-destructive font-medium mt-2">
+              ⚠️ Numeri di maglia duplicati rilevati! Correggi prima di continuare.
             </p>
           )}
         </div>
@@ -594,34 +641,52 @@ export function RosterSetup({
             <div className="p-4 gradient-home text-team-home-foreground">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-606:                   <Users className="h-5 w-5" />
-607:                   <span className="font-bold">Squadra di casa</span>
-608:                 </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleResetRoster}
-                  disabled={isLoading}
-                  className="gap-1 h-8"
-                  title="Ripristina la rosa salvata dal database"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  Reset
-                </Button>
-                {user && !isGuest && (
-                  <Button 
-                    size="sm" 
-                    variant="secondary"
-                    onClick={handleSaveRoster}
-                    disabled={isSaving}
-                    className="gap-1 h-8"
-                  >
-                    <Save className="h-4 w-4" />
-                    {isSaving ? 'Salvo...' : 'Salva'}
-                  </Button>
-                )}
-              </div>
+                  <Users className="h-5 w-5" />
+                  <span className="font-bold">Squadra di casa</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled={isLoading}
+                        className="h-7 w-7 text-team-home-foreground/70 hover:text-team-home-foreground hover:bg-team-home-foreground/10"
+                        title="Ripristina la rosa salvata"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Ripristinare la rosa?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {user && !isGuest 
+                            ? "La rosa verrà ricaricata dal database. Le modifiche non salvate andranno perse."
+                            : "I numeri di maglia verranno azzerati."}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Annulla</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleResetRoster}>
+                          Ripristina
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                  {user && !isGuest && (
+                    <Button 
+                      size="sm" 
+                      variant="secondary"
+                      onClick={handleSaveRoster}
+                      disabled={isSaving}
+                      className="gap-1 h-7 text-xs"
+                    >
+                      <Save className="h-3 w-3" />
+                      {isSaving ? 'Salvo...' : 'Salva'}
+                    </Button>
+                  )}
+                </div>
               </div>
               <Input
                 value={homeTeamName}
@@ -672,15 +737,18 @@ export function RosterSetup({
               <div className="space-y-2 max-h-[400px] overflow-y-auto">
                 {homePlayers.map((player) => {
                   const status = saveStatusByPlayerId[player.id] ?? 'idle';
+                  const isDuplicate = player.number !== null && duplicateHomeNumbers.has(player.number);
 
                   return (
                     <div
                       key={player.id}
                       className={cn(
                         "flex items-center gap-2 p-2 rounded-lg border",
-                        player.number !== null
-                          ? "bg-on-field/5 border-on-field/30"
-                          : "bg-muted/50 border-border"
+                        isDuplicate
+                          ? "bg-destructive/10 border-destructive"
+                          : player.number !== null
+                            ? "bg-on-field/5 border-on-field/30"
+                            : "bg-muted/50 border-border"
                       )}
                     >
                       <div className="flex items-center gap-1">
@@ -691,7 +759,10 @@ export function RosterSetup({
                           onChange={(e) => handleUpdateNumber(player.id, e.target.value)}
                           onBlur={() => queueRosterNumberSave(player, player.number ?? null)}
                           placeholder="#"
-                          className="w-14 text-center"
+                          className={cn(
+                            "w-14 text-center",
+                            isDuplicate && "border-destructive focus-visible:ring-destructive"
+                          )}
                         />
                         <Button
                           variant="ghost"
@@ -787,20 +858,29 @@ export function RosterSetup({
 
               {/* Opponents List */}
               <div className="flex flex-wrap gap-2 max-h-[400px] overflow-y-auto">
-                {awayPlayers.map((player) => (
-                  <div
-                    key={player.id}
-                    className="flex items-center gap-1 px-3 py-2 rounded-lg bg-muted border border-border"
-                  >
-                    <span className="font-bold">#{player.number}</span>
-                    <button
-                      onClick={() => onRemoveOpponentPlayer(player.id)}
-                      className="ml-1 text-muted-foreground hover:text-destructive"
+                {awayPlayers.map((player) => {
+                  const isDuplicate = player.number !== null && duplicateAwayNumbers.has(player.number);
+                  
+                  return (
+                    <div
+                      key={player.id}
+                      className={cn(
+                        "flex items-center gap-1 px-3 py-2 rounded-lg border",
+                        isDuplicate
+                          ? "bg-destructive/10 border-destructive"
+                          : "bg-muted border-border"
+                      )}
                     >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
+                      <span className="font-bold">#{player.number}</span>
+                      <button
+                        onClick={() => onRemoveOpponentPlayer(player.id)}
+                        className="ml-1 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  );
+                })}
                 {awayPlayers.length === 0 && (
                   <p className="w-full text-center text-sm text-muted-foreground py-4">
                     Nessun numero inserito
@@ -829,7 +909,9 @@ export function RosterSetup({
             </Button>
             {!canProceed && (
               <p className="text-center text-xs text-muted-foreground mt-2">
-                Inserisci almeno un giocatore per squadra con numero assegnato
+                {hasDuplicates 
+                  ? "Correggi i numeri di maglia duplicati prima di continuare"
+                  : "Inserisci almeno un giocatore per squadra con numero assegnato"}
               </p>
             )}
           </div>

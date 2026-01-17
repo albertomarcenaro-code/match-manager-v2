@@ -319,64 +319,31 @@ const MatchApp = () => {
   };
 
 
+  const isTournamentMode = tournament.isActive || !!pendingTournamentName;
+
+  const handleTournamentModeChange = (enabled: boolean) => {
+    if (enabled && !tournament.isActive) {
+      // Navigate to create tournament flow
+      navigate('/match', { state: { mode: 'tournament', createTournament: true } });
+    }
+    // Disable is handled by ending tournament from dashboard
+  };
+
   if (phase === 'setup') {
     return (
       <div className="min-h-screen flex flex-col">
-        <Header syncStatus={syncStatus} />
+        <Header 
+          syncStatus={syncStatus} 
+          isTournamentMode={isTournamentMode}
+          onTournamentModeChange={handleTournamentModeChange}
+          showNavButtons={true}
+          onNewMatch={handleNewMatch}
+        />
         <Helmet>
           <title>Gestione Partita - Match Manager Live</title>
-          <meta name="description" content="Applicazione per la gestione in tempo reale degli eventi durante partite di calcio giovanile. Traccia gol, sostituzioni, cartellini e cronaca live." />
+          <meta name="description" content="Applicazione per la gestione in tempo reale degli eventi durante partite di calcio giovanile." />
         </Helmet>
         <div className="flex-1">
-          <div className="max-w-4xl mx-auto p-4">
-            <div className="flex justify-between items-center mb-4">
-              <div className="text-sm text-muted-foreground">
-                {isGuest ? (
-                  <span className="flex items-center gap-1">
-                    Modalità Ospite
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1">
-                    {user?.email}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={handleGoHome} className="gap-1">
-                  <Home className="h-4 w-4" />
-                  <span className="hidden sm:inline">Home</span>
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => navigate('/tournament')} className="gap-1">
-                  <Trophy className="h-4 w-4" />
-                  <span className="hidden sm:inline">Torneo</span>
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="secondary" size="sm" className="gap-1">
-                      <Plus className="h-4 w-4" />
-                      Nuova Partita
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Iniziare nuova partita?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        {state.isMatchStarted 
-                          ? "C'è una partita in corso. Vuoi resettare tutto e perdere i dati correnti?"
-                          : "I dati della partita corrente verranno conservati. Procedi alla selezione titolari."}
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Annulla</AlertDialogCancel>
-                      <AlertDialogAction onClick={state.isMatchStarted ? handleNewMatch : handleRosterComplete}>
-                        {state.isMatchStarted ? "Reset e Nuova Partita" : "Continua"}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            </div>
-          </div>
           <RosterSetup
             homeTeamName={state.homeTeam.name}
             awayTeamName={state.awayTeam.name}
@@ -394,6 +361,7 @@ const MatchApp = () => {
             onSwapTeams={swapTeams}
             onCreatePlayersWithNumbers={createPlayersWithNumbers}
             pendingTournamentName={pendingTournamentName}
+            isTournamentMode={isTournamentMode}
           />
         </div>
         <Footer />

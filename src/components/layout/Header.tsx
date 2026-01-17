@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import logo from '@/assets/logo.png';
-import { User, LogOut, KeyRound, Mail, ChevronDown, Wifi, WifiOff } from 'lucide-react';
+import { User, LogOut, KeyRound, ChevronDown, Wifi, WifiOff, Home, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,15 +13,31 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
 interface HeaderProps {
   syncStatus?: 'connected' | 'disconnected' | 'checking';
+  isTournamentMode?: boolean;
+  onTournamentModeChange?: (enabled: boolean) => void;
+  onNewMatch?: () => void;
+  showNavButtons?: boolean;
 }
 
-export function Header({ syncStatus = 'checking' }: HeaderProps) {
+export function Header({ 
+  syncStatus = 'checking', 
+  isTournamentMode = false, 
+  onTournamentModeChange,
+  onNewMatch,
+  showNavButtons = false,
+}: HeaderProps) {
   const { user, isGuest, signOut, exitGuest } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
@@ -62,19 +80,81 @@ export function Header({ syncStatus = 'checking' }: HeaderProps) {
     }
   };
 
+  const handleGoHome = () => {
+    navigate('/dashboard');
+  };
+
+  const canToggleTournament = user && !isGuest;
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 max-w-6xl items-center justify-between gap-3 px-4 mx-auto">
-        {/* Left: Logo */}
-        <div className="flex items-center gap-3">
-          <img src={logo} alt="Match Manager Live Logo" className="h-10 w-10 object-contain" />
+      <div className="container flex h-14 max-w-6xl items-center justify-between gap-2 px-3 mx-auto">
+        {/* Left: Logo + Nav Buttons */}
+        <div className="flex items-center gap-2">
+          <img src={logo} alt="Match Manager Live Logo" className="h-9 w-9 object-contain" />
+          
+          {showNavButtons && (
+            <>
+              <Button variant="ghost" size="sm" onClick={handleGoHome} className="gap-1 h-8 px-2">
+                <Home className="h-4 w-4" />
+                <span className="hidden sm:inline text-xs">Home</span>
+              </Button>
+              {onNewMatch && (
+                <Button variant="ghost" size="sm" onClick={onNewMatch} className="gap-1 h-8 px-2">
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline text-xs">Nuova</span>
+                </Button>
+              )}
+            </>
+          )}
         </div>
         
-        {/* Center: Title with Sync LED */}
+        {/* Center: Toggle Switch */}
         <div className="flex items-center gap-2">
-          <h1 className="text-lg font-bold tracking-tight text-foreground" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-            Match Manager <span className="text-secondary">Live</span>
-          </h1>
+          {onTournamentModeChange && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className={cn(
+                    "flex items-center gap-2 px-2 py-1 rounded-full transition-colors",
+                    !canToggleTournament && "opacity-50"
+                  )}>
+                    <Label 
+                      htmlFor="tournament-toggle" 
+                      className={cn(
+                        "text-xs cursor-pointer transition-colors",
+                        !isTournamentMode ? "text-foreground font-medium" : "text-muted-foreground"
+                      )}
+                    >
+                      Singola
+                    </Label>
+                    <Switch
+                      id="tournament-toggle"
+                      checked={isTournamentMode}
+                      onCheckedChange={onTournamentModeChange}
+                      disabled={!canToggleTournament}
+                      className="data-[state=checked]:bg-secondary"
+                    />
+                    <Label 
+                      htmlFor="tournament-toggle" 
+                      className={cn(
+                        "text-xs cursor-pointer transition-colors",
+                        isTournamentMode ? "text-secondary font-medium" : "text-muted-foreground"
+                      )}
+                    >
+                      Torneo
+                    </Label>
+                  </div>
+                </TooltipTrigger>
+                {!canToggleTournament && (
+                  <TooltipContent>
+                    <p>Accedi per usare la modalità torneo</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          
           {/* Sync Status LED */}
           {!isGuest && user && (
             <div 
@@ -106,20 +186,27 @@ export function Header({ syncStatus = 'checking' }: HeaderProps) {
         {/* Right: User Menu */}
         <div className="flex items-center">
           {isGuest ? (
-            <span className="px-2 py-1 rounded-md bg-muted text-xs font-medium text-muted-foreground">
-              Ospite
-            </span>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleLogout}
+              disabled={isLoading}
+              className="gap-1 h-8 text-muted-foreground hover:text-destructive"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline text-xs">Esci</span>
+            </Button>
           ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-1.5 h-9">
+                <Button variant="ghost" size="sm" className="gap-1 h-8 px-2">
                   <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center">
                     <User className="h-4 w-4 text-primary" />
                   </div>
                   <ChevronDown className="h-3 w-3 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuContent align="end" className="w-48">
                 <div className="px-2 py-1.5">
                   <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                 </div>
@@ -127,10 +214,6 @@ export function Header({ syncStatus = 'checking' }: HeaderProps) {
                 <DropdownMenuItem onClick={handleResetPassword} disabled={isLoading}>
                   <KeyRound className="h-4 w-4 mr-2" />
                   Reset Password
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleResetPassword} disabled={isLoading}>
-                  <Mail className="h-4 w-4 mr-2" />
-                  Recupero Password
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
