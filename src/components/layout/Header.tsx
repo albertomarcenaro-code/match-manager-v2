@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import logo from '@/assets/logo.png';
-import { User, LogOut, KeyRound, ChevronDown, Wifi, WifiOff, Home, Plus } from 'lucide-react';
+import { User, LogOut, KeyRound, Wifi, WifiOff, Home, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -183,34 +183,29 @@ export function Header({
           )}
         </div>
         
-        {/* Right: User Menu */}
+        {/* Right: User Menu - Icon only, no text */}
         <div className="flex items-center">
           {isGuest ? (
             <Button 
-              variant="ghost" 
+              variant="outline" 
               size="sm" 
               onClick={handleLogout}
               disabled={isLoading}
-              className="gap-1 h-8 text-muted-foreground hover:text-destructive"
+              className="gap-1 h-8 border-destructive/50 text-destructive hover:text-destructive hover:bg-destructive/10"
             >
               <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline text-xs">Esci</span>
+              <span className="text-xs">ESCI</span>
             </Button>
           ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-1 h-8 px-2">
+                <Button variant="ghost" size="icon" className="h-8 w-8">
                   <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center">
                     <User className="h-4 w-4 text-primary" />
                   </div>
-                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <div className="px-2 py-1.5">
-                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                </div>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleResetPassword} disabled={isLoading}>
                   <KeyRound className="h-4 w-4 mr-2" />
                   Reset Password

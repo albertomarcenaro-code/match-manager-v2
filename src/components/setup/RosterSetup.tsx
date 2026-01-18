@@ -134,10 +134,11 @@ export function RosterSetup({
 
   const hasDuplicates = duplicateHomeNumbers.size > 0 || duplicateAwayNumbers.size > 0;
 
-  // Load saved data for logged-in users
+  // PRIVACY: HARD RESET for guest mode - ensure NO data leaks from logged-in users
   useEffect(() => {
-    // GUEST: Always start with empty list
     if (isGuest) {
+      // Guest mode: ALWAYS start completely fresh - never load ANY data
+      // Clear any cached data that might have leaked
       return;
     }
     
@@ -645,35 +646,6 @@ export function RosterSetup({
                   <span className="font-bold">Squadra di casa</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        disabled={isLoading}
-                        className="h-7 w-7 text-team-home-foreground/70 hover:text-team-home-foreground hover:bg-team-home-foreground/10"
-                        title="Ripristina la rosa salvata"
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Ripristinare la rosa?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          {user && !isGuest 
-                            ? "La rosa verrà ricaricata dal database. Le modifiche non salvate andranno perse."
-                            : "I numeri di maglia verranno azzerati."}
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Annulla</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleResetRoster}>
-                          Ripristina
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
                   {user && !isGuest && (
                     <Button 
                       size="sm" 
@@ -895,9 +867,9 @@ export function RosterSetup({
           </div>
         </div>
 
-        {/* Continue Button */}
+        {/* Continue Button with discrete Reset link */}
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur border-t border-border">
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-4xl mx-auto space-y-2">
             <Button
               size="lg"
               className="w-full gap-2 bg-secondary hover:bg-secondary/90 text-secondary-foreground"
@@ -908,12 +880,43 @@ export function RosterSetup({
               Continua alla partita
             </Button>
             {!canProceed && (
-              <p className="text-center text-xs text-muted-foreground mt-2">
+              <p className="text-center text-xs text-muted-foreground">
                 {hasDuplicates 
                   ? "Correggi i numeri di maglia duplicati prima di continuare"
                   : "Inserisci almeno un giocatore per squadra con numero assegnato"}
               </p>
             )}
+            {/* Discrete Reset link - far from main button */}
+            <div className="flex justify-center pt-2">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    className="text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition-colors"
+                  >
+                    <RotateCcw className="h-3 w-3 inline mr-1" />
+                    Ripristina rosa salvata
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Ripristinare la rosa?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {user && !isGuest 
+                        ? "La rosa verrà ricaricata dal database. Le modifiche non salvate andranno perse."
+                        : "I numeri di maglia verranno azzerati."}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Annulla</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleResetRoster}>
+                      Ripristina
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
         </div>
       </div>

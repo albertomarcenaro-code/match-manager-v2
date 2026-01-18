@@ -76,14 +76,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const enterAsGuest = () => {
+    // HARD RESET: Clear ALL user data before entering guest mode
+    localStorage.removeItem('match-manager-state');
+    localStorage.removeItem('match-timer-state');
     setIsGuest(true);
     localStorage.setItem('match-manager-guest', 'true');
   };
 
   const exitGuest = () => {
+    // HARD RESET: Clear ALL cached data when exiting guest mode
     setIsGuest(false);
     localStorage.removeItem('match-manager-guest');
     localStorage.removeItem('match-manager-state');
+    localStorage.removeItem('match-timer-state');
   };
 
   return (
