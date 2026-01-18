@@ -996,11 +996,22 @@ export function useMatch() {
 
   const swapTeams = useCallback(() => {
     setState(prev => {
-      const temp = prev.homeTeam;
+      // DEEP SWAP: Create complete copies of team objects with all players and data
+      const homeTeamCopy = {
+        name: prev.homeTeam.name,
+        players: prev.homeTeam.players.map(p => ({ ...p })),
+        score: prev.homeTeam.score,
+      };
+      const awayTeamCopy = {
+        name: prev.awayTeam.name,
+        players: prev.awayTeam.players.map(p => ({ ...p })),
+        score: prev.awayTeam.score,
+      };
+      
       return {
         ...prev,
-        homeTeam: prev.awayTeam,
-        awayTeam: temp,
+        homeTeam: awayTeamCopy,
+        awayTeam: homeTeamCopy,
       };
     });
   }, []);
