@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, forwardRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ const authSchema = z.object({
   password: z.string().min(6, 'La password deve avere almeno 6 caratteri'),
 });
 
-const Landing = () => {
+const Landing = forwardRef<HTMLDivElement>((props, ref) => {
   const navigate = useNavigate();
   const { signUp, signIn, enterAsGuest } = useAuth();
   const [email, setEmail] = useState('');
@@ -72,7 +72,7 @@ const Landing = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30">
+    <div ref={ref} className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30">
       <Helmet>
         <title>Match Manager Live - Gestione Partite Calcio</title>
         <meta name="description" content="Gestisci le tue partite di calcio in tempo reale. Traccia gol, sostituzioni, cartellini e cronaca live." />
@@ -203,6 +203,8 @@ const Landing = () => {
       <Footer />
     </div>
   );
-};
+});
+
+Landing.displayName = 'Landing';
 
 export default Landing;
