@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, forwardRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import logo from '@/assets/logo.png';
@@ -31,13 +31,13 @@ interface HeaderProps {
   showNavButtons?: boolean;
 }
 
-export function Header({ 
+export const Header = forwardRef<HTMLElement, HeaderProps>(({ 
   syncStatus = 'checking', 
   isTournamentMode = false, 
   onTournamentModeChange,
   onNewMatch,
   showNavButtons = false,
-}: HeaderProps) {
+}, ref) => {
   const { user, isGuest, signOut, exitGuest } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
@@ -87,7 +87,7 @@ export function Header({
   const canToggleTournament = user && !isGuest;
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header ref={ref} className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 max-w-6xl items-center justify-between gap-2 px-3 mx-auto">
         {/* Left: Logo + Nav Buttons */}
         <div className="flex items-center gap-2">
@@ -226,4 +226,6 @@ export function Header({
       </div>
     </header>
   );
-}
+});
+
+Header.displayName = 'Header';
