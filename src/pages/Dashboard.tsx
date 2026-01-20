@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -32,6 +33,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
 const STORAGE_KEY = 'match-manager-state';
+const TOURNAMENT_STORAGE_KEY = 'tournament-state';
 
 interface SavedMatchState {
   homeTeam: { name: string; score: number };
@@ -51,8 +53,9 @@ interface SavedTournament {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, isGuest } = useAuth();
-  const { tournament, loadTournamentById } = useTournament();
+  const { tournament, loadTournamentById, resetForSingleMatch } = useTournament();
   const [activeSession, setActiveSession] = useState<SavedMatchState | null>(null);
   const [showActiveSessionDialog, setShowActiveSessionDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState<'single' | 'tournament' | null>(null);
@@ -128,24 +131,45 @@ const Dashboard = () => {
       setPendingAction('single');
       setShowActiveSessionDialog(true);
     } else {
-      // Clear jersey numbers for single match mode
-      try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed.homeTeam?.players) {
-            parsed.homeTeam.players = parsed.homeTeam.players.map((p: any) => ({ ...p, number: null }));
-          }
-          if (parsed.awayTeam?.players) {
-            parsed.awayTeam.players = [];
-          }
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-        }
-      } catch (e) {
-        console.error('Error clearing jersey numbers:', e);
-      }
+      // HARD RESET: Clear ALL tournament/match state for single match mode
+      performSingleMatchReset();
       navigate('/match', { state: { mode: 'single' } });
     }
+  };
+
+  // HARD RESET function for single match mode - prevents data leaks
+  const performSingleMatchReset = () => {
+    // 1. Clear TanStack Query cache (prevents Supabase data leaks)
+    queryClient.clear();
+    
+    // 2. Reset tournament state completely
+    resetForSingleMatch();
+    
+    // 3. Clear match state but preserve home team names for logged-in users
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.homeTeam?.players) {
+          parsed.homeTeam.players = parsed.homeTeam.players.map((p: any) => ({ ...p, number: null }));
+        }
+        if (parsed.awayTeam?.players) {
+          parsed.awayTeam.players = [];
+        }
+        // Reset match counters and flags
+        parsed.currentPeriod = 0;
+        parsed.isMatchStarted = false;
+        parsed.isMatchEnded = false;
+        parsed.events = [];
+        parsed.periodScores = [];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+      }
+    } catch (e) {
+      console.error('Error clearing match state:', e);
+    }
+    
+    // 4. Force clear tournament localStorage
+    localStorage.removeItem(TOURNAMENT_STORAGE_KEY);
   };
 
   const handleTournamentMode = () => {
@@ -206,6 +230,8 @@ const Dashboard = () => {
     setShowActiveSessionDialog(false);
     
     if (pendingAction === 'single') {
+      // HARD RESET for single match
+      performSingleMatchReset();
       navigate('/match', { state: { mode: 'single' } });
     } else if (pendingAction === 'tournament') {
       setShowTournamentChoiceDialog(true);

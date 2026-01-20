@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { QueryClient } from '@tanstack/react-query';
 
 interface AuthContextType {
   user: User | null;
@@ -10,7 +11,7 @@ interface AuthContextType {
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
-  enterAsGuest: () => void;
+  enterAsGuest: (queryClient?: QueryClient) => void;
   exitGuest: () => void;
 }
 
@@ -75,10 +76,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('match-manager-guest');
   };
 
-  const enterAsGuest = () => {
+  const enterAsGuest = (queryClient?: QueryClient) => {
     // HARD RESET: Clear ALL user data before entering guest mode
     localStorage.removeItem('match-manager-state');
     localStorage.removeItem('match-timer-state');
+    localStorage.removeItem('tournament-state');
+    
+    // Clear TanStack Query cache if provided (prevents Supabase data leaks)
+    if (queryClient) {
+      queryClient.clear();
+    }
+    
     setIsGuest(true);
     localStorage.setItem('match-manager-guest', 'true');
   };
