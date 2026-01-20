@@ -1,5 +1,6 @@
 import { useState, forwardRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,13 +21,15 @@ const authSchema = z.object({
 
 const Landing = forwardRef<HTMLDivElement>((props, ref) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { signUp, signIn, enterAsGuest } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleGuestAccess = () => {
-    enterAsGuest();
+    // PRIVACY: Clear query cache when entering guest mode to prevent data leaks
+    enterAsGuest(queryClient);
     navigate('/app');
   };
 

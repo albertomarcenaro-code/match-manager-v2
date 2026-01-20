@@ -569,10 +569,18 @@ export function RosterSetup({
   const eligiblePlayers = homePlayers.filter(p => p.number !== null);
   const canProceed = eligiblePlayers.length >= 1 && awayPlayers.length >= 1 && !hasDuplicates;
 
-  // Determine page title
-  const pageTitle = isTournamentMode && tournament.name 
-    ? tournament.name 
-    : 'Configurazione Partita';
+  // Determine page title - STRICT HIERARCHY:
+  // Show tournament name ONLY if: logged in AND tournament mode AND tournament name exists
+  // Otherwise ALWAYS show 'Configurazione Partita'
+  const shouldShowTournamentName = 
+    user && 
+    !isGuest && 
+    !isSingleMatchMode && 
+    isTournamentMode && 
+    tournament.isActive && 
+    tournament.name;
+  
+  const pageTitle = shouldShowTournamentName ? tournament.name : 'Configurazione Partita';
 
   return (
     <div className="min-h-screen bg-background p-4 pb-24">

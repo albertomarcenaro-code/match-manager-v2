@@ -20,6 +20,15 @@ const createEmptyTournament = (): TournamentState => ({
   createdAt: new Date().toISOString(),
 });
 
+// Force clear tournament state - used when entering single match mode
+const clearTournamentState = () => {
+  try {
+    localStorage.removeItem(TOURNAMENT_STORAGE_KEY);
+  } catch (e) {
+    console.error('Failed to clear tournament state:', e);
+  }
+};
+
 const loadFromLocalStorage = (): TournamentState | null => {
   try {
     const saved = localStorage.getItem(TOURNAMENT_STORAGE_KEY);
@@ -375,6 +384,14 @@ export function useTournament() {
     return tournament.matches.find(m => m.id === matchId);
   }, [tournament.matches]);
 
+  // HARD RESET: Force clear all tournament state for single match mode
+  const resetForSingleMatch = useCallback(() => {
+    const emptyTournament = createEmptyTournament();
+    setTournament(emptyTournament);
+    setDbTournamentId(null);
+    clearTournamentState();
+  }, []);
+
   return {
     tournament,
     isLoading,
@@ -385,5 +402,6 @@ export function useTournament() {
     getMatchById,
     loadFromDatabase,
     loadTournamentById,
+    resetForSingleMatch,
   };
 }
