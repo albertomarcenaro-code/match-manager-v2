@@ -11,6 +11,7 @@ import { EventTimeline } from '@/components/match/EventTimeline';
 import { StarterSelection } from '@/components/match/StarterSelection';
 import { ExportButton } from '@/components/match/ExportButton';
 import { PDFExportButton } from '@/components/match/PDFExportButton';
+import { WhatsAppShareButton } from '@/components/match/WhatsAppShareButton';
 import { MatchSettings } from '@/components/match/MatchSettings';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
@@ -503,6 +504,9 @@ const MatchApp = () => {
               {/* Export Buttons and Exit */}
               {state.isMatchEnded && (
                 <div className="flex flex-col items-center gap-4 pt-4">
+                  {/* WhatsApp Share - prominent position */}
+                  <WhatsAppShareButton state={state} />
+                  
                   <div className="flex justify-center gap-4">
                     <ExportButton state={state} />
                     <PDFExportButton state={state} />
