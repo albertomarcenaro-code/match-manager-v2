@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -53,6 +53,7 @@ interface SavedTournament {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { user, isGuest } = useAuth();
   const { tournament, loadTournamentById, resetForSingleMatch } = useTournament();
@@ -68,6 +69,15 @@ const Dashboard = () => {
   const [newTournamentName, setNewTournamentName] = useState('');
   const [isLoadingTournaments, setIsLoadingTournaments] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
+
+  // Show toast if redirected from auth-required route
+  useEffect(() => {
+    if (location.state?.authRequired) {
+      toast.info('Per la modalità torneo bisogna essere loggati');
+      // Clear the state to prevent showing toast again on refresh
+      navigate('/dashboard', { replace: true, state: {} });
+    }
+  }, [location.state, navigate]);
 
   // Check for active match session
   useEffect(() => {
@@ -322,17 +332,20 @@ const Dashboard = () => {
 
             {/* Tournament Archive */}
             <Card 
-              className="p-6 cursor-pointer hover:shadow-lg transition-all hover:border-muted-foreground group"
-              onClick={() => navigate('/tournament')}
+              className={`p-6 transition-all ${isGuest ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:shadow-lg hover:border-muted-foreground'} group`}
+              onClick={isGuest ? undefined : () => navigate('/tournament')}
             >
               <div className="flex items-center gap-4">
-                <div className="p-3 rounded-full bg-muted text-muted-foreground group-hover:bg-muted-foreground group-hover:text-background transition-colors">
-                  <History className="h-6 w-6" />
+                <div className={`p-3 rounded-full ${isGuest ? 'bg-muted text-muted-foreground' : 'bg-muted text-muted-foreground group-hover:bg-muted-foreground group-hover:text-background'} transition-colors`}>
+                  {isGuest ? <Lock className="h-6 w-6" /> : <History className="h-6 w-6" />}
                 </div>
                 <div className="flex-1">
                   <h2 className="text-lg font-semibold">Archivio Tornei</h2>
                   <p className="text-sm text-muted-foreground">
-                    Visualizza statistiche e cronologia partite
+                    {isGuest 
+                      ? 'Accedi per vedere l\'archivio' 
+                      : 'Visualizza statistiche e cronologia partite'
+                    }
                   </p>
                 </div>
               </div>

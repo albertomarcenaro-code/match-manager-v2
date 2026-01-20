@@ -12,7 +12,7 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute({ children, requireAuth = false }: { children: React.ReactNode; requireAuth?: boolean }) {
   const { user, isGuest, isLoading } = useAuth();
   
   if (isLoading) {
@@ -25,6 +25,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   
   if (!user && !isGuest) {
     return <Navigate to="/" replace />;
+  }
+
+  // Routes that require full authentication (no guests)
+  if (requireAuth && !user) {
+    return <Navigate to="/dashboard" replace state={{ authRequired: true }} />;
   }
   
   return <>{children}</>;
@@ -70,7 +75,7 @@ function AppRoutes() {
       <Route 
         path="/tournament" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requireAuth>
             <TournamentArchive />
           </ProtectedRoute>
         } 
