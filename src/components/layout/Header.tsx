@@ -89,23 +89,30 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(({
   return (
     <header ref={ref} className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 max-w-6xl items-center justify-between gap-2 px-3 mx-auto">
-        {/* Left: Logo + Nav Buttons */}
+        
+        {/* Left: Logo + Text + Nav Buttons */}
         <div className="flex items-center gap-2">
-          <img src={logo} alt="Match Manager Live Logo" className="h-9 w-9 object-contain" />
+          <div className="flex items-center gap-2 mr-1">
+            <img src={logo} alt="Match Manager Live Logo" className="h-8 w-8 object-contain" />
+            <span className="font-bold text-sm sm:text-base tracking-tight leading-none whitespace-nowrap">
+              <span className="text-slate-900">Match Manager</span>{' '}
+              <span className="text-green-500">Live</span>
+            </span>
+          </div>
           
           {showNavButtons && (
-            <>
+            <div className="flex items-center gap-1 border-l pl-2 border-border/60">
               <Button variant="ghost" size="sm" onClick={handleGoHome} className="gap-1 h-8 px-2">
                 <Home className="h-4 w-4" />
-                <span className="hidden sm:inline text-xs">Home</span>
+                <span className="hidden md:inline text-xs">Home</span>
               </Button>
               {onNewMatch && (
                 <Button variant="ghost" size="sm" onClick={onNewMatch} className="gap-1 h-8 px-2">
                   <Plus className="h-4 w-4" />
-                  <span className="hidden sm:inline text-xs">Nuova</span>
+                  <span className="hidden md:inline text-xs">Nuova</span>
                 </Button>
               )}
-            </>
+            </div>
           )}
         </div>
         
@@ -122,7 +129,7 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(({
                     <Label 
                       htmlFor="tournament-toggle" 
                       className={cn(
-                        "text-xs cursor-pointer transition-colors",
+                        "text-[10px] sm:text-xs cursor-pointer transition-colors",
                         !isTournamentMode ? "text-foreground font-medium" : "text-muted-foreground"
                       )}
                     >
@@ -133,12 +140,12 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(({
                       checked={isTournamentMode}
                       onCheckedChange={onTournamentModeChange}
                       disabled={!canToggleTournament}
-                      className="data-[state=checked]:bg-secondary"
+                      className="scale-75 sm:scale-90 data-[state=checked]:bg-secondary"
                     />
                     <Label 
                       htmlFor="tournament-toggle" 
                       className={cn(
-                        "text-xs cursor-pointer transition-colors",
+                        "text-[10px] sm:text-xs cursor-pointer transition-colors",
                         isTournamentMode ? "text-secondary font-medium" : "text-muted-foreground"
                       )}
                     >
@@ -159,7 +166,7 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(({
           {!isGuest && user && (
             <div 
               className={cn(
-                "flex items-center gap-1 px-1.5 py-0.5 rounded-full",
+                "hidden xs:flex items-center gap-1 px-1.5 py-0.5 rounded-full",
                 syncStatus === 'connected' && "bg-green-500/10",
                 syncStatus === 'disconnected' && "bg-red-500/10",
                 syncStatus === 'checking' && "bg-yellow-500/10"
@@ -173,17 +180,11 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(({
               ) : (
                 <Wifi className="h-3 w-3 text-yellow-600 animate-pulse" />
               )}
-              <span className={cn(
-                "w-2 h-2 rounded-full",
-                syncStatus === 'connected' && "bg-green-500",
-                syncStatus === 'disconnected' && "bg-red-500",
-                syncStatus === 'checking' && "bg-yellow-500 animate-pulse"
-              )} />
             </div>
           )}
         </div>
         
-        {/* Right: User Menu - Icon only, no text */}
+        {/* Right: User Menu */}
         <div className="flex items-center">
           {isGuest ? (
             <Button 
@@ -191,16 +192,16 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(({
               size="sm" 
               onClick={handleLogout}
               disabled={isLoading}
-              className="gap-1 h-8 border-destructive/50 text-destructive hover:text-destructive hover:bg-destructive/10"
+              className="gap-1 h-8 px-2 border-destructive/50 text-destructive hover:text-destructive hover:bg-destructive/10"
             >
-              <LogOut className="h-4 w-4" />
-              <span className="text-xs">ESCI</span>
+              <LogOut className="h-3 w-3" />
+              <span className="text-[10px] font-bold">ESCI</span>
             </Button>
           ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center">
+                  <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
                     <User className="h-4 w-4 text-primary" />
                   </div>
                 </Button>
