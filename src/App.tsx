@@ -28,7 +28,6 @@ function ProtectedRoute({ children, requireAuth = false }: { children: React.Rea
     return <Navigate to="/" replace />;
   }
 
-  // Routes that require full authentication (no guests)
   if (requireAuth && !user) {
     return <Navigate to="/dashboard" replace state={{ authRequired: true }} />;
   }
@@ -37,15 +36,7 @@ function ProtectedRoute({ children, requireAuth = false }: { children: React.Rea
 }
 
 function AppRoutes() {
-  const { user, isGuest, isLoading } = useAuth();
-  
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  const { user, isGuest } = useAuth();
   
   return (
     <Routes>
@@ -69,54 +60,6 @@ function AppRoutes() {
           </ProtectedRoute>
         } 
       />
-      <Route 
-        path="/app" 
-        element={<Navigate to="/dashboard" replace />} 
-      />
-      <Route 
-        path="/tournament" 
-        element={
-          <ProtectedRoute requireAuth>
-            <TournamentArchive />
-          </ProtectedRoute>
-        } 
-      />
-      <Route path="*" element={<NotFound />} />
-function AppRoutes() {
-  const { user, isGuest, isLoading } = useAuth();
-  
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-  
-  return (
-    <Routes>
-      <Route 
-        path="/" 
-        element={user || isGuest ? <Navigate to="/dashboard" replace /> : <Landing />} 
-      />
-      <Route 
-        path="/dashboard" 
-        element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/match" 
-        element={
-          <ProtectedRoute>
-            <MatchApp />
-          </ProtectedRoute>
-        } 
-      />
-      
-      {/* --- AGGIUNGI QUESTA ROTTA --- */}
       <Route 
         path="/tournaments" 
         element={
@@ -125,8 +68,6 @@ function AppRoutes() {
           </ProtectedRoute>
         } 
       />
-      {/* ---------------------------- */}
-
       <Route 
         path="/app" 
         element={<Navigate to="/dashboard" replace />} 
@@ -140,10 +81,6 @@ function AppRoutes() {
         } 
       />
       <Route path="*" element={<NotFound />} />
-    </Routes>
-  );
-}
-      
     </Routes>
   );
 }
