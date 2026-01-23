@@ -31,18 +31,14 @@ export default function Landing() {
   const handleGuestAccess = async () => {
     setIsLoading(true);
     try {
-      // 1. Eseguiamo l'accesso ospite
+      // Ora enterAsGuest è async, quindi l'await è valido
       await enterAsGuest(queryClient); 
+      toast.success('Accesso come ospite effettuato');
       
-      // 2. Messaggio di conferma
-      toast.success('Entrando come ospite...');
-      
-      // 3. Aspettiamo un istante per permettere al Context di aggiornarsi
-      // Questo evita il rimbalzo verso la home (404/Redirect)
+      // Piccolo timeout per assicurarsi che lo stato isGuest sia propagato
       setTimeout(() => {
-        navigate('/dashboard');
-      }, 500);
-      
+        navigate('/dashboard'); 
+      }, 300);
     } catch (error) {
       toast.error("Errore nell'accesso ospite");
       setIsLoading(false);
@@ -58,22 +54,15 @@ export default function Landing() {
 
     setIsLoading(true);
     try {
-      if (mode === 'register') {
-        const { error } = await signUp(email, password);
-        if (error) {
-          toast.error(error.message);
-        } else {
-          toast.success('Registrazione completata!');
-          navigate('/dashboard'); 
-        }
+      const { error } = mode === 'register' 
+        ? await signUp(email, password) 
+        : await signIn(email, password);
+
+      if (error) {
+        toast.error(error.message === 'Invalid login credentials' ? 'Email o password errati' : error.message);
       } else {
-        const { error } = await signIn(email, password);
-        if (error) {
-          toast.error(error.message === 'Invalid login credentials' ? 'Email o password errati' : error.message);
-        } else {
-          toast.success('Accesso effettuato!');
-          navigate('/dashboard'); 
-        }
+        toast.success(mode === 'login' ? 'Accesso effettuato!' : 'Registrazione completata!');
+        navigate('/dashboard'); 
       }
     } catch (err: any) {
       toast.error("Si è verificato un errore");
@@ -87,29 +76,22 @@ export default function Landing() {
       <Helmet>
         <title>Match Manager Live - Gestione Partite Calcio</title>
       </Helmet>
-      
       <Header />
-      
       <main className="flex-1 flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-6">
-          <div className="text-center space-y-2">
-            <h2 className="text-3xl font-bold tracking-tight">Benvenuto</h2>
-            <p className="text-muted-foreground">Gestisci le tue partite in tempo reale</p>
-          </div>
-
           <Card className="border-2 shadow-xl">
             <CardHeader className="text-center pb-2">
-              <CardTitle className="text-lg">Scegli come entrare</CardTitle>
+              <CardTitle className="text-2xl font-bold">Benvenuto</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <Button 
                 variant="outline" 
-                className="w-full h-14 text-lg gap-3 border-primary/20 hover:bg-primary/5"
+                className="w-full h-14 text-lg gap-3"
                 onClick={handleGuestAccess}
                 disabled={isLoading}
               >
                 <UserCircle className="h-6 w-6 text-primary" />
-                {isLoading ? 'Caricamento...' : 'Entra come Ospite'}
+                {isLoading ? 'Accesso...' : 'Entra come Ospite'}
               </Button>
               
               <div className="relative py-2">
@@ -119,38 +101,34 @@ export default function Landing() {
                 </div>
               </div>
 
-              <Tabs defaultValue="login" className="w-full">
+              <Tabs defaultValue="login">
                 <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="login" className="gap-2">Accedi</TabsTrigger>
-                  <TabsTrigger value="register" className="gap-2">Registrati</TabsTrigger>
+                  <TabsTrigger value="login" className="gap-2"><LogIn className="h-4 w-4" /> Accedi</TabsTrigger>
+                  <TabsTrigger value="register" className="gap-2"><UserPlus className="h-4 w-4" /> Registrati</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="login" className="space-y-4 mt-4">
                   <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
-                    <Input id="login-email" type="email" placeholder="email@esempio.com" value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading} />
+                    <Label>Email</Label>
+                    <Input type="email" placeholder="la-tua@email.com" value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
-                    <Input id="login-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} disabled={isLoading} />
+                    <Label>Password</Label>
+                    <Input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} disabled={isLoading} />
                   </div>
-                  <Button className="w-full" onClick={() => handleAuth('login')} disabled={isLoading}>
-                    {isLoading ? 'Accesso...' : 'Accedi'}
-                  </Button>
+                  <Button className="w-full h-11" onClick={() => handleAuth('login')} disabled={isLoading}>Accedi</Button>
                 </TabsContent>
-                
+
                 <TabsContent value="register" className="space-y-4 mt-4">
                   <div className="space-y-2">
-                    <Label htmlFor="register-email">Email</Label>
-                    <Input id="register-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading} />
+                    <Label>Email</Label>
+                    <Input type="email" placeholder="la-tua@email.com" value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="register-password">Password</Label>
-                    <Input id="register-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} disabled={isLoading} />
+                    <Label>Password</Label>
+                    <Input type="password" placeholder="Minimo 6 caratteri" value={password} onChange={(e) => setPassword(e.target.value)} disabled={isLoading} />
                   </div>
-                  <Button className="w-full" onClick={() => handleAuth('register')} disabled={isLoading}>
-                    {isLoading ? 'Registrazione...' : 'Registrati'}
-                  </Button>
+                  <Button className="w-full h-11" onClick={() => handleAuth('register')} disabled={isLoading}>Registrati</Button>
                 </TabsContent>
               </Tabs>
             </CardContent>
