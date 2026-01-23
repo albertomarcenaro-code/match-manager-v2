@@ -182,19 +182,16 @@ const Dashboard = () => {
     localStorage.removeItem(TOURNAMENT_STORAGE_KEY);
   };
 
-  const handleTournamentMode = () => {
+const handleTournamentMode = () => {
     if (activeSession) {
       setPendingAction('tournament');
       setShowActiveSessionDialog(true);
-    } else if (tournament.isActive) {
-      // Continue existing tournament
-      navigate('/match', { state: { mode: 'tournament' } });
     } else {
-      // Show choice dialog: Create New or Load Existing
-      setShowTournamentChoiceDialog(true);
+      // Naviga direttamente al nuovo Hub dei Tornei
+      navigate('/tournaments');
     }
   };
-
+  
   const handleCreateNewTournament = () => {
     setShowTournamentChoiceDialog(false);
     setNewTournamentName('');
