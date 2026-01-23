@@ -1,11 +1,11 @@
-import { useState, forwardRef } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
@@ -19,18 +19,22 @@ const authSchema = z.object({
   password: z.string().min(6, 'La password deve avere almeno 6 caratteri'),
 });
 
-const Landing = forwardRef<HTMLDivElement>((props, ref) => {
+export default function Landing() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { signUp, signIn, enterAsGuest } = useAuth();
+  const { signUp, signIn, loginAsGuest } = useAuth(); // Usiamo loginAsGuest come nel contesto attuale
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleGuestAccess = () => {
-    // PRIVACY: Clear query cache when entering guest mode to prevent data leaks
-    enterAsGuest(queryClient);
-    navigate('/app');
+  const handleGuestAccess = async () => {
+    try {
+      await loginAsGuest();
+      queryClient.clear(); // Pulisce la cache per sicurezza
+      navigate('/dashboard'); // Destinazione corretta
+    } catch (error) {
+      toast.error("Errore nell'accesso ospite");
+    }
   };
 
   const handleAuth = async (mode: 'login' | 'register') => {
@@ -47,39 +51,34 @@ const Landing = forwardRef<HTMLDivElement>((props, ref) => {
       if (mode === 'register') {
         const { error } = await signUp(email, password);
         if (error) {
-          if (error.message.includes('already registered')) {
-            toast.error('Email già registrata. Prova ad accedere.');
-          } else {
-            toast.error(error.message);
-          }
+          toast.error(error.message);
         } else {
           toast.success('Registrazione completata! Ora puoi accedere.');
-          navigate('/app');
+          // In base alla config di Supabase potrebbe servire conferma email
         }
       } else {
         const { error } = await signIn(email, password);
         if (error) {
-          if (error.message.includes('Invalid login')) {
-            toast.error('Email o password non corretti');
-          } else {
-            toast.error(error.message);
-          }
+          toast.error(error.message === 'Invalid login credentials' ? 'Email o password errati' : error.message);
         } else {
           toast.success('Accesso effettuato!');
-          navigate('/app');
+          navigate('/dashboard'); // Destinazione corretta
         }
       }
+    } catch (err: any) {
+      toast.error("Si è verificato un errore");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div ref={ref} className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30">
       <Helmet>
         <title>Match Manager Live - Gestione Partite Calcio</title>
         <meta name="description" content="Gestisci le tue partite di calcio in tempo reale. Traccia gol, sostituzioni, cartellini e cronaca live." />
       </Helmet>
+      
       <Header />
       
       <main className="flex-1 flex items-center justify-center p-4">
@@ -91,18 +90,18 @@ const Landing = forwardRef<HTMLDivElement>((props, ref) => {
             </p>
           </div>
 
-          <Card className="border-2">
+          <Card className="border-2 shadow-xl">
             <CardHeader className="text-center pb-2">
               <CardTitle className="text-lg">Come vuoi continuare?</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Guest Access Button */}
               <Button 
                 variant="outline" 
-                className="w-full h-14 text-lg gap-3"
+                className="w-full h-14 text-lg gap-3 border-primary/20 hover:bg-primary/5"
                 onClick={handleGuestAccess}
+                disabled={isLoading}
               >
-                <UserCircle className="h-6 w-6" />
+                <UserCircle className="h-6 w-6 text-primary" />
                 Entra come Ospite
               </Button>
               
@@ -117,7 +116,6 @@ const Landing = forwardRef<HTMLDivElement>((props, ref) => {
                 </div>
               </div>
 
-              {/* Auth Tabs */}
               <Tabs defaultValue="login" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="login" className="gap-2">
@@ -197,7 +195,7 @@ const Landing = forwardRef<HTMLDivElement>((props, ref) => {
             </CardContent>
           </Card>
 
-          <p className="text-center text-sm text-muted-foreground">
+          <p className="text-center text-sm text-muted-foreground italic">
             La modalità ospite non salva i dati in modo persistente
           </p>
         </div>
@@ -206,8 +204,4 @@ const Landing = forwardRef<HTMLDivElement>((props, ref) => {
       <Footer />
     </div>
   );
-});
-
-Landing.displayName = 'Landing';
-
-export default Landing;
+}
