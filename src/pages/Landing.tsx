@@ -22,7 +22,7 @@ const authSchema = z.object({
 export default function Landing() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { signUp, signIn, loginAsGuest } = useAuth(); // Usiamo loginAsGuest come nel contesto attuale
+  const { signUp, signIn, loginAsGuest } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -30,8 +30,9 @@ export default function Landing() {
   const handleGuestAccess = async () => {
     try {
       await loginAsGuest();
-      queryClient.clear(); // Pulisce la cache per sicurezza
-      navigate('/dashboard'); // Destinazione corretta
+      queryClient.clear(); 
+      // MODIFICA: cambiato da /app a /dashboard
+      navigate('/dashboard'); 
     } catch (error) {
       toast.error("Errore nell'accesso ospite");
     }
@@ -53,8 +54,9 @@ export default function Landing() {
         if (error) {
           toast.error(error.message);
         } else {
-          toast.success('Registrazione completata! Ora puoi accedere.');
-          // In base alla config di Supabase potrebbe servire conferma email
+          toast.success('Registrazione completata!');
+          // MODIFICA: cambiato da /app a /dashboard
+          navigate('/dashboard'); 
         }
       } else {
         const { error } = await signIn(email, password);
@@ -62,7 +64,8 @@ export default function Landing() {
           toast.error(error.message === 'Invalid login credentials' ? 'Email o password errati' : error.message);
         } else {
           toast.success('Accesso effettuato!');
-          navigate('/dashboard'); // Destinazione corretta
+          // MODIFICA: cambiato da /app a /dashboard
+          navigate('/dashboard'); 
         }
       }
     } catch (err: any) {
