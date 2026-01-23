@@ -4,10 +4,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { Trophy, Users, Zap, Star, ArrowRight } from "lucide-react";
-import { Auth } from "@supabase/auth-ui-react";
-import { ThemeSupa } from "@supabase/auth-ui-shared";
-import { supabase } from "@/integrations/supabase/client";
+import { Trophy, Users, Zap, Star, ArrowRight, LogIn } from "lucide-react";
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -49,51 +46,70 @@ export default function Landing() {
             Organizza tornei, tieni traccia dei punteggi in tempo reale e genera classifiche automatiche. Tutto in un'unica piattaforma.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12 max-w-4xl mx-auto items-start">
-            {/* Box Login/Registrazione */}
-            <div className="bg-card border rounded-xl p-6 shadow-sm">
-              <h3 className="text-xl font-bold mb-4">Inizia ora</h3>
-              <Auth
-                supabaseClient={supabase}
-                appearance={{ theme: ThemeSupa }}
-                theme="dark"
-                providers={["google"]}
-                redirectTo={window.location.origin + "/dashboard"}
-              />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12 max-w-4xl mx-auto items-stretch">
+            {/* Box Login / Registrazione */}
+            <div className="bg-card border rounded-2xl p-8 shadow-sm flex flex-col items-center justify-center text-center space-y-6">
+              <div className="p-3 bg-primary/10 rounded-full">
+                <LogIn className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold">Bentornato</h3>
+                <p className="text-muted-foreground mt-2">Accedi al tuo account per gestire i tuoi tornei salvati.</p>
+              </div>
+              <Button 
+                onClick={() => navigate("/dashboard")} 
+                size="lg" 
+                className="w-full h-14 text-lg font-semibold"
+              >
+                Accedi ora
+              </Button>
             </div>
 
-            {/* Box Accesso Rapido */}
-            <div className="flex flex-col gap-4 p-6 bg-secondary/5 rounded-xl border border-secondary/20 h-full justify-center">
-              <h3 className="text-xl font-bold">Accesso Rapido</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Vuoi solo dare un'occhiata? Entra subito come ospite senza creare un account.
-              </p>
+            {/* Box Accesso Rapido / Ospite */}
+            <div className="bg-secondary/5 border border-secondary/20 rounded-2xl p-8 shadow-sm flex flex-col items-center justify-center text-center space-y-6">
+              <div className="p-3 bg-secondary/10 rounded-full">
+                <Users className="h-8 w-8 text-secondary" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold">Entra come Ospite</h3>
+                <p className="text-muted-foreground mt-2">Prova tutte le funzionalità subito, senza registrazione.</p>
+              </div>
               <Button 
                 onClick={handleGuest} 
+                variant="outline" 
                 size="lg" 
-                className="w-full text-lg h-14 bg-secondary hover:bg-secondary/90 text-white"
+                className="w-full h-14 text-lg font-semibold border-secondary text-secondary hover:bg-secondary/10"
               >
-                Entra come Ospite
+                Prova Gratis
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </div>
           </div>
         </section>
 
-        {/* Features Brevi */}
+        {/* Features Section */}
         <section className="border-t bg-muted/30 py-16">
           <div className="max-w-5xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="flex gap-4 items-start">
-              <div className="p-2 bg-background rounded-lg border shadow-sm"><Trophy className="text-secondary" /></div>
-              <div><h4 className="font-bold">Tornei</h4><p className="text-sm text-muted-foreground">Crea tabelloni e gironi in pochi clic.</p></div>
+            <div className="flex gap-4 items-start p-4 bg-background rounded-xl border shadow-sm">
+              <Trophy className="text-secondary h-6 w-6 shrink-0" />
+              <div>
+                <h4 className="font-bold">Tornei</h4>
+                <p className="text-sm text-muted-foreground text-left">Crea tabelloni e gironi in pochi clic.</p>
+              </div>
             </div>
-            <div className="flex gap-4 items-start">
-              <div className="p-2 bg-background rounded-lg border shadow-sm"><Users className="text-secondary" /></div>
-              <div><h4 className="font-bold">Squadre</h4><p className="text-sm text-muted-foreground">Gestisci player e statistiche team.</p></div>
+            <div className="flex gap-4 items-start p-4 bg-background rounded-xl border shadow-sm">
+              <Users className="text-secondary h-6 w-6 shrink-0" />
+              <div>
+                <h4 className="font-bold">Squadre</h4>
+                <p className="text-sm text-muted-foreground text-left">Gestisci player e statistiche team.</p>
+              </div>
             </div>
-            <div className="flex gap-4 items-start">
-              <div className="p-2 bg-background rounded-lg border shadow-sm"><Zap className="text-secondary" /></div>
-              <div><h4 className="font-bold">Live</h4><p className="text-sm text-muted-foreground">Aggiornamenti punteggi in tempo reale.</p></div>
+            <div className="flex gap-4 items-start p-4 bg-background rounded-xl border shadow-sm">
+              <Zap className="text-secondary h-6 w-6 shrink-0" />
+              <div>
+                <h4 className="font-bold">Live</h4>
+                <p className="text-sm text-muted-foreground text-left">Aggiornamenti punteggi in tempo reale.</p>
+              </div>
             </div>
           </div>
         </section>
