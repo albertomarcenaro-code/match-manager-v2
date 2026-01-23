@@ -1,121 +1,213 @@
-import React from "react";
-import { useNavigate } from "react-router-dom";
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
-import { Button } from "@/components/ui/button";
-import { useAuth } from "@/contexts/AuthContext";
-import { Trophy, Users, Zap, Star, ArrowRight, LogIn } from "lucide-react";
+import { useState, forwardRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Header } from '@/components/layout/Header';
+import { Footer } from '@/components/layout/Footer';
+import { toast } from 'sonner';
+import { UserCircle, LogIn, UserPlus } from 'lucide-react';
+import { Helmet } from 'react-helmet';
+import { z } from 'zod';
 
-export default function Landing() {
+const authSchema = z.object({
+  email: z.string().email('Email non valida'),
+  password: z.string().min(6, 'La password deve avere almeno 6 caratteri'),
+});
+
+const Landing = forwardRef<HTMLDivElement>((props, ref) => {
   const navigate = useNavigate();
-  const { user, loginAsGuest } = useAuth();
+  const queryClient = useQueryClient();
+  const { signUp, signIn, enterAsGuest } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Se l'utente è già loggato, lo mandiamo in dashboard
-  React.useEffect(() => {
-    if (user) {
-      navigate("/dashboard");
+  const handleGuestAccess = () => {
+    // PRIVACY: Clear query cache when entering guest mode to prevent data leaks
+    enterAsGuest(queryClient);
+    navigate('/app');
+  };
+
+  const handleAuth = async (mode: 'login' | 'register') => {
+    const validation = authSchema.safeParse({ email, password });
+    
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
+      return;
     }
-  }, [user, navigate]);
 
-  const handleGuest = async () => {
+    setIsLoading(true);
+    
     try {
-      await loginAsGuest();
-      navigate("/dashboard");
-    } catch (error) {
-      console.error("Errore login ospite:", error);
+      if (mode === 'register') {
+        const { error } = await signUp(email, password);
+        if (error) {
+          if (error.message.includes('already registered')) {
+            toast.error('Email già registrata. Prova ad accedere.');
+          } else {
+            toast.error(error.message);
+          }
+        } else {
+          toast.success('Registrazione completata! Ora puoi accedere.');
+          navigate('/app');
+        }
+      } else {
+        const { error } = await signIn(email, password);
+        if (error) {
+          if (error.message.includes('Invalid login')) {
+            toast.error('Email o password non corretti');
+          } else {
+            toast.error(error.message);
+          }
+        } else {
+          toast.success('Accesso effettuato!');
+          navigate('/app');
+        }
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div ref={ref} className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30">
+      <Helmet>
+        <title>Match Manager Live - Gestione Partite Calcio</title>
+        <meta name="description" content="Gestisci le tue partite di calcio in tempo reale. Traccia gol, sostituzioni, cartellini e cronaca live." />
+      </Helmet>
       <Header />
       
-      <main className="flex-1">
-        {/* Hero Section */}
-        <section className="py-20 px-6 text-center max-w-5xl mx-auto space-y-8">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/10 text-secondary text-sm font-medium mb-4">
-            <Star className="h-4 w-4 fill-current" />
-            <span>Il miglior gestore di tornei live</span>
+      <main className="flex-1 flex items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-6">
+          <div className="text-center space-y-2">
+            <h2 className="text-3xl font-bold tracking-tight">Benvenuto</h2>
+            <p className="text-muted-foreground">
+              Gestisci le tue partite di calcio in tempo reale
+            </p>
           </div>
-          
-          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight">
-            Gestisci i tuoi match come un <span className="text-secondary">Professionista</span>
-          </h1>
-          
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Organizza tornei, tieni traccia dei punteggi in tempo reale e genera classifiche automatiche. Tutto in un'unica piattaforma.
-          </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12 max-w-4xl mx-auto items-stretch">
-            {/* Box Login / Registrazione */}
-            <div className="bg-card border rounded-2xl p-8 shadow-sm flex flex-col items-center justify-center text-center space-y-6">
-              <div className="p-3 bg-primary/10 rounded-full">
-                <LogIn className="h-8 w-8 text-primary" />
-              </div>
-              <div>
-                <h3 className="text-2xl font-bold">Bentornato</h3>
-                <p className="text-muted-foreground mt-2">Accedi al tuo account per gestire i tuoi tornei salvati.</p>
-              </div>
+          <Card className="border-2">
+            <CardHeader className="text-center pb-2">
+              <CardTitle className="text-lg">Come vuoi continuare?</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Guest Access Button */}
               <Button 
-                onClick={() => navigate("/dashboard")} 
-                size="lg" 
-                className="w-full h-14 text-lg font-semibold"
-              >
-                Accedi ora
-              </Button>
-            </div>
-
-            {/* Box Accesso Rapido / Ospite */}
-            <div className="bg-secondary/5 border border-secondary/20 rounded-2xl p-8 shadow-sm flex flex-col items-center justify-center text-center space-y-6">
-              <div className="p-3 bg-secondary/10 rounded-full">
-                <Users className="h-8 w-8 text-secondary" />
-              </div>
-              <div>
-                <h3 className="text-2xl font-bold">Entra come Ospite</h3>
-                <p className="text-muted-foreground mt-2">Prova tutte le funzionalità subito, senza registrazione.</p>
-              </div>
-              <Button 
-                onClick={handleGuest} 
                 variant="outline" 
-                size="lg" 
-                className="w-full h-14 text-lg font-semibold border-secondary text-secondary hover:bg-secondary/10"
+                className="w-full h-14 text-lg gap-3"
+                onClick={handleGuestAccess}
               >
-                Prova Gratis
-                <ArrowRight className="ml-2 h-5 w-5" />
+                <UserCircle className="h-6 w-6" />
+                Entra come Ospite
               </Button>
-            </div>
-          </div>
-        </section>
+              
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">
+                    oppure
+                  </span>
+                </div>
+              </div>
 
-        {/* Features Section */}
-        <section className="border-t bg-muted/30 py-16">
-          <div className="max-w-5xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="flex gap-4 items-start p-4 bg-background rounded-xl border shadow-sm">
-              <Trophy className="text-secondary h-6 w-6 shrink-0" />
-              <div>
-                <h4 className="font-bold">Tornei</h4>
-                <p className="text-sm text-muted-foreground text-left">Crea tabelloni e gironi in pochi clic.</p>
-              </div>
-            </div>
-            <div className="flex gap-4 items-start p-4 bg-background rounded-xl border shadow-sm">
-              <Users className="text-secondary h-6 w-6 shrink-0" />
-              <div>
-                <h4 className="font-bold">Squadre</h4>
-                <p className="text-sm text-muted-foreground text-left">Gestisci player e statistiche team.</p>
-              </div>
-            </div>
-            <div className="flex gap-4 items-start p-4 bg-background rounded-xl border shadow-sm">
-              <Zap className="text-secondary h-6 w-6 shrink-0" />
-              <div>
-                <h4 className="font-bold">Live</h4>
-                <p className="text-sm text-muted-foreground text-left">Aggiornamenti punteggi in tempo reale.</p>
-              </div>
-            </div>
-          </div>
-        </section>
+              {/* Auth Tabs */}
+              <Tabs defaultValue="login" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="login" className="gap-2">
+                    <LogIn className="h-4 w-4" />
+                    Accedi
+                  </TabsTrigger>
+                  <TabsTrigger value="register" className="gap-2">
+                    <UserPlus className="h-4 w-4" />
+                    Registrati
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="login" className="space-y-4 mt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="login-email">Email</Label>
+                    <Input
+                      id="login-email"
+                      type="email"
+                      placeholder="la-tua@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="login-password">Password</Label>
+                    <Input
+                      id="login-password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <Button 
+                    className="w-full" 
+                    onClick={() => handleAuth('login')}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Accesso...' : 'Accedi'}
+                  </Button>
+                </TabsContent>
+                
+                <TabsContent value="register" className="space-y-4 mt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="register-email">Email</Label>
+                    <Input
+                      id="register-email"
+                      type="email"
+                      placeholder="la-tua@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="register-password">Password</Label>
+                    <Input
+                      id="register-password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <Button 
+                    className="w-full" 
+                    onClick={() => handleAuth('register')}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Registrazione...' : 'Registrati'}
+                  </Button>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+
+          <p className="text-center text-sm text-muted-foreground">
+            La modalità ospite non salva i dati in modo persistente
+          </p>
+        </div>
       </main>
 
       <Footer />
     </div>
   );
-}
+});
+
+Landing.displayName = 'Landing';
+
+export default Landing;
