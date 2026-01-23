@@ -37,7 +37,7 @@ export default function Tournaments() {
       setTournaments(data || []);
     } catch (error: any) {
       console.error("Errore caricamento:", error);
-      toast.error("Errore nel caricamento dei tornei");
+      toast.error("Non è stato possibile caricare i tornei");
     } finally {
       setLoading(false);
     }
@@ -53,7 +53,7 @@ export default function Tournaments() {
 
     setIsCreating(true);
     try {
-      // Passiamo ESPLICITAMENTE user_id per soddisfare la policy RLS
+      // Inviamo esplicitamente user_id per superare i controlli di sicurezza (RLS)
       const { error } = await supabase
         .from('tournaments')
         .insert([
@@ -66,12 +66,12 @@ export default function Tournaments() {
 
       if (error) throw error;
 
-      toast.success("Torneo creato!");
+      toast.success("Torneo creato con successo!");
       setNewTournamentName('');
       await loadTournaments();
     } catch (error: any) {
       console.error("Errore creazione:", error);
-      // Se l'errore persiste, mostriamo il messaggio tecnico nel toast
+      // Questo toast mostrerà l'errore tecnico specifico (es. RLS policy violation)
       toast.error(`Errore: ${error.message || "Impossibile creare il torneo"}`);
     } finally {
       setIsCreating(false);
@@ -85,11 +85,12 @@ export default function Tournaments() {
         .from('tournaments')
         .delete()
         .eq('id', id);
+      
       if (error) throw error;
       toast.success("Torneo eliminato");
       loadTournaments();
     } catch (error: any) {
-      toast.error("Errore nell'eliminazione");
+      toast.error("Errore durante l'eliminazione");
     }
   };
 
@@ -100,6 +101,7 @@ export default function Tournaments() {
         .from('tournaments')
         .update({ status: newStatus })
         .eq('id', id);
+
       if (error) throw error;
       loadTournaments();
     } catch (error: any) {
@@ -110,4 +112,7 @@ export default function Tournaments() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
-      <main className="flex-1 p-4 max-w-2xl mx-
+      
+      <main className="flex-1 p-4 max-w-2xl mx-auto w-full">
+        <div className="flex items-center justify-between mb-8 pt-4">
+          <h1 className="text-2xl font-bold flex items-
