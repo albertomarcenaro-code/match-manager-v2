@@ -15,71 +15,20 @@ const queryClient = new QueryClient();
 
 function ProtectedRoute({ children, requireAuth = false }: { children: React.ReactNode; requireAuth?: boolean }) {
   const { user, isGuest, isLoading } = useAuth();
-  
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-  
-  if (!user && !isGuest) {
-    return <Navigate to="/" replace />;
-  }
-
-  if (requireAuth && !user) {
-    return <Navigate to="/dashboard" replace state={{ authRequired: true }} />;
-  }
-  
+  if (isLoading) return <div className="h-screen flex items-center justify-center">Caricamento...</div>;
+  if (!user && !isGuest) return <Navigate to="/" replace />;
+  if (requireAuth && !user) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
 function AppRoutes() {
-  const { user, isGuest } = useAuth();
-  
   return (
     <Routes>
-      <Route 
-        path="/" 
-        element={user || isGuest ? <Navigate to="/dashboard" replace /> : <Landing />} 
-      />
-      <Route 
-        path="/dashboard" 
-        element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/match" 
-        element={
-          <ProtectedRoute>
-            <MatchApp />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/tournaments" 
-        element={
-          <ProtectedRoute requireAuth>
-            <Tournaments />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/app" 
-        element={<Navigate to="/dashboard" replace />} 
-      />
-      <Route 
-        path="/tournament" 
-        element={
-          <ProtectedRoute requireAuth>
-            <TournamentArchive />
-          </ProtectedRoute>
-        } 
-      />
+      <Route path="/" element={<Landing />} />
+      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/match" element={<ProtectedRoute><MatchApp /></ProtectedRoute>} />
+      <Route path="/tournaments" element={<ProtectedRoute requireAuth><Tournaments /></ProtectedRoute>} />
+      <Route path="/tournament" element={<ProtectedRoute requireAuth><TournamentArchive /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
