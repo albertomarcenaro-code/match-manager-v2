@@ -1,8 +1,9 @@
+import React from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Trophy, Plus, History, Settings } from "lucide-react";
+import { Trophy, Plus } from "lucide-react"; // Rimosse icone inutilizzate per evitare warning
 import { useNavigate } from "react-router-dom";
 
 export default function Dashboard() {
