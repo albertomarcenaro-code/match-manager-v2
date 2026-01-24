@@ -34,146 +34,144 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { TournamentPlayerMatchStats } from '@/types/tournament';
 import { supabase } from '@/integrations/supabase/client';
 
-type AppPhase = 'setup' | 'starterSelection' | 'match';
-
 const MatchApp = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isGuest } = useAuth();
   const { tournament, addMatchToTournament, startTournament } = useTournament();
-  const [phase, setPhase] = useState<AppPhase>('setup');
+  const [phase, setPhase] = useState<'setup' | 'match'>('setup');
   const [matchSavedToTournament, setMatchSavedToTournament] = useState(false);
   const [pendingTournamentName, setPendingTournamentName] = useState<string | null>(null);
-  const [syncStatus, setSyncStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
   
   const {
-    state,
-    setHomeTeamName,
-    setAwayTeamName,
-    addPlayer,
-    bulkAddPlayers,
-    createPlayersWithNumbers,
-    updatePlayerNumber,
-    removePlayer,
-    addOpponentPlayer,
-    addHomePlayerWithNumber,
-    addAwayPlayerWithNumber,
-    removeOpponentPlayer,
-    setStarters,
-    confirmStarters,
-    setPeriodDuration,
-    setTotalPeriods,
-    undoLastEvent,
-    startPeriod,
-    pauseTimer,
-    resumeTimer,
-    endPeriod,
-    endMatch,
-    recordGoal,
-    recordOwnGoal,
-    recordSubstitution,
-    recordCard,
-    resetMatch,
-    forceStarterSelection,
-    swapTeams,
+    state, setHomeTeamName, setAwayTeamName, addPlayer, bulkAddPlayers,
+    createPlayersWithNumbers, updatePlayerNumber, removePlayer, addOpponentPlayer,
+    removeOpponentPlayer, setStarters, confirmStarters, setPeriodDuration,
+    setTotalPeriods, undoLastEvent, startPeriod, pauseTimer, resumeTimer,
+    endPeriod, endMatch, recordGoal, recordOwnGoal, recordSubstitution,
+    recordCard, resetMatch, forceStarterSelection, swapTeams,
   } = useMatch();
 
-  // Verifica lo stato di sincronizzazione
   useEffect(() => {
-    const checkSync = async () => {
-      if (!user || isGuest) {
-        setSyncStatus('disconnected');
-        return;
-      }
-      try {
-        const { error } = await supabase.from('profiles').select('id').limit(1);
-        setSyncStatus(error ? 'disconnected' : 'connected');
-      } catch {
-        setSyncStatus('disconnected');
-      }
-    };
-    checkSync();
-    const interval = setInterval(checkSync, 30000);
-    return () => clearInterval(interval);
-  }, [user, isGuest]);
-
-  // GESTIONE LOGICA MODALITÀ
-  useEffect(() => {
-    const navState = location.state as { mode?: string; resume?: boolean; createTournament?: boolean; tournamentName?: string } | null;
-    
+    const navState = location.state as any;
     if (navState?.mode === 'single') {
       setPendingTournamentName(null);
       setPhase(state.isMatchStarted ? 'match' : 'setup');
     } else if (navState?.mode === 'tournament') {
-      if (navState.createTournament && navState.tournamentName) {
-        setPendingTournamentName(navState.tournamentName);
-      }
+      if (navState.createTournament) setPendingTournamentName(navState.tournamentName);
       setPhase(state.isMatchStarted ? 'match' : 'setup');
-    } else if (navState?.resume && state.isMatchStarted) {
-      setPhase('match');
-    }
-    
-    if (navState) {
-      window.history.replaceState({}, document.title);
     }
   }, []);
 
-  const isTournamentActive = tournament.isActive || !!pendingTournamentName;
+  const isTournamentActive = !!(tournament?.isActive || pendingTournamentName);
 
-  const calculatePlayerStats = useCallback((): TournamentPlayerMatchStats[] => {
-    const playerStats: TournamentPlayerMatchStats[] = [];
-    const periodsPlayed = state.periodScores.length > 0 
-      ? Math.max(...state.periodScores.map(ps => ps.period))
-      : state.currentPeriod;
+  const handleRosterComplete = () => {
+    if (pendingTournamentName) {
+      const players = state.homeTeam.players.map(p => ({ name: p.name, number: p.number }));
+      startTournament(pendingTournamentName, state.homeTeam.name, players);
+      setPendingTournamentName(null);
+    }
+    forceStarterSelection();
+    setPhase('match');
+  };
 
-    state.homeTeam.players.forEach(player => {
-      let goals = 0;
-      let minutes = 0;
-      let yellowCards = 0;
-      let redCards = 0;
+  const handleNewMatch = () => {
+    resetMatch(isTournamentActive);
+    setPhase('setup');
+  };
 
-      state.events.forEach(e => {
-        if (e.team === 'home' && e.playerId === player.id) {
-          if (e.type === 'goal') goals++;
-          if (e.type === 'yellow_card') yellowCards++;
-          if (e.type === 'red_card') redCards++;
-        }
-      });
+  if (phase === 'setup') {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <RosterSetup
+          homeTeamName={state.homeTeam.name}
+          awayTeamName={state.awayTeam.name}
+          homePlayers={state.homeTeam.players}
+          awayPlayers={state.awayTeam.players}
+          onHomeTeamNameChange={setHomeTeamName}
+          onAwayTeamNameChange={setAwayTeamName}
+          onAddPlayer={addPlayer}
+          onUpdatePlayerNumber={updatePlayerNumber}
+          onRemovePlayer={removePlayer}
+          onAddOpponentPlayer={addOpponentPlayer}
+          onRemoveOpponentPlayer={removeOpponentPlayer}
+          onComplete={handleRosterComplete}
+          onBulkAddPlayers={bulkAddPlayers}
+          onSwapTeams={swapTeams}
+          onCreatePlayersWithNumbers={createPlayersWithNumbers}
+          isTournamentMode={isTournamentActive}
+        />
+        <Footer />
+      </div>
+    );
+  }
 
-      for (let period = 1; period <= periodsPlayed; period++) {
-        const periodEvents = state.events.filter(e => e.period === period);
-        const periodStart = periodEvents.find(e => e.type === 'period_start');
-        const periodEnd = periodEvents.find(e => e.type === 'period_end');
-        if (!periodStart) continue;
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <main className="flex-1 p-4 max-w-6xl mx-auto w-full space-y-4">
+        <MatchHeader state={state} isTournamentMode={isTournamentActive} />
         
-        const periodDurationSeconds = periodEnd 
-          ? periodEnd.timestamp 
-          : (period === state.currentPeriod ? state.elapsedTime : state.periodDuration * 60);
+        {state.needsStarterSelection && !state.isMatchEnded ? (
+          <StarterSelection
+            homePlayers={state.homeTeam.players}
+            awayPlayers={state.awayTeam.players}
+            period={state.currentPeriod}
+            onConfirm={(h, a) => { setStarters(h, true); setStarters(a, false); confirmStarters(); }}
+          />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="lg:col-span-8 space-y-4">
+              <TimerControls
+                isRunning={state.isRunning}
+                isPaused={state.isPaused}
+                elapsedTime={state.elapsedTime}
+                currentPeriod={state.currentPeriod}
+                totalPeriods={state.totalPeriods}
+                periodDuration={state.periodDuration}
+                isMatchStarted={state.isMatchStarted}
+                isMatchEnded={state.isMatchEnded}
+                onStartPeriod={startPeriod}
+                onPauseTimer={pauseTimer}
+                onResumeTimer={resumeTimer}
+                onEndPeriod={endPeriod}
+                onEndMatch={endMatch}
+                onUndo={undoLastEvent}
+                hasEvents={state.events.length > 0}
+              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <TeamPanel
+                  team="home"
+                  name={state.homeTeam.name}
+                  players={state.homeTeam.players}
+                  onGoal={(id) => recordGoal(id, 'home')}
+                  onOwnGoal={(id) => recordOwnGoal(id, 'home')}
+                  onCard={(id, type) => recordCard(id, 'home', type)}
+                  onSubstitution={(out, inv) => recordSubstitution(out, inv, 'home')}
+                  disabled={!state.isRunning || state.isPaused}
+                />
+                <TeamPanel
+                  team="away"
+                  name={state.awayTeam.name}
+                  players={state.awayTeam.players}
+                  onGoal={(id) => recordGoal(id, 'away')}
+                  onOwnGoal={(id) => recordOwnGoal(id, 'away')}
+                  onCard={(id, type) => recordCard(id, 'away', type)}
+                  onSubstitution={(out, inv) => recordSubstitution(out, inv, 'away')}
+                  disabled={!state.isRunning || state.isPaused}
+                />
+              </div>
+            </div>
+            <div className="lg:col-span-4">
+              <EventTimeline events={state.events} onUndo={undoLastEvent} />
+            </div>
+          </div>
+        )}
+      </main>
+      <Footer />
+    </div>
+  );
+};
 
-        let onFieldAtStart = false;
-        if (period === 1) {
-          onFieldAtStart = player.isStarter;
-        } else {
-          let onField = player.isStarter;
-          const prevEvents = state.events.filter(e => e.period < period);
-          prevEvents.forEach(event => {
-            if (event.type === 'substitution' && event.team === 'home') {
-              if (event.playerOutId === player.id) onField = false;
-              if (event.playerInId === player.id) onField = true;
-            }
-            if (event.type === 'red_card' && event.team === 'home' && event.playerId === player.id) {
-              onField = false;
-            }
-          });
-          onFieldAtStart = onField;
-        }
-
-        let wasOnFieldThisPeriod = onFieldAtStart;
-        let exitTime = periodDurationSeconds;
-        let entryTimeThisPeriod = periodStart.timestamp;
-
-        periodEvents.forEach(event => {
-          if (event.type === 'substitution' && event.team === 'home') {
-            if (event.playerOutId === player.id) {
-              exitTime = event.timestamp;
-              wasOnFieldThisPeriod = false;
+export default MatchApp;
