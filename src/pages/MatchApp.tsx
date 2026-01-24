@@ -97,19 +97,13 @@ const MatchApp = () => {
     return () => clearInterval(interval);
   }, [user, isGuest]);
 
-  // GESTIONE LOGICA MODALITÀ (Torneo vs Singola)
+  // GESTIONE LOGICA MODALITÀ
   useEffect(() => {
     const navState = location.state as { mode?: string; resume?: boolean; createTournament?: boolean; tournamentName?: string } | null;
     
     if (navState?.mode === 'single') {
-      // FORZATURA: Se entriamo in modalità singola, resettiamo ogni riferimento a tornei attivi
-      // per evitare che l'header mostri dati sporchi
       setPendingTournamentName(null);
-      if (!state.isMatchStarted) {
-        setPhase('setup');
-      } else {
-        setPhase('match');
-      }
+      setPhase(state.isMatchStarted ? 'match' : 'setup');
     } else if (navState?.mode === 'tournament') {
       if (navState.createTournament && navState.tournamentName) {
         setPendingTournamentName(navState.tournamentName);
@@ -124,7 +118,6 @@ const MatchApp = () => {
     }
   }, []);
 
-  // Determiniamo se siamo DAVVERO in un torneo per passare l'info ai componenti figli
   const isTournamentActive = tournament.isActive || !!pendingTournamentName;
 
   const calculatePlayerStats = useCallback((): TournamentPlayerMatchStats[] => {
@@ -158,8 +151,6 @@ const MatchApp = () => {
           : (period === state.currentPeriod ? state.elapsedTime : state.periodDuration * 60);
 
         let onFieldAtStart = false;
-        let entryTime = 0;
-        
         if (period === 1) {
           onFieldAtStart = player.isStarter;
         } else {
@@ -179,207 +170,10 @@ const MatchApp = () => {
 
         let wasOnFieldThisPeriod = onFieldAtStart;
         let exitTime = periodDurationSeconds;
+        let entryTimeThisPeriod = periodStart.timestamp;
 
         periodEvents.forEach(event => {
           if (event.type === 'substitution' && event.team === 'home') {
             if (event.playerOutId === player.id) {
-              if (wasOnFieldThisPeriod) exitTime = event.timestamp;
+              exitTime = event.timestamp;
               wasOnFieldThisPeriod = false;
-            }
-            if (event.playerInId === player.id) wasOnFieldThisPeriod = true;
-          }
-          if (event.type === 'red_card' && event.team === 'home' && event.playerId === player.id) {
-            if (wasOnFieldThisPeriod) exitTime = event.timestamp;
-            wasOnFieldThisPeriod = false;
-          }
-        });
-
-        if (onFieldAtStart) {
-          minutes += Math.floor((exitTime - entryTime) / 60);
-        } else if (wasOnFieldThisPeriod) {
-          const subbedInEvent = periodEvents.find(e => e.type === 'substitution' && e.team === 'home' && e.playerInId === player.id);
-          if (subbedInEvent) {
-            minutes += Math.floor((exitTime - subbedInEvent.timestamp) / 60);
-          }
-        }
-      }
-
-      playerStats.push({
-        playerId: player.id,
-        playerName: player.name,
-        playerNumber: player.number,
-        goals,
-        minutes,
-        yellowCards,
-        redCards,
-      });
-    });
-
-    return playerStats;
-  }, [state]);
-
-  useEffect(() => {
-    // Salvataggio automatico solo se il torneo è attivo
-    if (state.isMatchEnded && isTournamentActive && tournament.isActive && !matchSavedToTournament) {
-      const playerStats = calculatePlayerStats();
-      addMatchToTournament(
-        state.homeTeam.name,
-        state.awayTeam.name,
-        state.homeTeam.score,
-        state.awayTeam.score,
-        playerStats,
-        state.events,
-        state.periodScores
-      );
-      setMatchSavedToTournament(true);
-    }
-  }, [state.isMatchEnded, isTournamentActive, tournament.isActive, matchSavedToTournament, calculatePlayerStats, addMatchToTournament, state]);
-
-  useBeforeUnload(state.isRunning && !state.isPaused, 'Hai una partita in corso. Sei sicuro di voler uscire?');
-
-  const handleRosterComplete = () => {
-    if (pendingTournamentName) {
-      const players = state.homeTeam.players.map(p => ({ name: p.name, number: p.number }));
-      startTournament(pendingTournamentName, state.homeTeam.name, players);
-      setPendingTournamentName(null);
-    }
-    forceStarterSelection();
-    setPhase('match');
-    toast.success('Configurazione completata');
-  };
-
-  const handleStartersConfirm = useCallback((homeStarters: string[], awayStarters: string[]) => {
-    setStarters(homeStarters, true);
-    setStarters(awayStarters, false);
-    confirmStarters();
-    toast.success('Titolari confermati');
-  }, [setStarters, confirmStarters]);
-
-  const handleNewMatch = () => {
-    const preserveHome = isTournamentActive;
-    resetMatch(preserveHome);
-    setMatchSavedToTournament(false);
-    setPhase('setup');
-    toast.success(preserveHome ? 'Nuova partita torneo' : 'Nuova partita rapida');
-  };
-
-  const handleExitMatch = () => {
-    resetMatch(false);
-    setMatchSavedToTournament(false);
-    navigate('/dashboard');
-  };
-
-  const handleTournamentModeChange = (enabled: boolean) => {
-    if (enabled && !isTournamentActive) {
-      navigate('/match', { state: { mode: 'tournament', createTournament: true } });
-    }
-  };
-
-  if (phase === 'setup') {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Header 
-          syncStatus={syncStatus} 
-          isTournamentMode={isTournamentActive}
-          onTournamentModeChange={handleTournamentModeChange}
-          showNavButtons={true}
-          onNewMatch={handleNewMatch}
-        />
-        <div className="flex-1">
-          <RosterSetup
-            homeTeamName={state.homeTeam.name}
-            awayTeamName={state.awayTeam.name}
-            homePlayers={state.homeTeam.players}
-            awayPlayers={state.awayTeam.players}
-            onHomeTeamNameChange={setHomeTeamName}
-            onAwayTeamNameChange={setAwayTeamName}
-            onAddPlayer={addPlayer}
-            onUpdatePlayerNumber={updatePlayerNumber}
-            onRemovePlayer={removePlayer}
-            onAddOpponentPlayer={addOpponentPlayer}
-            onRemoveOpponentPlayer={removeOpponentPlayer}
-            onComplete={handleRosterComplete}
-            onBulkAddPlayers={bulkAddPlayers}
-            onSwapTeams={swapTeams}
-            onCreatePlayersWithNumbers={createPlayersWithNumbers}
-            pendingTournamentName={pendingTournamentName}
-            isTournamentMode={isTournamentActive}
-          />
-        </div>
-        <Footer />
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen flex flex-col">
-      <Header syncStatus={syncStatus} />
-      <Helmet>
-        <title>{state.homeTeam.name || 'Casa'} vs {state.awayTeam.name || 'Ospite'}</title>
-      </Helmet>
-      <main className="flex-1 bg-background p-4 pb-8">
-        <div className="max-w-6xl mx-auto space-y-4">
-          {!state.isMatchEnded && (
-            <div className="flex items-center justify-between gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPhase('setup')}
-                disabled={state.isRunning}
-                className="gap-1"
-              >
-                <Edit className="h-4 w-4" />
-                <span className="hidden sm:inline">Modifica rose</span>
-              </Button>
-
-              <div className="flex items-center gap-2">
-                <MatchSettings
-                  periodDuration={state.periodDuration}
-                  totalPeriods={state.totalPeriods}
-                  onPeriodDurationChange={setPeriodDuration}
-                  onTotalPeriodsChange={setTotalPeriods}
-                  disabled={state.isMatchStarted}
-                />
-                
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="outline" size="icon">
-                      <RotateCcw className="h-5 w-5" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Nuova partita?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Tutti i dati correnti verranno persi.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Annulla</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleNewMatch}>Conferma</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            </div>
-          )}
-          
-          {state.isMatchEnded && (
-            <div className="flex items-center justify-center gap-2 py-2 px-4 bg-muted rounded-lg text-muted-foreground">
-              <Check className="h-4 w-4" />
-              <span className="text-sm font-medium">Partita completata</span>
-            </div>
-          )}
-
-          {/* PASSIAMO isTournamentMode AL COMPONENTE CHE GESTISCE L'HEADER DEL MATCH */}
-          <MatchHeader state={state} isTournamentMode={isTournamentActive} />
-
-          {state.needsStarterSelection && !state.isMatchEnded ? (
-            <StarterSelection
-              homePlayers={state.homeTeam.players}
-              awayPlayers={state.awayTeam.players}
-              period={state.currentPeriod}
-              onConfirm={handleStartersConfirm}
-            />
-          ) : (
-            <>
