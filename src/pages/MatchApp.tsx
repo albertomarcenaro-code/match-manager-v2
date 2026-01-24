@@ -1,71 +1,26 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useMatch } from '@/hooks/useMatch';
-import { useAuth } from '@/contexts/AuthContext';
-import { useTournament } from '@/hooks/useTournament';
 import { RosterSetup } from '@/components/setup/RosterSetup';
 import { MatchHeader } from '@/components/match/MatchHeader';
 import { TimerControls } from '@/components/match/TimerControls';
 import { TeamPanel } from '@/components/match/TeamPanel';
-import { EventTimeline } from '@/components/match/EventTimeline';
 import { StarterSelection } from '@/components/match/StarterSelection';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
-import { useNavigate, useLocation } from 'react-router-dom';
 
 const MatchApp = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { user } = useAuth(); // Rimossa isGuest se non usata direttamente qui, altrimenti riaggiungila
-  const { tournament, startTournament } = useTournament();
   const [phase, setPhase] = useState<'setup' | 'match'>('setup');
-  const [pendingTournamentName, setPendingTournamentName] = useState<string | null>(null);
-  
   const {
-    state, setHomeTeamName, setAwayTeamName, addPlayer, bulkAddPlayers,
-    createPlayersWithNumbers, updatePlayerNumber, removePlayer, addOpponentPlayer,
-    removeOpponentPlayer, setStarters, confirmStarters, 
-    // setPeriodDuration, setTotalPeriods, (aggiungi se servono settings)
-    undoLastEvent, startPeriod, pauseTimer, resumeTimer,
-    endPeriod, endMatch, recordGoal, recordOwnGoal, recordSubstitution,
-    recordCard, resetMatch, forceStarterSelection, swapTeams,
+    state, setHomeTeamName, setAwayTeamName, addPlayer,
+    setStarters, confirmStarters, startPeriod, pauseTimer, 
+    resumeTimer, recordGoal, recordCard, resetMatch, forceStarterSelection
   } = useMatch();
 
-  // Gestione stato iniziale da navigazione
-  useEffect(() => {
-    const navState = location.state as any;
-    if (navState?.mode === 'single') {
-      setPendingTournamentName(null);
-      // Se il match è già iniziato tecnicamente, vai subito al match
-      setPhase(state.isMatchStarted ? 'match' : 'setup');
-    } else if (navState?.mode === 'tournament') {
-      if (navState.createTournament) setPendingTournamentName(navState.tournamentName);
-      setPhase(state.isMatchStarted ? 'match' : 'setup');
-    }
-  }, [location.state, state.isMatchStarted]);
-
-  const isTournamentActive = !!(tournament?.isActive || pendingTournamentName);
-
-  // Funzione corretta e stabilizzata per il passaggio alla fase Match
   const handleRosterComplete = useCallback(() => {
-    if (pendingTournamentName) {
-      const players = state.homeTeam.players.map(p => ({ name: p.name, number: p.number }));
-      startTournament(pendingTournamentName, state.homeTeam.name, players);
-      setPendingTournamentName(null);
-    }
-    
-    // 1. Assicuriamo che l'hook sappia che servono i titolari
     forceStarterSelection();
-    
-    // 2. Cambiamo la visualizzazione
     setPhase('match');
-  }, [pendingTournamentName, state.homeTeam, forceStarterSelection, startTournament, setPendingTournamentName]);
+  }, [forceStarterSelection]);
 
-  const handleNewMatch = () => {
-    resetMatch(isTournamentActive);
-    setPhase('setup');
-  };
-
-  // --- RENDER: FASE SETUP (ROSE) ---
   if (phase === 'setup') {
     return (
       <div className="min-h-screen flex flex-col">
@@ -78,16 +33,72 @@ const MatchApp = () => {
           onHomeTeamNameChange={setHomeTeamName}
           onAwayTeamNameChange={setAwayTeamName}
           onAddPlayer={addPlayer}
-          onUpdatePlayerNumber={updatePlayerNumber}
-          onRemovePlayer={removePlayer}
-          onAddOpponentPlayer={addOpponentPlayer}
-          onRemoveOpponentPlayer={removeOpponentPlayer}
           onComplete={handleRosterComplete}
-          onBulkAddPlayers={bulkAddPlayers}
-          onSwapTeams={swapTeams}
-          onCreatePlayersWithNumbers={createPlayersWithNumbers}
-          isTournamentMode={isTournamentActive}
+          // Aggiungi qui gli altri props se richiesti da RosterSetup
+          onUpdatePlayerNumber={() => {}} 
+          onRemovePlayer={() => {}}
+          onAddOpponentPlayer={() => {}}
+          onRemoveOpponentPlayer={() => {}}
+          onBulkAddPlayers={() => {}}
+          onSwapTeams={() => {}}
+          onCreatePlayersWithNumbers={() => {}}
         />
         <Footer />
       </div>
     );
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <main className="flex-1 p-4 max-w-6xl mx-auto w-full space-y-4">
+        <MatchHeader state={state} />
+        
+        {state.needsStarterSelection ? (
+          <StarterSelection
+            homePlayers={state.homeTeam.players}
+            awayPlayers={state.awayTeam.players}
+            onConfirm={(h, a) => {
+              setStarters(h, true);
+              setStarters(a, false);
+              confirmStarters();
+            }}
+          />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="lg:col-span-8 space-y-4">
+              <TimerControls
+                isRunning={state.isRunning}
+                isPaused={state.isPaused}
+                elapsedTime={state.elapsedTime}
+                onStartPeriod={startPeriod}
+                onPauseTimer={pauseTimer}
+                onResumeTimer={resumeTimer}
+                isMatchStarted={state.isMatchStarted}
+              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <TeamPanel
+                  team="home"
+                  name={state.homeTeam.name}
+                  players={state.homeTeam.players}
+                  onGoal={(id) => recordGoal('home', id)}
+                  onCard={(id, type) => recordCard('home', id, type)}
+                />
+                <TeamPanel
+                  team="away"
+                  name={state.awayTeam.name}
+                  players={state.awayTeam.players}
+                  onGoal={(id) => recordGoal('away', id)}
+                  onCard={(id, type) => recordCard('away', id, type)}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+      <Footer />
+    </div>
+  );
+};
+
+export default MatchApp;
