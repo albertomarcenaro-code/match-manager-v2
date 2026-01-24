@@ -16,7 +16,7 @@ import { MatchSettings } from '@/components/match/MatchSettings';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
-import { RotateCcw, Edit, Home, Trophy, Plus, Check } from 'lucide-react';
+import { RotateCcw, Edit, Home, Check } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,6 +45,7 @@ const MatchApp = () => {
   const [matchSavedToTournament, setMatchSavedToTournament] = useState(false);
   const [pendingTournamentName, setPendingTournamentName] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
+  
   const {
     state,
     setHomeTeamName,
@@ -77,14 +78,13 @@ const MatchApp = () => {
     swapTeams,
   } = useMatch();
 
-  // Check sync status
+  // Verifica lo stato di sincronizzazione
   useEffect(() => {
     const checkSync = async () => {
       if (!user || isGuest) {
         setSyncStatus('disconnected');
         return;
       }
-      
       try {
         const { error } = await supabase.from('profiles').select('id').limit(1);
         setSyncStatus(error ? 'disconnected' : 'connected');
@@ -92,48 +92,41 @@ const MatchApp = () => {
         setSyncStatus('disconnected');
       }
     };
-    
     checkSync();
     const interval = setInterval(checkSync, 30000);
     return () => clearInterval(interval);
   }, [user, isGuest]);
 
-  // Handle navigation state from Dashboard - only run once on mount
+  // GESTIONE LOGICA MODALITÀ (Torneo vs Singola)
   useEffect(() => {
     const navState = location.state as { mode?: string; resume?: boolean; createTournament?: boolean; tournamentName?: string } | null;
     
-    if (navState?.resume && state.isMatchStarted) {
-      // Resume existing match - go directly to match phase
-      setPhase('match');
+    if (navState?.mode === 'single') {
+      // FORZATURA: Se entriamo in modalità singola, resettiamo ogni riferimento a tornei attivi
+      // per evitare che l'header mostri dati sporchi
+      setPendingTournamentName(null);
+      if (!state.isMatchStarted) {
+        setPhase('setup');
+      } else {
+        setPhase('match');
+      }
     } else if (navState?.mode === 'tournament') {
       if (navState.createTournament && navState.tournamentName) {
-        // Store the tournament name to be used after roster setup
         setPendingTournamentName(navState.tournamentName);
       }
-      // Only go to setup if match hasn't started yet
-      if (!state.isMatchStarted) {
-        setPhase('setup');
-      } else {
-        setPhase('match');
-      }
-    } else if (navState?.mode === 'single') {
-      // Single match mode
-      if (!state.isMatchStarted) {
-        setPhase('setup');
-      } else {
-        setPhase('match');
-      }
+      setPhase(state.isMatchStarted ? 'match' : 'setup');
+    } else if (navState?.resume && state.isMatchStarted) {
+      setPhase('match');
     }
     
-    // Clear navigation state to prevent re-triggering
     if (navState) {
       window.history.replaceState({}, document.title);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run only once on mount
+  }, []);
 
-  // Calculate player stats for tournament with proper minutes per period
-  // Each period is tracked independently - if player plays only T1, they get T1 minutes and 0 for T2
+  // Determiniamo se siamo DAVVERO in un torneo per passare l'info ai componenti figli
+  const isTournamentActive = tournament.isActive || !!pendingTournamentName;
+
   const calculatePlayerStats = useCallback((): TournamentPlayerMatchStats[] => {
     const playerStats: TournamentPlayerMatchStats[] = [];
     const periodsPlayed = state.periodScores.length > 0 
@@ -146,7 +139,6 @@ const MatchApp = () => {
       let yellowCards = 0;
       let redCards = 0;
 
-      // Count goals and cards
       state.events.forEach(e => {
         if (e.team === 'home' && e.playerId === player.id) {
           if (e.type === 'goal') goals++;
@@ -155,30 +147,23 @@ const MatchApp = () => {
         }
       });
 
-      // Calculate minutes per period independently
       for (let period = 1; period <= periodsPlayed; period++) {
         const periodEvents = state.events.filter(e => e.period === period);
         const periodStart = periodEvents.find(e => e.type === 'period_start');
         const periodEnd = periodEvents.find(e => e.type === 'period_end');
-        
         if (!periodStart) continue;
         
         const periodDurationSeconds = periodEnd 
           ? periodEnd.timestamp 
           : (period === state.currentPeriod ? state.elapsedTime : state.periodDuration * 60);
 
-        // Determine if player was on field at start of this period
         let onFieldAtStart = false;
         let entryTime = 0;
         
         if (period === 1) {
           onFieldAtStart = player.isStarter;
         } else {
-          // Check if player was on field at end of previous period
-          // Start with isStarter status
           let onField = player.isStarter;
-          
-          // Apply all substitutions from previous periods
           const prevEvents = state.events.filter(e => e.period < period);
           prevEvents.forEach(event => {
             if (event.type === 'substitution' && event.team === 'home') {
@@ -189,49 +174,32 @@ const MatchApp = () => {
               onField = false;
             }
           });
-          
           onFieldAtStart = onField;
         }
 
         let wasOnFieldThisPeriod = onFieldAtStart;
         let exitTime = periodDurationSeconds;
-        let effectiveEntryTime = 0;
 
-        // Process this period's events
         periodEvents.forEach(event => {
           if (event.type === 'substitution' && event.team === 'home') {
             if (event.playerOutId === player.id) {
-              if (wasOnFieldThisPeriod) {
-                // Player left field
-                exitTime = event.timestamp;
-              }
+              if (wasOnFieldThisPeriod) exitTime = event.timestamp;
               wasOnFieldThisPeriod = false;
             }
-            if (event.playerInId === player.id) {
-              // Player entered field
-              wasOnFieldThisPeriod = true;
-              effectiveEntryTime = event.timestamp;
-            }
+            if (event.playerInId === player.id) wasOnFieldThisPeriod = true;
           }
           if (event.type === 'red_card' && event.team === 'home' && event.playerId === player.id) {
-            if (wasOnFieldThisPeriod) {
-              exitTime = event.timestamp;
-            }
+            if (wasOnFieldThisPeriod) exitTime = event.timestamp;
             wasOnFieldThisPeriod = false;
           }
         });
 
-        // Calculate minutes for this period
         if (onFieldAtStart) {
-          // Started the period
-          const played = Math.floor((exitTime - entryTime) / 60);
-          minutes += played;
-        } else if (wasOnFieldThisPeriod || periodEvents.some(e => e.type === 'substitution' && e.team === 'home' && e.playerInId === player.id)) {
-          // Entered during the period
+          minutes += Math.floor((exitTime - entryTime) / 60);
+        } else if (wasOnFieldThisPeriod) {
           const subbedInEvent = periodEvents.find(e => e.type === 'substitution' && e.team === 'home' && e.playerInId === player.id);
           if (subbedInEvent) {
-            const played = Math.floor((exitTime - subbedInEvent.timestamp) / 60);
-            minutes += played;
+            minutes += Math.floor((exitTime - subbedInEvent.timestamp) / 60);
           }
         }
       }
@@ -250,9 +218,9 @@ const MatchApp = () => {
     return playerStats;
   }, [state]);
 
-  // Auto-save to tournament when match ends
   useEffect(() => {
-    if (state.isMatchEnded && tournament.isActive && !matchSavedToTournament) {
+    // Salvataggio automatico solo se il torneo è attivo
+    if (state.isMatchEnded && isTournamentActive && tournament.isActive && !matchSavedToTournament) {
       const playerStats = calculatePlayerStats();
       addMatchToTournament(
         state.homeTeam.name,
@@ -265,19 +233,16 @@ const MatchApp = () => {
       );
       setMatchSavedToTournament(true);
     }
-  }, [state.isMatchEnded, tournament.isActive, matchSavedToTournament, calculatePlayerStats, addMatchToTournament, state]);
+  }, [state.isMatchEnded, isTournamentActive, tournament.isActive, matchSavedToTournament, calculatePlayerStats, addMatchToTournament, state]);
 
-  // Warn before closing if timer is running
   useBeforeUnload(state.isRunning && !state.isPaused, 'Hai una partita in corso. Sei sicuro di voler uscire?');
 
   const handleRosterComplete = () => {
-    // If we have a pending tournament name, create the tournament first
     if (pendingTournamentName) {
       const players = state.homeTeam.players.map(p => ({ name: p.name, number: p.number }));
       startTournament(pendingTournamentName, state.homeTeam.name, players);
       setPendingTournamentName(null);
     }
-    
     forceStarterSelection();
     setPhase('match');
     toast.success('Configurazione completata');
@@ -287,47 +252,27 @@ const MatchApp = () => {
     setStarters(homeStarters, true);
     setStarters(awayStarters, false);
     confirmStarters();
-    toast.success('Titolari confermati - Premi "Inizia Tempo" per partire');
+    toast.success('Titolari confermati');
   }, [setStarters, confirmStarters]);
 
   const handleNewMatch = () => {
-    // For tournament mode: keep home team players (names only), clear away team
-    if (tournament.isActive) {
-      resetMatch(true); // Preserve home team
-      setMatchSavedToTournament(false);
-      setPhase('setup');
-      toast.success('Nuova partita torneo - la tua squadra è pronta');
-    } else {
-      resetMatch(false); // Reset everything
-      setMatchSavedToTournament(false);
-      setPhase('setup');
-      toast.success('Nuova partita iniziata');
-    }
-  };
-
-  const handleGoHome = () => {
-    // Home button = exit current context completely
-    resetMatch(false);
+    const preserveHome = isTournamentActive;
+    resetMatch(preserveHome);
     setMatchSavedToTournament(false);
-    navigate('/dashboard');
+    setPhase('setup');
+    toast.success(preserveHome ? 'Nuova partita torneo' : 'Nuova partita rapida');
   };
 
   const handleExitMatch = () => {
-    // Reset match and go to dashboard
     resetMatch(false);
     setMatchSavedToTournament(false);
     navigate('/dashboard');
   };
 
-
-  const isTournamentMode = tournament.isActive || !!pendingTournamentName;
-
   const handleTournamentModeChange = (enabled: boolean) => {
-    if (enabled && !tournament.isActive) {
-      // Navigate to create tournament flow
+    if (enabled && !isTournamentActive) {
       navigate('/match', { state: { mode: 'tournament', createTournament: true } });
     }
-    // Disable is handled by ending tournament from dashboard
   };
 
   if (phase === 'setup') {
@@ -335,15 +280,11 @@ const MatchApp = () => {
       <div className="min-h-screen flex flex-col">
         <Header 
           syncStatus={syncStatus} 
-          isTournamentMode={isTournamentMode}
+          isTournamentMode={isTournamentActive}
           onTournamentModeChange={handleTournamentModeChange}
           showNavButtons={true}
           onNewMatch={handleNewMatch}
         />
-        <Helmet>
-          <title>Gestione Partita - Match Manager Live</title>
-          <meta name="description" content="Applicazione per la gestione in tempo reale degli eventi durante partite di calcio giovanile." />
-        </Helmet>
         <div className="flex-1">
           <RosterSetup
             homeTeamName={state.homeTeam.name}
@@ -362,7 +303,7 @@ const MatchApp = () => {
             onSwapTeams={swapTeams}
             onCreatePlayersWithNumbers={createPlayersWithNumbers}
             pendingTournamentName={pendingTournamentName}
-            isTournamentMode={isTournamentMode}
+            isTournamentMode={isTournamentActive}
           />
         </div>
         <Footer />
@@ -374,26 +315,22 @@ const MatchApp = () => {
     <div className="min-h-screen flex flex-col">
       <Header syncStatus={syncStatus} />
       <Helmet>
-        <title>{state.homeTeam.name || 'Casa'} vs {state.awayTeam.name || 'Ospite'} - Partita in Corso</title>
-        <meta name="description" content={`Segui la partita ${state.homeTeam.name} contro ${state.awayTeam.name}. Cronaca live e gestione eventi.`} />
+        <title>{state.homeTeam.name || 'Casa'} vs {state.awayTeam.name || 'Ospite'}</title>
       </Helmet>
       <main className="flex-1 bg-background p-4 pb-8">
         <div className="max-w-6xl mx-auto space-y-4">
-          {/* Top Bar - Hide edit controls when match is completed */}
           {!state.isMatchEnded && (
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPhase('setup')}
-                  disabled={state.isRunning}
-                  className="gap-1"
-                >
-                  <Edit className="h-4 w-4" />
-                  <span className="hidden sm:inline">Modifica rose</span>
-                </Button>
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPhase('setup')}
+                disabled={state.isRunning}
+                className="gap-1"
+              >
+                <Edit className="h-4 w-4" />
+                <span className="hidden sm:inline">Modifica rose</span>
+              </Button>
 
               <div className="flex items-center gap-2">
                 <MatchSettings
@@ -414,14 +351,12 @@ const MatchApp = () => {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Nuova partita?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Tutti i dati della partita corrente verranno persi. Vuoi continuare?
+                        Tutti i dati correnti verranno persi.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Annulla</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleNewMatch}>
-                        Nuova partita
-                      </AlertDialogAction>
+                      <AlertDialogAction onClick={handleNewMatch}>Conferma</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
@@ -429,18 +364,16 @@ const MatchApp = () => {
             </div>
           )}
           
-          {/* Read-only indicator for completed matches */}
           {state.isMatchEnded && (
             <div className="flex items-center justify-center gap-2 py-2 px-4 bg-muted rounded-lg text-muted-foreground">
               <Check className="h-4 w-4" />
-              <span className="text-sm font-medium">Partita completata - Visualizzazione in sola lettura</span>
+              <span className="text-sm font-medium">Partita completata</span>
             </div>
           )}
 
-          {/* Match Header */}
-          <MatchHeader state={state} />
+          {/* PASSIAMO isTournamentMode AL COMPONENTE CHE GESTISCE L'HEADER DEL MATCH */}
+          <MatchHeader state={state} isTournamentMode={isTournamentActive} />
 
-          {/* Starter Selection or Match Content */}
           {state.needsStarterSelection && !state.isMatchEnded ? (
             <StarterSelection
               homePlayers={state.homeTeam.players}
@@ -450,85 +383,3 @@ const MatchApp = () => {
             />
           ) : (
             <>
-              {/* Timer Controls */}
-              <TimerControls
-                state={state}
-                onStartPeriod={startPeriod}
-                onPause={pauseTimer}
-                onResume={resumeTimer}
-                onEndPeriod={endPeriod}
-                onEndMatch={endMatch}
-                onUndo={undoLastEvent}
-              />
-
-              {/* Team Panels */}
-              <div className="grid grid-cols-2 gap-3">
-                <TeamPanel
-                  teamName={state.homeTeam.name}
-                  players={state.homeTeam.players.filter(p => p.number !== null)}
-                  isHome={true}
-                  isRunning={state.isRunning && !state.isPaused}
-                  events={state.events}
-                  isMatchEnded={state.isMatchEnded}
-                  onGoal={(id) => recordGoal('home', id)}
-                  onOwnGoal={(id) => recordOwnGoal('home', id)}
-                  onSubstitution={(outId, inId) => recordSubstitution('home', outId, inId)}
-                  onYellowCard={(id) => recordCard('home', id, 'yellow')}
-                  onRedCard={(id) => recordCard('home', id, 'red')}
-                  onAddPlayer={addHomePlayerWithNumber}
-                />
-
-                <TeamPanel
-                  teamName={state.awayTeam.name}
-                  players={state.awayTeam.players}
-                  isHome={false}
-                  isRunning={state.isRunning && !state.isPaused}
-                  events={state.events}
-                  isMatchEnded={state.isMatchEnded}
-                  onGoal={(id) => recordGoal('away', id)}
-                  onOwnGoal={(id) => recordOwnGoal('away', id)}
-                  onSubstitution={(outId, inId) => recordSubstitution('away', outId, inId)}
-                  onYellowCard={(id) => recordCard('away', id, 'yellow')}
-                  onRedCard={(id) => recordCard('away', id, 'red')}
-                  onAddPlayer={addAwayPlayerWithNumber}
-                />
-              </div>
-
-              {/* Event Timeline */}
-              <EventTimeline
-                events={state.events}
-                homeTeamName={state.homeTeam.name}
-                awayTeamName={state.awayTeam.name}
-              />
-
-              {/* Export Buttons and Exit */}
-              {state.isMatchEnded && (
-                <div className="flex flex-col items-center gap-4 pt-4">
-                  {/* WhatsApp Share - prominent position */}
-                  <WhatsAppShareButton state={state} />
-                  
-                  <div className="flex justify-center gap-4">
-                    <ExportButton state={state} />
-                    <PDFExportButton state={state} />
-                  </div>
-                  <Button 
-                    variant="default" 
-                    size="lg" 
-                    onClick={handleExitMatch}
-                    className="gap-2"
-                  >
-                    <Home className="h-5 w-5" />
-                    Torna alla Dashboard
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </main>
-      <Footer />
-    </div>
-  );
-};
-
-export default MatchApp;
