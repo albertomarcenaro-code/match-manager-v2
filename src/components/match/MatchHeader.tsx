@@ -1,14 +1,16 @@
 import { MatchState, MatchEvent } from '@/types/match';
 import { cn } from '@/lib/utils';
-import { useTournament } from '@/hooks/useTournament'; // Importiamo il hook per i dati del torneo
+import { useTournament } from '@/hooks/useTournament';
 
 interface MatchHeaderProps {
   state: MatchState;
-  isTournamentMode?: boolean; // Nuova prop per distinguere il flusso
+  isTournamentMode?: boolean;
 }
 
 export function MatchHeader({ state, isTournamentMode }: MatchHeaderProps) {
-  const { tournament } = useTournament();
+  const tournamentData = useTournament();
+  // Accesso sicuro ai dati per evitare crash
+  const tournament = tournamentData?.tournament;
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -31,30 +33,28 @@ export function MatchHeader({ state, isTournamentMode }: MatchHeaderProps) {
   return (
     <div className="bg-card rounded-xl shadow-card overflow-hidden border border-border/50">
       
-      {/* SEZIONE DINAMICA: Torneo vs Partita Rapida */}
-      {isTournamentMode && tournament.isActive ? (
+      {/* Barra superiore dinamica */}
+      {isTournamentMode && tournament?.isActive ? (
         <div className="bg-secondary/10 py-2 px-4 border-b border-secondary/20 flex justify-between items-center">
           <span className="text-[10px] font-bold uppercase tracking-widest text-secondary">
             Torneo: {tournament.name}
           </span>
           <span className="text-[10px] font-medium text-muted-foreground uppercase">
-            {tournament.matches.length} Partite nel database
+            {tournament.matches?.length || 0} Partite salvate
           </span>
         </div>
       ) : (
         <div className="bg-muted/30 py-2 px-4 border-b border-border/50 flex justify-center">
           <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            Modalità Partita Rapida (Amichevole)
+            Modalità Partita Rapida
           </span>
         </div>
       )}
 
-      {/* Main Score Header */}
       <div className={cn(
         "gradient-header text-primary-foreground p-4 transition-colors duration-300",
         isOvertime && "bg-destructive"
       )}>
-        {/* Teams and Score */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex-1 text-center px-2">
             <p className="text-xs uppercase tracking-wider opacity-80">Casa</p>
@@ -75,31 +75,20 @@ export function MatchHeader({ state, isTournamentMode }: MatchHeaderProps) {
           </div>
         </div>
 
-        {/* Timer and Period Info */}
         <div className="flex items-center justify-center gap-6">
           <div className="text-center">
             <p className="text-xs uppercase tracking-wider opacity-70">Tempo</p>
-            <p className="font-semibold">
-              {state.currentPeriod > 0 ? `${state.currentPeriod}°` : '-'}
-            </p>
+            <p className="font-semibold">{state.currentPeriod > 0 ? `${state.currentPeriod}°` : '-'}</p>
           </div>
 
           <div className={cn(
             "backdrop-blur px-6 py-2 rounded-lg transition-all duration-300",
-            isOvertime 
-              ? "bg-destructive-foreground/20 animate-pulse" 
-              : "bg-primary-foreground/10"
+            isOvertime ? "bg-destructive-foreground/20" : "bg-primary-foreground/10"
           )}>
-            <p className={cn(
-              "text-3xl font-bold tabular-nums",
-              state.isRunning && !state.isPaused && !isOvertime && "animate-pulse-ring",
-              isOvertime && "text-destructive-foreground"
-            )}>
-              {formatTime(state.elapsedTime)}
-            </p>
+            <p className="text-3xl font-bold tabular-nums">{formatTime(state.elapsedTime)}</p>
             {isOvertime && (
               <p className="text-xs text-center text-destructive-foreground/80 font-medium">
-                +{Math.floor((state.elapsedTime - state.periodDuration * 60) / 60)}' recupero
+                +{Math.floor((state.elapsedTime - state.periodDuration * 60) / 60)}' rec.
               </p>
             )}
           </div>
@@ -110,14 +99,12 @@ export function MatchHeader({ state, isTournamentMode }: MatchHeaderProps) {
               {state.isMatchEnded ? 'Terminata' : 
                state.isPaused ? 'In pausa' : 
                isOvertime ? 'Recupero' :
-               state.isRunning ? 'In corso' : 
-               !state.isMatchStarted ? 'Da iniziare' : 'Intervallo'}
+               state.isRunning ? 'In corso' : 'Da iniziare'}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Period Scores with Scorers */}
       {state.periodScores.length > 0 && (
         <div className="p-3 bg-muted/50 space-y-3">
           {state.periodScores.map((ps) => {
@@ -141,11 +128,8 @@ export function MatchHeader({ state, isTournamentMode }: MatchHeaderProps) {
                     {homeGoals.map((g, i) => (
                       <span key={g.id} className="inline-flex items-center gap-1">
                         {i > 0 && ', '}
-                        <span className="font-medium text-team-home">
-                          {g.playerNumber} {g.playerName?.split(' ')[0]}
-                        </span>
+                        <span className="font-medium text-team-home">{g.playerNumber} {g.playerName?.split(' ')[0]}</span>
                         <span>{formatMinute(g.timestamp)}</span>
-                        {g.type === 'own_goal' && <span className="text-destructive">(AG)</span>}
                       </span>
                     ))}
                   </div>
@@ -153,11 +137,8 @@ export function MatchHeader({ state, isTournamentMode }: MatchHeaderProps) {
                     {awayGoals.map((g, i) => (
                       <span key={g.id} className="inline-flex items-center gap-1">
                         {i > 0 && ', '}
-                        <span className="font-medium text-team-away">
-                          {g.playerNumber} {g.playerName?.split(' ')[0]}
-                        </span>
+                        <span className="font-medium text-team-away">{g.playerNumber} {g.playerName?.split(' ')[0]}</span>
                         <span>{formatMinute(g.timestamp)}</span>
-                        {g.type === 'own_goal' && <span className="text-destructive">(AG)</span>}
                       </span>
                     ))}
                   </div>
