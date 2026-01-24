@@ -1,11 +1,15 @@
 import { MatchState, MatchEvent } from '@/types/match';
 import { cn } from '@/lib/utils';
+import { useTournament } from '@/hooks/useTournament'; // Importiamo il hook per i dati del torneo
 
 interface MatchHeaderProps {
   state: MatchState;
+  isTournamentMode?: boolean; // Nuova prop per distinguere il flusso
 }
 
-export function MatchHeader({ state }: MatchHeaderProps) {
+export function MatchHeader({ state, isTournamentMode }: MatchHeaderProps) {
+  const { tournament } = useTournament();
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -16,10 +20,8 @@ export function MatchHeader({ state }: MatchHeaderProps) {
     return `${Math.floor(seconds / 60)}'`;
   };
 
-  // Check if we're in overtime
   const isOvertime = state.isRunning && state.elapsedTime >= state.periodDuration * 60;
 
-  // Get goals for a specific period
   const getGoalsForPeriod = (period: number): MatchEvent[] => {
     return state.events.filter(e => 
       e.period === period && (e.type === 'goal' || e.type === 'own_goal')
@@ -27,7 +29,26 @@ export function MatchHeader({ state }: MatchHeaderProps) {
   };
 
   return (
-    <div className="bg-card rounded-xl shadow-card overflow-hidden">
+    <div className="bg-card rounded-xl shadow-card overflow-hidden border border-border/50">
+      
+      {/* SEZIONE DINAMICA: Torneo vs Partita Rapida */}
+      {isTournamentMode && tournament.isActive ? (
+        <div className="bg-secondary/10 py-2 px-4 border-b border-secondary/20 flex justify-between items-center">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-secondary">
+            Torneo: {tournament.name}
+          </span>
+          <span className="text-[10px] font-medium text-muted-foreground uppercase">
+            {tournament.matches.length} Partite nel database
+          </span>
+        </div>
+      ) : (
+        <div className="bg-muted/30 py-2 px-4 border-b border-border/50 flex justify-center">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            Modalità Partita Rapida (Amichevole)
+          </span>
+        </div>
+      )}
+
       {/* Main Score Header */}
       <div className={cn(
         "gradient-header text-primary-foreground p-4 transition-colors duration-300",
@@ -116,7 +137,6 @@ export function MatchHeader({ state }: MatchHeaderProps) {
                   <span className="text-team-away">{ps.awayScore}</span>
                 </div>
                 <div className="flex justify-center gap-6 mt-1 text-xs text-muted-foreground">
-                  {/* Home scorers */}
                   <div className="text-left">
                     {homeGoals.map((g, i) => (
                       <span key={g.id} className="inline-flex items-center gap-1">
@@ -129,7 +149,6 @@ export function MatchHeader({ state }: MatchHeaderProps) {
                       </span>
                     ))}
                   </div>
-                  {/* Away scorers */}
                   <div className="text-right">
                     {awayGoals.map((g, i) => (
                       <span key={g.id} className="inline-flex items-center gap-1">
