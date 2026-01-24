@@ -3,18 +3,17 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Trophy, Plus, Lock } from "lucide-react"; // Aggiunta l'icona Lock
+import { Trophy, Plus, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext"; // Importato per gestire lo stato ospite
-import { toast } from "sonner"; // Importato per i messaggi
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { isGuest } = useAuth(); // Recuperiamo se l'utente è ospite
+  const { isGuest } = useAuth();
 
   const handleTournamentClick = () => {
     if (isGuest) {
-      // Se è ospite, blocchiamo la navigazione e avvisiamo l'utente
       toast.error("Accesso limitato", {
         description: "Devi essere registrato per creare e gestire i tornei nel database.",
         duration: 4000,
@@ -24,6 +23,12 @@ export default function Dashboard() {
     navigate("/tournaments");
   };
 
+  // NUOVA FUNZIONE: Resetta lo stato del torneo prima di avviare una partita rapida
+  const handleQuickMatch = () => {
+    localStorage.removeItem('tournament-state'); // Rimuove i dati di eventuali tornei attivi
+    navigate("/match");
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
@@ -31,14 +36,13 @@ export default function Dashboard() {
         <h1 className="text-3xl font-bold mb-8">Benvenuto</h1>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Box Gestione Tornei - Modificato per gestire l'ospite */}
+          {/* Box Gestione Tornei */}
           <Card className={`p-6 flex flex-col items-center text-center gap-4 transition-all border-2 relative ${
             isGuest 
               ? "opacity-80 border-muted bg-muted/5 shadow-none" 
               : "hover:shadow-lg border-secondary/20"
           }`}>
             
-            {/* Icona Lucchetto se ospite */}
             {isGuest && (
               <div className="absolute top-3 right-3 bg-background p-1 rounded-full shadow-sm border border-muted">
                 <Lock className="h-4 w-4 text-muted-foreground" />
@@ -53,7 +57,7 @@ export default function Dashboard() {
               <h2 className="text-xl font-bold">I Tuoi Tornei</h2>
               <p className="text-sm text-muted-foreground">
                 {isGuest 
-                  ? "Registrati per sbloccare la creazione di tornei e classifiche persistenti." 
+                  ? "Registrati per sbloccare la creazione di tornei e classifiche." 
                   : "Crea, modifica e gestisci le partite dei tuoi tornei."}
               </p>
             </div>
@@ -67,7 +71,7 @@ export default function Dashboard() {
             </Button>
           </Card>
 
-          {/* Box Nuova Partita Rapida - Sempre accessibile anche agli ospiti */}
+          {/* Box Nuova Partita Rapida */}
           <Card className="p-6 flex flex-col items-center text-center gap-4 hover:shadow-lg transition-shadow border-2 border-transparent hover:border-primary/20">
             <div className="p-4 bg-primary/10 rounded-full">
               <Plus className="h-8 w-8 text-primary" />
@@ -76,7 +80,8 @@ export default function Dashboard() {
               <h2 className="text-xl font-bold">Partita Rapida</h2>
               <p className="text-sm text-muted-foreground">Avvia subito una partita singola senza torneo.</p>
             </div>
-            <Button onClick={() => navigate("/match")} variant="outline" className="w-full">
+            {/* Utilizziamo handleQuickMatch invece di navigate diretto */}
+            <Button onClick={handleQuickMatch} variant="outline" className="w-full">
               Inizia Partita
             </Button>
           </Card>
