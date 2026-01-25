@@ -8,64 +8,42 @@ interface WhatsAppShareButtonProps {
 
 export const WhatsAppShareButton = ({ state }: WhatsAppShareButtonProps) => {
   const handleShare = async () => {
-    // Build the share message
-    const homeGoals = state.events
-      .filter(e => e.type === 'goal' && e.team === 'home')
-      .map(e => e.playerName)
-      .filter(Boolean);
+    // 1. Intestazione pulita senza emoji
+    let message = `RISULTATO FINALE\n\n`;
+    message += `${state.homeTeam.name} ${state.homeTeam.score} - ${state.awayTeam.score} ${state.awayTeam.name}\n\n`;
     
-    const awayGoals = state.events
-      .filter(e => e.type === 'goal' && e.team === 'away')
-      .map(e => e.playerName)
-      .filter(Boolean);
+    message += `Parziali:\n`;
 
-    // Format goal scorers
-    const formatGoals = (goals: string[]) => {
-      if (goals.length === 0) return '';
+    // 2. Costruzione dinamica dei tempi con marcatori
+    // Usiamo un array basato sui periodi totali o quelli giocati
+    const totalPeriods = state.totalPeriods || (state.periodScores?.length || 0);
+
+    for (let i = 1; i <= totalPeriods; i++) {
+      // Troviamo il punteggio del periodo i-esimo
+      const periodScore = state.periodScores?.find(ps => ps.period === i);
+      const scoreText = periodScore ? `${periodScore.homeScore}-${periodScore.awayScore}` : "0-0";
+
+      // Filtriamo i goal di questo tempo e formattiamo: Nome (Squadra)
+      const periodScorers = state.events
+        .filter(e => e.type === 'goal' && e.period === i)
+        .map(e => {
+          const teamName = e.team === 'home' ? state.homeTeam.name : state.awayTeam.name;
+          return `${e.playerName} (${teamName})`;
+        });
+
+      // Raggruppiamo per contare i gol multipli dello stesso giocatore (es: x2)
       const counts: Record<string, number> = {};
-      goals.forEach(g => { counts[g] = (counts[g] || 0) + 1; });
-      return Object.entries(counts)
-        .map(([name, count]) => count > 1 ? `${name} (x${count})` : name)
+      periodScorers.forEach(s => { counts[s] = (counts[s] || 0) + 1; });
+      
+      const formattedScorers = Object.entries(counts)
+        .map(([nameWithTeam, count]) => count > 1 ? `${nameWithTeam} (x${count})` : nameWithTeam)
         .join(', ');
-    };
 
-    const homeScorers = formatGoals(homeGoals);
-    const awayScorers = formatGoals(awayGoals);
-
-    // Build message with emojis
-    let message = `🏟️ *RISULTATO FINALE*\n\n`;
-    message += `⚽ ${state.homeTeam.name} ${state.homeTeam.score} - ${state.awayTeam.score} ${state.awayTeam.name}\n\n`;
-    
-    if (homeScorers || awayScorers) {
-      message += `📋 *Marcatori:*\n`;
-      if (homeScorers) {
-        message += `${state.homeTeam.name}: ${homeScorers}\n`;
-      }
-      if (awayScorers) {
-        message += `${state.awayTeam.name}: ${awayScorers}\n`;
-      }
-      message += '\n';
+      message += `${i}°T:  ${scoreText}   | ${formattedScorers}\n`;
     }
 
-    // Period scores
-    if (state.periodScores && state.periodScores.length > 0) {
-      message += `📊 *Parziali:* `;
-      message += state.periodScores
-        .map(ps => `${ps.period}°T: ${ps.homeScore}-${ps.awayScore}`)
-        .join(' | ');
-      message += '\n\n';
-    }
-
-    // Winner indication
-    if (state.homeTeam.score > state.awayTeam.score) {
-      message += `🏆 Vittoria ${state.homeTeam.name}!`;
-    } else if (state.awayTeam.score > state.homeTeam.score) {
-      message += `🏆 Vittoria ${state.awayTeam.name}!`;
-    } else {
-      message += `🤝 Pareggio!`;
-    }
-
-    message += `\n\n📲 Match Manager Live`;
+    // 3. Chiusura semplice
+    message += `\nMatch Manager Live`;
 
     // Try Web Share API first (mobile)
     if (navigator.share) {
@@ -76,13 +54,11 @@ export const WhatsAppShareButton = ({ state }: WhatsAppShareButtonProps) => {
         });
         toast.success('Condiviso!');
       } catch (error) {
-        // User cancelled or error - fallback to WhatsApp link
         if ((error as Error).name !== 'AbortError') {
           openWhatsAppLink(message);
         }
       }
     } else {
-      // Desktop fallback - open WhatsApp Web
       openWhatsAppLink(message);
     }
   };
