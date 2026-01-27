@@ -73,7 +73,7 @@ const Landing = () => {
         </section>
 
 
-        {/* --- FEATURES SECTION (Stile NotebookLM minimal) --- */}
+        {/* --- FEATURES SECTION (Stile minimal) --- */}
         <section className="py-24 bg-muted/30 border-t border-border">
           <div className="container mx-auto px-4">
              <div className="text-center mb-16 max-w-2xl mx-auto">
