@@ -187,7 +187,36 @@
     line-height: 1.2;
     word-wrap: break-word;
     overflow-wrap: break-word;
-
-    
   }
+
+  /* --- NUOVE ANIMAZIONI LANDING --- */
+  .animate-fade-up {
+    animation: fadeUp 0.8s ease-out forwards;
+    opacity: 0;
+  }
+
+  .animation-delay-200 {
+    animation-delay: 0.2s;
+  }
+
+  .animation-delay-500 {
+    animation-delay: 0.5s;
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Colore selezione testo personalizzato col tuo verde Athletic */
+::selection {
+  background-color: hsla(145, 60%, 42%, 0.2);
+  color: hsl(145, 60%, 25%);
 }
