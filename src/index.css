@@ -181,46 +181,6 @@
     animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
-  /* Animazioni New Style */
-  .animate-fade-in {
-    animation: fadeIn 0.8s ease-out forwards;
-  }
-
-  .animate-fade-up {
-    animation: fadeUp 1s ease-out forwards;
-  }
-
-  .animation-delay-200 {
-    animation-delay: 0.2s;
-  }
-
-  .animation-delay-500 {
-    animation-delay: 0.5s;
-  }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes fadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(24px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Selezione testo personalizzata col tuo verde */
-::selection {
-  background-color: hsl(145 60% 42% / 0.2);
-  color: hsl(145 60% 25%);
-}
-  
   /* Fluid team name sizing */
   .team-name-fluid {
     font-size: clamp(0.875rem, 4vw, 1.25rem);
