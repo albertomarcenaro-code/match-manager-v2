@@ -19,7 +19,7 @@ const authSchema = z.object({
   password: z.string().min(6, 'La password deve avere almeno 6 caratteri'),
 });
 
-export default function Landing() {
+export default function Auth() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { signUp, signIn, enterAsGuest } = useAuth(); 
