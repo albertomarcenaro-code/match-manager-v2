@@ -33,9 +33,9 @@ const Landing = () => {
               </div>
 
               <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 text-foreground leading-[1.1] animate-fade-up">
-                Il calcio giocato, <br />
+                Il campo da gioco, <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#2ea35f] to-emerald-600">
-                  gestito in tempo reale.
+                  in tempo reale.
                 </span>
               </h1>
               
