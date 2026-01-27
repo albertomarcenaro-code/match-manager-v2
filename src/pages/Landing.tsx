@@ -60,11 +60,9 @@ const Landing = () => {
 
             {/* Colonna Immagine Fotorealistica (Destra - visibile su desktop) */}
             <div className="hidden lg:block relative animate-fade-up animation-delay-200">
-              {/* Overlay sfumato verde per armonizzare l'immagine */}
               <div className="absolute inset-0 bg-gradient-to-tr from-[#2ea35f]/30 via-transparent to-transparent rounded-[2.5rem] z-10 pointer-events-none"></div>
-              {/* Immagine Stadio */}
               <img 
-                src="https://images.unsplash.com/photo-1522778119026-d647f0596c20?q=80&w=2070&auto=format&fit=crop" 
+                src="https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=2070&auto=format&fit=crop" 
                 alt="Stadio da calcio al tramonto" 
                 className="rounded-[2.5rem] shadow-2xl shadow-green-900/10 object-cover h-[600px] w-full border border-border/50"
               />
@@ -73,7 +71,7 @@ const Landing = () => {
         </section>
 
 
-        {/* --- FEATURES SECTION (Stile minimal) --- */}
+        {/* --- FEATURES SECTION --- */}
         <section className="py-24 bg-muted/30 border-t border-border">
           <div className="container mx-auto px-4">
              <div className="text-center mb-16 max-w-2xl mx-auto">
@@ -104,64 +102,23 @@ const Landing = () => {
         </section>
       </main>
 
-      {/* 3. FOOTER CON IMMAGINE FOTOREALISTICA DEL MANTO ERBOSO */}
-      <footer className="relative pt-24 pb-12 text-white overflow-hidden">
-        {/* Immagine di sfondo (Manto erboso ravvicinato) */}
+      {/* 3. FOOTER CON IMMAGINE CORRETTA */}
+      <footer className="relative pt-24 pb-12 text-white overflow-hidden min-h-[400px] flex items-center">
+        {/* Background Image Logic */}
         <div className="absolute inset-0 z-0">
             <img 
-                src="https://images.unsplash.com/photo-1589136787385-73733c2cb43a?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3"
-                alt="Dettaglio manto erboso campo da calcio" 
-                className="w-full h-full object-cover filter brightness-[0.6]" // Scurita per leggibilità
+                src="https://images.unsplash.com/photo-1556056504-517173f44412?q=80&w=2076&auto=format&fit=crop"
+                alt="Manto erboso" 
+                className="w-full h-full object-cover"
             />
-            {/* Overlay verde scuro per armonizzare col brand */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0f291a] via-[#1a3d2b]/80 to-[#2ea35f]/20 mix-blend-multiply"></div>
+            {/* Overlay scuro per leggibilità testi */}
+            <div className="absolute inset-0 bg-black/40"></div>
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0a1a11] via-[#0f291a]/80 to-transparent"></div>
         </div>
 
-        {/* Contenuto Footer */}
         <div className="relative z-10 container mx-auto px-4 text-center">
-           <div className="inline-flex items-center gap-2 mb-6 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full">
-             <Trophy className="w-5 h-5 text-green-300" />
+           <div className="inline-flex items-center gap-2 mb-6 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/10">
+             <Trophy className="w-5 h-5 text-green-400" />
              <span className="font-bold tracking-tight">Match Manager Live</span>
            </div>
-           <h3 className="text-2xl font-bold mb-8">Pronto a scendere in campo?</h3>
-           <Button 
-              onClick={() => navigate("/auth")}
-              className="h-12 px-8 bg-white text-[#2ea35f] hover:bg-green-50 font-semibold rounded-full border-0 mb-12"
-           >
-             Accedi alla Piattaforma
-           </Button>
-           
-          <div className="border-t border-white/20 pt-8 mt-8 flex flex-col md:flex-row justify-between items-center text-sm text-green-100/70">
-            <p>© 2026 Match Manager Live. Tutti i diritti riservati.</p>
-            <div className="flex gap-4 mt-4 md:mt-0 font-medium">
-              <a href="#" className="hover:text-white transition-colors">Privacy</a>
-              <a href="#" className="hover:text-white transition-colors">Termini</a>
-              <a href="#" className="hover:text-white transition-colors">Contatti</a>
-            </div>
-          </div>
-        </div>
-      </footer>
-    </div>
-  );
-};
-
-// Componente di supporto per le Card delle Features
-const FeatureCard = ({ icon, title, description, color }: { icon: React.ReactNode, title: string, description: string, color: string }) => (
-  <div className="group p-8 bg-card rounded-2xl border border-border/60 hover:shadow-xl hover:shadow-green-100/30 transition-all hover:-translate-y-1 relative overflow-hidden">
-    {/* Sfondo sfumato all'hover */}
-    <div className="absolute inset-0 bg-gradient-to-br from-green-50/0 to-green-50/0 group-hover:from-green-50/50 group-hover:to-transparent transition-all duration-500"></div>
-    
-    <div className="relative z-10">
-        <div 
-            className="mb-5 w-12 h-12 rounded-xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform bg-green-50"
-            style={{ color: color }}
-        >
-        {icon}
-        </div>
-        <h3 className="text-xl font-bold mb-3 text-foreground">{title}</h3>
-        <p className="text-muted-foreground leading-relaxed">{description}</p>
-    </div>
-  </div>
-);
-
-export default Landing;
+           <h3 className="text-3xl font-bold mb-8">Pronto a scendere in
