@@ -61,11 +61,12 @@ const Landing = () => {
             {/* Colonna Immagine Fotorealistica (Destra - visibile su desktop) */}
             <div className="hidden lg:block relative animate-fade-up animation-delay-200">
               {/* Overlay sfumato verde per armonizzare l'immagine */}
-              <div className="absolute inset-0 bg-gradient-to-tr from-[#2ea35f]/30 via-transparent to-transparent rounded-[2.5rem] z-10 pointer-events-none"></div>
-              {/* Immagine Stadio */}
+              <div className="absolute inset-0 bg-gradient-to-tr from-[#2ea35f]/20 via-transparent to-transparent rounded-[2.5rem] z-10 pointer-events-none"></div>
+              
+              {/* NUOVA IMMAGINE: Stadio illuminato (più affidabile) */}
               <img 
-                src="https://images.unsplash.com/photo-1522778119026-d647f0596c20?q=80&w=2070&auto=format&fit=crop" 
-                alt="Stadio da calcio al tramonto" 
+                src="https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?q=80&w=2070&auto=format&fit=crop" 
+                alt="Stadio da calcio illuminato" 
                 className="rounded-[2.5rem] shadow-2xl shadow-green-900/10 object-cover h-[600px] w-full border border-border/50"
               />
             </div>
@@ -104,34 +105,37 @@ const Landing = () => {
         </section>
       </main>
 
-      {/* 3. FOOTER CON IMMAGINE FOTOREALISTICA DEL MANTO ERBOSO */}
-      <footer className="relative pt-24 pb-12 text-white overflow-hidden">
-        {/* Immagine di sfondo (Manto erboso ravvicinato) */}
+      {/* 3. FOOTER FIXATO CON IMMAGINE NUOVA */}
+      <footer className="relative pt-24 pb-12 text-white overflow-hidden flex flex-col justify-center min-h-[500px]">
+        
+        {/* SFONDO GESTITO A LIVELLI PER EVITARE ERRORI VISIVI */}
         <div className="absolute inset-0 z-0">
+            {/* Livello 1: Immagine Erba (Alta qualità, texture pulita) */}
             <img 
-                src="https://images.unsplash.com/photo-1589136787385-73733c2cb43a?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3"
+                src="https://images.unsplash.com/photo-1556056504-517173f44412?q=80&w=2076&auto=format&fit=crop"
                 alt="Dettaglio manto erboso campo da calcio" 
-                className="w-full h-full object-cover filter brightness-[0.6]" // Scurita per leggibilità
+                className="w-full h-full object-cover"
             />
-            {/* Overlay verde scuro per armonizzare col brand */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0f291a] via-[#1a3d2b]/80 to-[#2ea35f]/20 mix-blend-multiply"></div>
+            {/* Livello 2: Overlay scuro GRADIENTE (più sicuro dei filtri blend) */}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#05110a] via-[#0f291a]/90 to-[#2ea35f]/30"></div>
         </div>
 
-        {/* Contenuto Footer */}
+        {/* Contenuto Footer (Sopra l'immagine) */}
         <div className="relative z-10 container mx-auto px-4 text-center">
-           <div className="inline-flex items-center gap-2 mb-6 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full">
-             <Trophy className="w-5 h-5 text-green-300" />
+           <div className="inline-flex items-center gap-2 mb-6 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full border border-white/10">
+             <Trophy className="w-5 h-5 text-green-400" />
              <span className="font-bold tracking-tight">Match Manager Live</span>
            </div>
-           <h3 className="text-2xl font-bold mb-8">Pronto a scendere in campo?</h3>
+           <h3 className="text-3xl md:text-4xl font-bold mb-8 text-white drop-shadow-md">Pronto a scendere in campo?</h3>
+           
            <Button 
               onClick={() => navigate("/auth")}
-              className="h-12 px-8 bg-white text-[#2ea35f] hover:bg-green-50 font-semibold rounded-full border-0 mb-12"
+              className="h-12 px-8 bg-white text-[#2ea35f] hover:bg-green-50 font-semibold rounded-full border-0 mb-12 shadow-lg hover:scale-105 transition-transform"
            >
              Accedi alla Piattaforma
            </Button>
            
-          <div className="border-t border-white/20 pt-8 mt-8 flex flex-col md:flex-row justify-between items-center text-sm text-green-100/70">
+          <div className="border-t border-white/20 pt-8 mt-8 flex flex-col md:flex-row justify-between items-center text-sm text-green-100/80">
             <p>© 2026 Match Manager Live. Tutti i diritti riservati.</p>
             <div className="flex gap-4 mt-4 md:mt-0 font-medium">
               <a href="#" className="hover:text-white transition-colors">Privacy</a>
