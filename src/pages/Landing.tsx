@@ -2,102 +2,81 @@ import { useNavigate } from "react-router-dom";
 import { Helmet } from 'react-helmet';
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Trophy, Zap, Users, Share2, CheckCircle2 } from "lucide-react";
-// Importiamo il tuo Header esistente per coerenza
 import { Header } from "@/components/layout/Header";
 
 const Landing = () => {
   const navigate = useNavigate();
-
-  // Colore verde principale estratto dal tuo logo (analogo a hsl(145 60% 42%))
   const brandGreen = "#2ea35f";
 
   return (
-    <div className="min-h-screen flex flex-col font-sans bg-background selection:bg-green-100 selection:text-green-900">
+    <div className="min-h-screen flex flex-col font-sans bg-background selection:bg-green-100">
       <Helmet>
-        <title>Match Manager Live | Il tuo assistente di campo digitale</title>
+        <title>Match Manager Live | Il tuo assistente di campo</title>
       </Helmet>
 
-      {/* 1. IL TUO HEADER ESISTENTE */}
       <Header />
 
       <main className="flex-1">
-        {/* --- HERO SECTION CON IMMAGINE LATERALE --- */}
-        <section className="relative overflow-hidden pt-12 pb-24 lg:pt-20">
-          <div className="container mx-auto px-4 grid lg:grid-cols-2 gap-16 items-center">
-            
-            {/* Colonna Testo (Sinistra) */}
-            <div className="text-center lg:text-left z-10">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-50 text-green-700 text-sm font-medium mb-8 animate-fade-in border border-green-100">
+        {/* --- HERO SECTION --- */}
+        <section className="relative pt-12 pb-20 lg:pt-20">
+          <div className="container mx-auto px-4 text-center lg:text-left grid lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-50 text-green-700 text-sm font-medium mb-8 border border-green-100">
                  <Zap className="w-4 h-4 fill-current" />
-                 <span>La soluzione definitiva per dirigenti e mister</span>
+                 <span>Gestione sportiva semplificata</span>
               </div>
-
-              <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 text-foreground leading-[1.1] animate-fade-up">
-                Il campo da gioco, <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#2ea35f] to-emerald-600">
-                  in tempo reale.
-                </span>
+              <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6">
+                Il campo, <br />
+                <span className="text-[#2ea35f]">in tempo reale.</span>
               </h1>
-              
-              <p className="text-xl text-muted-foreground mb-10 max-w-2xl mx-auto lg:mx-0 leading-relaxed animate-fade-up animation-delay-200">
-                Dimentica carta e penna. Gestisci rose, eventi live e condividi i risultati 
-                su WhatsApp con un tap. Semplice, veloce, professionale.
+              <p className="text-xl text-muted-foreground mb-10 max-w-xl leading-relaxed">
+                Gestisci rose, eventi live e condividi i risultati su WhatsApp con un tap. 
+                La soluzione definitiva per dirigenti e mister.
               </p>
-
-              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 animate-fade-up animation-delay-500">
+              <div className="flex flex-col sm:flex-row items-center gap-4">
                 <Button 
                   onClick={() => navigate("/auth")}
-                  className="h-14 px-10 text-lg rounded-full bg-[#2ea35f] hover:bg-[#268c50] shadow-xl shadow-green-200/50 transition-all transform hover:scale-105 group text-white border-0"
+                  className="h-14 px-10 text-lg rounded-full bg-[#2ea35f] hover:bg-[#268c50] shadow-lg transition-all text-white border-0"
                 >
                   Inizia Gratuitamente
-                  <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
-                <p className="text-sm text-muted-foreground flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-green-600" /> Nessuna carta richiesta
-                </p>
+                <span className="text-sm text-muted-foreground flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-600" /> Nessun setup complicato
+                </span>
               </div>
             </div>
-
-            {/* Colonna Immagine Fotorealistica (Destra - visibile su desktop) */}
-            <div className="hidden lg:block relative animate-fade-up animation-delay-200">
-              {/* Overlay sfumato verde per armonizzare l'immagine */}
-              <div className="absolute inset-0 bg-gradient-to-tr from-[#2ea35f]/20 via-transparent to-transparent rounded-[2.5rem] z-10 pointer-events-none"></div>
-              
-              {/* NUOVA IMMAGINE: Stadio illuminato (più affidabile) */}
+            
+            <div className="hidden lg:block">
               <img 
-                src="https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?q=80&w=2070&auto=format&fit=crop" 
-                alt="Stadio da calcio illuminato" 
-                className="rounded-[2.5rem] shadow-2xl shadow-green-900/10 object-cover h-[600px] w-full border border-border/50"
+                src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&q=80&w=1200" 
+                alt="Campo da calcio" 
+                className="rounded-3xl shadow-2xl object-cover h-[500px] w-full"
               />
             </div>
           </div>
         </section>
 
-
-        {/* --- FEATURES SECTION (Stile NotebookLM minimal) --- */}
-        <section className="py-24 bg-muted/30 border-t border-border">
+        {/* --- FEATURES SECTION --- */}
+        <section className="py-20 bg-muted/30">
           <div className="container mx-auto px-4">
-             <div className="text-center mb-16 max-w-2xl mx-auto">
-              <h2 className="text-3xl font-bold tracking-tight mb-4">Tutto quello che serve a bordo campo.</h2>
-              <p className="text-muted-foreground text-lg">Un set di strumenti essenziali progettati per chi vive la partita minuto per minuto.</p>
-            </div>
             <div className="grid md:grid-cols-3 gap-8">
               <FeatureCard 
-                icon={<Users className="w-6 h-6" />}
-                title="Gestione Rose Rapida"
-                description="Crea le tue squadre e trascina i giocatori tra titolari e panchina in secondi."
+                icon={<Users />}
+                title="Gestione Rose"
+                description="Crea le tue squadre e sposta i giocatori tra titolari e panchina in un istante."
                 color={brandGreen}
               />
               <FeatureCard 
-                icon={<Trophy className="w-6 h-6" />}
-                title="Cronaca Live Match"
-                description="Registra gol, assist e cartellini con un'interfaccia ottimizzata per smartphone."
+                icon={<Trophy />}
+                title="Live Match"
+                description="Registra gol, assist e cartellini con un'interfaccia pensata per il bordo campo."
                 color={brandGreen}
               />
               <FeatureCard 
-                icon={<Share2 className="w-6 h-6" />}
-                title="Condivisione Istantanea"
-                description="Genera report formattati perfettamente per i tuoi gruppi WhatsApp a fine gara."
+                icon={<Share2 />}
+                title="Condivisione"
+                description="Genera report pronti per i gruppi WhatsApp non appena fischia la fine."
                 color={brandGreen}
               />
             </div>
@@ -105,42 +84,26 @@ const Landing = () => {
         </section>
       </main>
 
-      {/* 3. FOOTER FIXATO CON IMMAGINE NUOVA */}
-      <footer className="relative pt-24 pb-12 text-white overflow-hidden flex flex-col justify-center min-h-[500px]">
-        
-        {/* SFONDO GESTITO A LIVELLI PER EVITARE ERRORI VISIVI */}
-        <div className="absolute inset-0 z-0">
-            {/* Livello 1: Immagine Erba (Alta qualità, texture pulita) */}
-            <img 
-                src="https://images.unsplash.com/photo-1556056504-517173f44412?q=80&w=2076&auto=format&fit=crop"
-                alt="Dettaglio manto erboso campo da calcio" 
-                className="w-full h-full object-cover"
-            />
-            {/* Livello 2: Overlay scuro GRADIENTE (più sicuro dei filtri blend) */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#05110a] via-[#0f291a]/90 to-[#2ea35f]/30"></div>
-        </div>
-
-        {/* Contenuto Footer (Sopra l'immagine) */}
-        <div className="relative z-10 container mx-auto px-4 text-center">
-           <div className="inline-flex items-center gap-2 mb-6 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full border border-white/10">
-             <Trophy className="w-5 h-5 text-green-400" />
-             <span className="font-bold tracking-tight">Match Manager Live</span>
-           </div>
-           <h3 className="text-3xl md:text-4xl font-bold mb-8 text-white drop-shadow-md">Pronto a scendere in campo?</h3>
+      {/* --- FOOTER SEMPLIFICATO --- */}
+      <footer className="bg-gradient-to-b from-background to-green-50/50 pt-20 pb-12 border-t border-border">
+        <div className="container mx-auto px-4 text-center">
+           <h3 className="text-3xl md:text-4xl font-bold mb-8 tracking-tight">
+             Pronto per la prossima partita?
+           </h3>
            
            <Button 
               onClick={() => navigate("/auth")}
-              className="h-12 px-8 bg-white text-[#2ea35f] hover:bg-green-50 font-semibold rounded-full border-0 mb-12 shadow-lg hover:scale-105 transition-transform"
+              className="h-12 px-8 bg-[#2ea35f] text-white hover:bg-[#268c50] rounded-full shadow-md mb-16"
            >
-             Accedi alla Piattaforma
+             Crea il tuo primo match
            </Button>
            
-          <div className="border-t border-white/20 pt-8 mt-8 flex flex-col md:flex-row justify-between items-center text-sm text-green-100/80">
+          <div className="border-t border-border pt-8 flex flex-col md:flex-row justify-between items-center text-sm text-muted-foreground">
             <p>© 2026 Match Manager Live. Tutti i diritti riservati.</p>
-            <div className="flex gap-4 mt-4 md:mt-0 font-medium">
-              <a href="#" className="hover:text-white transition-colors">Privacy</a>
-              <a href="#" className="hover:text-white transition-colors">Termini</a>
-              <a href="#" className="hover:text-white transition-colors">Contatti</a>
+            <div className="flex gap-6 mt-4 md:mt-0">
+              <a href="#" className="hover:text-green-600 transition-colors">Privacy</a>
+              <a href="#" className="hover:text-green-600 transition-colors">Termini</a>
+              <a href="#" className="hover:text-green-600 transition-colors">Supporto</a>
             </div>
           </div>
         </div>
@@ -149,22 +112,15 @@ const Landing = () => {
   );
 };
 
-// Componente di supporto per le Card delle Features
+// Componente FeatureCard (Versione rifinita)
 const FeatureCard = ({ icon, title, description, color }: { icon: React.ReactNode, title: string, description: string, color: string }) => (
-  <div className="group p-8 bg-card rounded-2xl border border-border/60 hover:shadow-xl hover:shadow-green-100/30 transition-all hover:-translate-y-1 relative overflow-hidden">
-    {/* Sfondo sfumato all'hover */}
-    <div className="absolute inset-0 bg-gradient-to-br from-green-50/0 to-green-50/0 group-hover:from-green-50/50 group-hover:to-transparent transition-all duration-500"></div>
-    
-    <div className="relative z-10">
-        <div 
-            className="mb-5 w-12 h-12 rounded-xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform bg-green-50"
-            style={{ color: color }}
-        >
-        {icon}
-        </div>
-        <h3 className="text-xl font-bold mb-3 text-foreground">{title}</h3>
-        <p className="text-muted-foreground leading-relaxed">{description}</p>
+  <div className="group p-8 bg-card rounded-2xl border border-border/60 hover:border-green-500/30 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden h-full flex flex-col">
+    <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
+    <div className="mb-6 w-12 h-12 rounded-xl flex items-center justify-center bg-green-50" style={{ color: color }}>
+      {icon}
     </div>
+    <h3 className="text-xl font-bold mb-3">{title}</h3>
+    <p className="text-muted-foreground leading-relaxed">{description}</p>
   </div>
 );
 
