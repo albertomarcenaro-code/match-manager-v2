@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useParams } from 'react-router-dom'; // <--- AGGIUNTO: Necessario per leggere l'ID
 import { useMatch } from '@/hooks/useMatch';
 import { RosterSetup } from '@/components/setup/RosterSetup';
 import { MatchHeader } from '@/components/match/MatchHeader';
@@ -9,17 +10,31 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 
 const MatchApp = () => {
+  const { id } = useParams(); // <--- AGGIUNTO: Legge l'ID dall'URL (es: quick-12345)
   const [phase, setPhase] = useState<'setup' | 'match'>('setup');
+  
   const {
     state, setHomeTeamName, setAwayTeamName, addPlayer,
     setStarters, confirmStarters, startPeriod, pauseTimer, 
     resumeTimer, recordGoal, recordCard, resetMatch, forceStarterSelection
   } = useMatch();
 
+  // Logica per gestire il tipo di partita in base all'ID
+  useEffect(() => {
+    if (id && id.startsWith('quick-')) {
+      console.log("Inizializzazione Partita Rapida:", id);
+      // Qui potresti resettare il match se vuoi essere sicuro che sia pulito
+      // resetMatch(); 
+    }
+  }, [id]);
+
   const handleRosterComplete = useCallback(() => {
     forceStarterSelection();
     setPhase('match');
   }, [forceStarterSelection]);
+
+  // Se l'ID non è presente (molto raro con le nostre nuove rotte), mostra caricamento
+  if (!id) return <div className="p-20 text-center">Caricamento partita...</div>;
 
   if (phase === 'setup') {
     return (
@@ -34,7 +49,6 @@ const MatchApp = () => {
           onAwayTeamNameChange={setAwayTeamName}
           onAddPlayer={addPlayer}
           onComplete={handleRosterComplete}
-          // Aggiungi qui gli altri props se richiesti da RosterSetup
           onUpdatePlayerNumber={() => {}} 
           onRemovePlayer={() => {}}
           onAddOpponentPlayer={() => {}}
@@ -49,9 +63,16 @@ const MatchApp = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col font-sans">
       <Header />
       <main className="flex-1 p-4 max-w-6xl mx-auto w-full space-y-4">
+        {/* Mostriamo un piccolo badge se è una partita rapida (opzionale) */}
+        {id.startsWith('quick-') && (
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground bg-muted w-fit px-2 py-0.5 rounded">
+            Partita Rapida
+          </div>
+        )}
+
         <MatchHeader state={state} />
         
         {state.needsStarterSelection ? (
@@ -73,7 +94,7 @@ const MatchApp = () => {
                 elapsedTime={state.elapsedTime}
                 onStartPeriod={startPeriod}
                 onPauseTimer={pauseTimer}
-                onResumeTimer={resumeTimer}
+                onResumeTimer={onResumeTimer}
                 isMatchStarted={state.isMatchStarted}
               />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -81,15 +102,15 @@ const MatchApp = () => {
                   team="home"
                   name={state.homeTeam.name}
                   players={state.homeTeam.players}
-                  onGoal={(id) => recordGoal('home', id)}
-                  onCard={(id, type) => recordCard('home', id, type)}
+                  onGoal={(playerId) => recordGoal('home', playerId)}
+                  onCard={(playerId, type) => recordCard('home', playerId, type)}
                 />
                 <TeamPanel
                   team="away"
                   name={state.awayTeam.name}
                   players={state.awayTeam.players}
-                  onGoal={(id) => recordGoal('away', id)}
-                  onCard={(id, type) => recordCard('away', id, type)}
+                  onGoal={(playerId) => recordGoal('away', playerId)}
+                  onCard={(playerId, type) => recordCard('away', playerId, type)}
                 />
               </div>
             </div>
