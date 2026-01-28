@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { MatchState, MatchEvent, Player, TeamType, CardType } from '../types/match';
+import { useParams } from 'react-router-dom';
 
 const STORAGE_KEY = 'match_manager_state';
-const TIMER_STATE_KEY = 'match_manager_timer';
 
 const initialState: MatchState = {
   homeTeam: { name: 'Casa', players: [], score: 0 },
@@ -22,7 +22,14 @@ const initialState: MatchState = {
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 export const useMatch = () => {
+  const { id } = useParams(); // Leggiamo l'ID dall'URL
+
   const [state, setState] = useState<MatchState>(() => {
+    // Se l'ID indica una NUOVA partita, ignoriamo il localStorage e partiamo da zero
+    if (id && (id.startsWith('new-') || id.startsWith('quick-'))) {
+      return initialState;
+    }
+
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
@@ -35,7 +42,13 @@ export const useMatch = () => {
     return initialState;
   });
 
-  const startTimestampRef = useRef<number | null>(null);
+  // Effetto per resettare lo stato se l'ID cambia in "new" mentre l'app è aperta
+  useEffect(() => {
+    if (id && (id.startsWith('new-') || id.startsWith('quick-'))) {
+      setState(initialState);
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, [id]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
