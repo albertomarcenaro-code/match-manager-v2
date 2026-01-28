@@ -37,7 +37,7 @@ interface RosterSetupProps {
   awayPlayers: Player[];
   onHomeTeamNameChange: (name: string) => void;
   onAwayTeamNameChange: (name: string) => void;
-  onAddPlayer: (team: 'home' | 'away', player: { name: string; number: number | null }) => void; // Adeguato allo standard attuale
+  onAddPlayer: (team: 'home' | 'away', player: { name: string; number: number | null }) => void;
   onUpdatePlayerNumber: (playerId: string, number: number | null) => void;
   onRemovePlayer: (playerId: string) => void;
   onComplete: () => void;
@@ -80,38 +80,19 @@ export function RosterSetup({
     }
   }, [user, isGuest]);
 
-  useEffect(() => {
-    setTournamentMode(tournament.isActive);
-    if (tournament.isActive) {
-      setTournamentName(tournament.name);
-    }
-  }, [tournament.isActive, tournament.name]);
-
   const loadUserData = async () => {
     if (!user) return;
     setIsLoading(true);
     try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('team_name')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (profile?.team_name) {
-        onHomeTeamNameChange(profile.team_name);
-      }
-
-      const { data: players } = await supabase
-        .from('players')
-        .select('name, number')
-        .eq('user_id', user.id)
-        .order('name');
-
+      const { data: profile } = await supabase.from('profiles').select('team_name').eq('user_id', user.id).maybeSingle();
+      if (profile?.team_name) onHomeTeamNameChange(profile.team_name);
+      
+      const { data: players } = await supabase.from('players').select('name, number').eq('user_id', user.id).order('name');
       if (players && players.length > 0 && onBulkAddPlayers) {
         onBulkAddPlayers(players.map(p => p.name));
       }
     } catch (error) {
-      console.error('Error loading user data:', error);
+      console.error('Error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -127,7 +108,7 @@ export function RosterSetup({
   const handleAddOpponent = () => {
     const num = parseInt(newOpponentNumber, 10);
     if (!isNaN(num)) {
-      onAddPlayer('away', { name: `Giocatore ${num}`, number: num });
+      onAddPlayer('away', { name: `AVVERSARIO ${num}`, number: num });
       setNewOpponentNumber('');
     }
   };
@@ -164,7 +145,9 @@ export function RosterSetup({
     if (autoNumberTeam === 'home') {
       homePlayers.slice(0, count).forEach((p, i) => onUpdatePlayerNumber(p.id, i + 1));
     } else {
-      for (let i = 1; i <= count; i++) onAddPlayer('away', { name: `Giocatore ${i}`, number: i });
+      for (let i = 1; i <= count; i++) {
+        onAddPlayer('away', { name: `AVVERSARIO ${i}`, number: i });
+      }
     }
     setAutoNumberDialogOpen(false);
     setAutoNumberCount('');
@@ -176,8 +159,12 @@ export function RosterSetup({
     <div className="min-h-screen bg-background p-4 pb-24">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="text-center py-6">
-          <h1 className="text-2xl font-bold">Configurazione Rose</h1>
-          {isLoading && <p className="text-xs text-primary animate-pulse">Caricamento database...</p>}
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/10 text-secondary mb-4">
+            <Shield className="h-5 w-5" />
+            <span className="font-semibold">Configurazione Partita</span>
+          </div>
+          <h1 className="text-2xl font-bold">Inserisci le rose</h1>
+          {isLoading && <p className="text-xs text-primary animate-pulse">Caricamento dati...</p>}
         </div>
 
         <div className="flex items-center justify-center gap-4 p-4 bg-card rounded-xl border">
@@ -187,46 +174,46 @@ export function RosterSetup({
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
-          {/* CASA */}
-          <div className="bg-card rounded-xl border overflow-hidden shadow-sm">
-            <div className="p-4 bg-primary/10 border-b flex justify-between items-center">
-              <span className="font-bold">Casa</span>
+          {/* SQUADRA CASA */}
+          <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
+            <div className="p-4 bg-secondary/10 border-b flex justify-between items-center">
+              <span className="font-bold">Squadra Casa</span>
               {user && !isGuest && (
-                <Button size="sm" variant="outline" onClick={handleSaveRoster} disabled={isSaving} className="h-7 text-xs">
-                  <Save className="h-3 w-3 mr-1" /> Salva
+                <Button size="sm" variant="outline" onClick={handleSaveRoster} disabled={isSaving} className="h-8">
+                  <Save className="h-4 w-4 mr-1" /> {isSaving ? '...' : 'Salva'}
                 </Button>
               )}
             </div>
             <div className="p-4 space-y-4">
-              <Input value={homeTeamName} onChange={(e) => onHomeTeamNameChange(e.target.value)} placeholder="Nome Squadra..." className="font-bold" />
+              <Input value={homeTeamName} onChange={(e) => onHomeTeamNameChange(e.target.value)} placeholder="Nome Squadra..." />
               <div className="flex gap-2">
-                <Input placeholder="Nuovo giocatore..." value={newPlayerName} onChange={(e) => setNewPlayerName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()} />
-                <Button onClick={handleAddPlayer} size="icon"><Plus /></Button>
+                <Input placeholder="Nome giocatore..." value={newPlayerName} onChange={(e) => setNewPlayerName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()} />
+                <Button onClick={handleAddPlayer} size="icon"><Plus className="h-5 w-5" /></Button>
               </div>
-              <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              <div className="space-y-2 max-h-[350px] overflow-y-auto">
                 {homePlayers.map(p => (
-                  <div key={p.id} className="flex items-center gap-2 p-2 rounded border bg-muted/20">
-                    <Input type="number" className="w-14 text-center font-bold" value={p.number ?? ''} onChange={(e) => onUpdatePlayerNumber(p.id, e.target.value === '' ? null : parseInt(e.target.value))} />
+                  <div key={p.id} className="flex items-center gap-2 p-2 rounded-lg border bg-muted/30">
+                    <Input type="number" className="w-16 text-center font-bold" value={p.number ?? ''} onChange={(e) => onUpdatePlayerNumber(p.id, e.target.value === '' ? null : parseInt(e.target.value))} />
                     <span className="flex-1 text-sm font-medium uppercase truncate">{p.name}</span>
-                    <Button variant="ghost" size="icon" onClick={() => onRemovePlayer(p.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>
+                    <Button variant="ghost" size="icon" onClick={() => onRemovePlayer(p.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* OSPITI */}
-          <div className="bg-card rounded-xl border overflow-hidden shadow-sm">
-            <div className="p-4 bg-muted/50 border-b font-bold text-muted-foreground">Ospiti</div>
+          {/* SQUADRA OSPITE */}
+          <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
+            <div className="p-4 bg-muted/50 border-b font-bold">Squadra Ospite</div>
             <div className="p-4 space-y-4">
               <Input value={awayTeamName} onChange={(e) => onAwayTeamNameChange(e.target.value)} placeholder="Nome Avversari..." />
               <div className="flex gap-2">
-                <Input type="number" placeholder="Num. Maglia..." value={newOpponentNumber} onChange={(e) => setNewOpponentNumber(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddOpponent()} />
-                <Button onClick={handleAddOpponent} variant="outline" size="icon"><Plus /></Button>
+                <Input type="number" placeholder="Numero..." value={newOpponentNumber} onChange={(e) => setNewOpponentNumber(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddOpponent()} />
+                <Button onClick={handleAddOpponent} variant="outline" size="icon"><Plus className="h-5 w-5" /></Button>
               </div>
               <div className="flex flex-wrap gap-2">
                 {awayPlayers.map(p => (
-                  <div key={p.id} className="flex items-center gap-1 bg-secondary/10 border border-secondary/20 px-2 py-1 rounded text-sm font-bold">
+                  <div key={p.id} className="flex items-center gap-1 bg-secondary/10 border border-secondary/20 px-3 py-1.5 rounded-full text-sm font-bold">
                     #{p.number}
                     <button onClick={() => onRemovePlayer(p.id)} className="ml-1 text-muted-foreground hover:text-destructive">×</button>
                   </div>
@@ -236,43 +223,43 @@ export function RosterSetup({
           </div>
         </div>
 
-        <div className="flex justify-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => { setAutoNumberTeam('home'); setAutoNumberDialogOpen(true); }}><Hash className="w-4 h-4 mr-1"/> Auto-Numeri</Button>
-          <Button variant="outline" size="sm" onClick={() => setBulkImportDialogOpen(true)}><Upload className="w-4 h-4 mr-1"/> Bulk Import</Button>
-          <Button variant="outline" size="sm" onClick={onSwapTeams}><ArrowLeftRight className="w-4 h-4 mr-1"/> Scambia</Button>
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => { setAutoNumberTeam('home'); setAutoNumberDialogOpen(true); }}><Hash className="h-4 w-4 mr-2"/> Auto-Numeri</Button>
+          <Button variant="outline" size="sm" onClick={() => setBulkImportDialogOpen(true)}><Upload className="h-4 w-4 mr-2"/> Importa Lista</Button>
+          <Button variant="outline" size="sm" onClick={onSwapTeams}><ArrowLeftRight className="h-4 w-4 mr-2"/> Scambia</Button>
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur border-t">
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur border-t z-50">
           <div className="max-w-4xl mx-auto">
-            <Button className="w-full h-12 font-bold" disabled={!canProceed} onClick={onComplete}>
-              {canProceed ? 'Vai alla Partita →' : 'Inserisci almeno 1 giocatore per squadra'}
+            <Button className="w-full h-12 bg-secondary hover:bg-secondary/90 text-white font-bold uppercase" disabled={!canProceed} onClick={onComplete}>
+              {canProceed ? 'Continua alla Partita →' : 'Configura le squadre'}
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Dialogs */}
+      {/* DIALOGS */}
       <Dialog open={bulkImportDialogOpen} onOpenChange={setBulkImportDialogOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Importa Lista Nomi</DialogTitle></DialogHeader>
-          <Textarea value={bulkImportText} onChange={(e) => setBulkImportText(e.target.value)} placeholder="MARIO ROSSI&#10;LUCA VERDI..." className="h-48" />
-          <Button onClick={handleBulkImport} className="w-full">Importa</Button>
+          <DialogHeader><DialogTitle>Importa Giocatori</DialogTitle></DialogHeader>
+          <Textarea value={bulkImportText} onChange={(e) => setBulkImportText(e.target.value)} placeholder="Un nome per riga..." className="h-40" />
+          <Button onClick={handleBulkImport} className="w-full">Conferma Importazione</Button>
         </DialogContent>
       </Dialog>
 
       <Dialog open={autoNumberDialogOpen} onOpenChange={setAutoNumberDialogOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Auto-Numerazione</DialogTitle></DialogHeader>
-          <Input type="number" value={autoNumberCount} onChange={(e) => setAutoNumberCount(e.target.value)} placeholder="Quanti giocatori?" />
-          <Button onClick={handleAutoNumber} className="w-full">Conferma</Button>
+          <DialogHeader><DialogTitle>Auto-numerazione</DialogTitle></DialogHeader>
+          <Input type="number" value={autoNumberCount} onChange={(e) => setAutoNumberCount(e.target.value)} placeholder="Quanti?" />
+          <Button onClick={handleAutoNumber} className="w-full">Applica</Button>
         </DialogContent>
       </Dialog>
 
       <Dialog open={showTournamentDialog} onOpenChange={setShowTournamentDialog}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Attiva Torneo</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Avvia Torneo</DialogTitle></DialogHeader>
           <Input value={tournamentName} onChange={(e) => setTournamentName(e.target.value)} placeholder="Nome Torneo..." />
-          <Button onClick={() => { startTournament(tournamentName, homeTeamName, homePlayers); setTournamentMode(true); setShowTournamentDialog(false); }} className="w-full">Avvia</Button>
+          <Button onClick={() => { startTournament(tournamentName, homeTeamName, homePlayers); setTournamentMode(true); setShowTournamentDialog(false); }} className="w-full">Conferma</Button>
         </DialogContent>
       </Dialog>
     </div>
