@@ -23,10 +23,15 @@ export default function Dashboard() {
     navigate("/tournaments");
   };
 
-  // NUOVA FUNZIONE: Resetta lo stato del torneo prima di avviare una partita rapida
+  // FUNZIONE CORRETTA: Crea un ID unico per evitare l'errore 404
   const handleQuickMatch = () => {
-    localStorage.removeItem('tournament-state'); // Rimuove i dati di eventuali tornei attivi
-    navigate("/match");
+    localStorage.removeItem('tournament-state'); 
+    
+    // Generiamo un ID temporaneo basato sulla data attuale
+    const quickId = "quick-" + Date.now();
+    
+    // Navighiamo verso la rotta dinamica che abbiamo impostato in App.tsx
+    navigate(`/match/${quickId}`);
   };
 
   return (
@@ -80,7 +85,6 @@ export default function Dashboard() {
               <h2 className="text-xl font-bold">Partita Rapida</h2>
               <p className="text-sm text-muted-foreground">Avvia subito una partita singola senza torneo.</p>
             </div>
-            {/* Utilizziamo handleQuickMatch invece di navigate diretto */}
             <Button onClick={handleQuickMatch} variant="outline" className="w-full">
               Inizia Partita
             </Button>
