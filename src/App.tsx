@@ -57,7 +57,7 @@ const App = () => (
             
             {/* Private - Accessibili anche agli Ospiti */}
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/match" element={<ProtectedRoute><MatchApp /></ProtectedRoute>} />
+            <Route path="/match/:id" element={<ProtectedRoute><MatchApp /></ProtectedRoute>} />
             
             {/* Private - SOLO per Utenti Registrati */}
             <Route 
