@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { MatchState, MatchEvent, Player, TeamType, CardType } from '../types/match';
+import { useState, useEffect, useCallback } from 'react';
+import { MatchState, Player, TeamType, CardType } from '../types/match';
 import { useParams } from 'react-router-dom';
+import { toast } from 'sonner';
 
 const STORAGE_KEY = 'match_manager_state';
 
@@ -22,14 +23,12 @@ const initialState: MatchState = {
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 export const useMatch = () => {
-  const { id } = useParams(); // Leggiamo l'ID dall'URL
+  const { id } = useParams();
 
   const [state, setState] = useState<MatchState>(() => {
-    // Se l'ID indica una NUOVA partita, ignoriamo il localStorage e partiamo da zero
     if (id && (id.startsWith('new-') || id.startsWith('quick-'))) {
       return initialState;
     }
-
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
@@ -42,7 +41,6 @@ export const useMatch = () => {
     return initialState;
   });
 
-  // Effetto per resettare lo stato se l'ID cambia in "new" mentre l'app è aperta
   useEffect(() => {
     if (id && (id.startsWith('new-') || id.startsWith('quick-'))) {
       setState(initialState);
@@ -62,16 +60,116 @@ export const useMatch = () => {
     ...prev, awayTeam: { ...prev.awayTeam, name }
   }));
 
-  const addPlayer = (team: TeamType, player: Omit<Player, 'id' | 'isOnField' | 'isExpelled' | 'goals' | 'cards'>) => {
-    const newPlayer: Player = { ...player, id: generateId(), isOnField: false, isExpelled: false, goals: 0, cards: { yellow: 0, red: 0 } };
+  const addPlayer = (name: string) => {
+    const newPlayer: Player = { 
+      id: generateId(), 
+      name, 
+      number: null, 
+      isOnField: false, 
+      isExpelled: false, 
+      goals: 0, 
+      cards: { yellow: 0, red: 0 } 
+    };
     setState(prev => ({
       ...prev,
-      [team === 'home' ? 'homeTeam' : 'awayTeam']: {
-        ...prev[team === 'home' ? 'homeTeam' : 'awayTeam'],
-        players: [...prev[team === 'home' ? 'homeTeam' : 'awayTeam'].players, newPlayer]
-      }
+      homeTeam: { ...prev.homeTeam, players: [...prev.homeTeam.players, newPlayer] }
     }));
   };
+
+  // --- FUNZIONI OPERATIVE ROSTER ---
+
+  // 1. RIMOZIONE CON CONTROLLO
+  const removePlayer = useCallback((playerId: string) => {
+    setState(prev => {
+      const player = prev.homeTeam.players.find(p => p.id === playerId);
+      if (player && player.goals > 0) {
+        toast.error("Impossibile rimuovere un giocatore che ha segnato!");
+        return prev;
+      }
+      return {
+        ...prev,
+        homeTeam: { ...prev.homeTeam, players: prev.homeTeam.players.filter(p => p.id !== playerId) }
+      };
+    });
+  }, []);
+
+  const removeOpponentPlayer = useCallback((playerId: string) => {
+    setState(prev => ({
+      ...prev,
+      awayTeam: { ...prev.awayTeam, players: prev.awayTeam.players.filter(p => p.id !== playerId) }
+    }));
+  }, []);
+
+  // 2. AGGIORNAMENTO NUMERO MANUALE
+  const updatePlayerNumber = useCallback((playerId: string, number: number | null) => {
+    setState(prev => ({
+      ...prev,
+      homeTeam: {
+        ...prev.homeTeam,
+        players: prev.homeTeam.players.map(p => p.id === playerId ? { ...p, number } : p)
+      },
+      awayTeam: {
+        ...prev.awayTeam,
+        players: prev.awayTeam.players.map(p => p.id === playerId ? { ...p, number } : p)
+      }
+    }));
+  }, []);
+
+  // AGGIUNTA OSPITE (Solo numero)
+  const addOpponentPlayer = useCallback((number: number) => {
+    const newPlayer: Player = {
+      id: generateId(),
+      name: `AVVERSARIO ${number}`,
+      number: number,
+      isOnField: false,
+      isExpelled: false,
+      goals: 0,
+      cards: { yellow: 0, red: 0 }
+    };
+    setState(prev => ({
+      ...prev,
+      awayTeam: { ...prev.awayTeam, players: [...prev.awayTeam.players, newPlayer] }
+    }));
+  }, []);
+
+  // 3. SCAMBIA SQUADRE (SOLO IN SETUP)
+  const swapTeams = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      homeTeam: { ...prev.awayTeam },
+      awayTeam: { ...prev.homeTeam }
+    }));
+    toast.success("Squadre scambiate");
+  }, []);
+
+  // 4. AUTO-NUMERAZIONE (GENERA LISTE)
+  const createPlayersWithNumbers = useCallback((count: number) => {
+    const newHome = Array.from({ length: count }, (_, i) => ({
+      id: generateId(),
+      name: `GIOCATORE ${i + 1}`,
+      number: i + 1,
+      isOnField: false,
+      isExpelled: false,
+      goals: 0,
+      cards: { yellow: 0, red: 0 }
+    }));
+    const newAway = Array.from({ length: count }, (_, i) => ({
+      id: generateId(),
+      name: `AVVERSARIO ${i + 1}`,
+      number: i + 1,
+      isOnField: false,
+      isExpelled: false,
+      goals: 0,
+      cards: { yellow: 0, red: 0 }
+    }));
+    setState(prev => ({
+      ...prev,
+      homeTeam: { ...prev.homeTeam, players: newHome },
+      awayTeam: { ...prev.awayTeam, players: newAway }
+    }));
+  }, []);
+
+  // --- GESTIONE PARTITA ---
 
   const forceStarterSelection = useCallback(() => {
     setState(prev => ({ ...prev, needsStarterSelection: true, isMatchStarted: true }));
@@ -155,9 +253,15 @@ export const useMatch = () => {
   return {
     state, setHomeTeamName, setAwayTeamName, addPlayer, setStarters, confirmStarters,
     startPeriod, pauseTimer, resumeTimer, recordGoal, recordCard, resetMatch, 
-    forceStarterSelection, bulkAddPlayers: () => {}, updatePlayerNumber: () => {}, 
-    removePlayer: () => {}, addOpponentPlayer: () => {}, removeOpponentPlayer: () => {},
-    createPlayersWithNumbers: () => {}, swapTeams: () => {}, undoLastEvent: () => {},
-    endPeriod: () => {}, endMatch: () => {}, recordOwnGoal: () => {}, recordSubstitution: () => {}
+    forceStarterSelection, 
+    updatePlayerNumber, 
+    removePlayer, 
+    addOpponentPlayer, 
+    removeOpponentPlayer,
+    createPlayersWithNumbers, 
+    swapTeams,
+    bulkAddPlayers: (names: string[]) => {
+      names.forEach(name => addPlayer(name));
+    }
   };
 };
