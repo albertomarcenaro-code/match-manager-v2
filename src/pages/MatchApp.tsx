@@ -12,10 +12,28 @@ const MatchApp = () => {
   const { id } = useParams();
   const [phase, setPhase] = useState<'setup' | 'match'>('setup');
   
+  // 1. ESTRAIAMO TUTTE LE FUNZIONI REALI DALL'HOOK (Quelle che abbiamo appena scritto in useMatch)
   const {
-    state, setHomeTeamName, setAwayTeamName, addPlayer,
-    setStarters, confirmStarters, startPeriod, pauseTimer, 
-    resumeTimer, recordGoal, recordCard, resetMatch, forceStarterSelection
+    state, 
+    setHomeTeamName, 
+    setAwayTeamName, 
+    addPlayer,
+    updatePlayerNumber,
+    removePlayer,
+    addOpponentPlayer,
+    removeOpponentPlayer,
+    bulkAddPlayers,
+    swapTeams,
+    createPlayersWithNumbers,
+    setStarters, 
+    confirmStarters, 
+    startPeriod, 
+    pauseTimer, 
+    resumeTimer, 
+    recordGoal, 
+    recordCard, 
+    resetMatch, 
+    forceStarterSelection
   } = useMatch();
 
   const handleRosterComplete = useCallback(() => {
@@ -25,10 +43,10 @@ const MatchApp = () => {
 
   if (!state) return <div className="p-20 text-center">Inizializzazione...</div>;
 
+  // --- FASE DI SETUP (Pulsanti Rose) ---
   if (phase === 'setup') {
     return (
       <div className="min-h-screen flex flex-col bg-background">
-        {/* Abbiamo tolto l'Header temporaneamente per testare */}
         <main className="flex-1">
           <RosterSetup
             homeTeamName={state.homeTeam.name}
@@ -37,16 +55,16 @@ const MatchApp = () => {
             awayPlayers={state.awayTeam.players}
             onHomeTeamNameChange={setHomeTeamName}
             onAwayTeamNameChange={setAwayTeamName}
-            onAddPlayer={addPlayer}
             onComplete={handleRosterComplete}
-            // Funzioni dummy per evitare crash di props mancanti
-            onUpdatePlayerNumber={() => {}} 
-            onRemovePlayer={() => {}}
-            onAddOpponentPlayer={() => {}}
-            onRemoveOpponentPlayer={() => {}}
-            onBulkAddPlayers={() => {}}
-            onSwapTeams={() => {}}
-            onCreatePlayersWithNumbers={() => {}}
+            // 2. COLLEGIAMO I PULSANTI ALLE FUNZIONI REALI (Niente più "() => {}")
+            onAddPlayer={addPlayer}
+            onUpdatePlayerNumber={updatePlayerNumber}
+            onRemovePlayer={removePlayer}
+            onAddOpponentPlayer={addOpponentPlayer}
+            onRemoveOpponentPlayer={removeOpponentPlayer}
+            onBulkAddPlayers={bulkAddPlayers}
+            onSwapTeams={swapTeams}
+            onCreatePlayersWithNumbers={createPlayersWithNumbers}
           />
         </main>
         <Footer />
@@ -54,6 +72,7 @@ const MatchApp = () => {
     );
   }
 
+  // --- FASE DI MATCH ---
   return (
     <div className="min-h-screen flex flex-col">
       <main className="flex-1 p-4 max-w-6xl mx-auto w-full space-y-4">
