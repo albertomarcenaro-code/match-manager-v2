@@ -63,7 +63,7 @@ export const useMatch = () => {
   const addPlayer = (name: string) => {
     const newPlayer: Player = { 
       id: generateId(), 
-      name, 
+      name: name.toUpperCase(), 
       number: null, 
       isOnField: false, 
       isExpelled: false, 
@@ -76,21 +76,11 @@ export const useMatch = () => {
     }));
   };
 
-  // --- FUNZIONI OPERATIVE ROSTER ---
-
-  // 1. RIMOZIONE CON CONTROLLO
   const removePlayer = useCallback((playerId: string) => {
-    setState(prev => {
-      const player = prev.homeTeam.players.find(p => p.id === playerId);
-      if (player && player.goals > 0) {
-        toast.error("Impossibile rimuovere un giocatore che ha segnato!");
-        return prev;
-      }
-      return {
-        ...prev,
-        homeTeam: { ...prev.homeTeam, players: prev.homeTeam.players.filter(p => p.id !== playerId) }
-      };
-    });
+    setState(prev => ({
+      ...prev,
+      homeTeam: { ...prev.homeTeam, players: prev.homeTeam.players.filter(p => p.id !== playerId) }
+    }));
   }, []);
 
   const removeOpponentPlayer = useCallback((playerId: string) => {
@@ -100,7 +90,6 @@ export const useMatch = () => {
     }));
   }, []);
 
-  // 2. AGGIORNAMENTO NUMERO MANUALE
   const updatePlayerNumber = useCallback((playerId: string, number: number | null) => {
     setState(prev => ({
       ...prev,
@@ -115,11 +104,11 @@ export const useMatch = () => {
     }));
   }, []);
 
-  // AGGIUNTA OSPITE (Solo numero)
+  // AGGIUNTA OSPITE SINGOLO (Assicuriamo il nome)
   const addOpponentPlayer = useCallback((number: number) => {
     const newPlayer: Player = {
       id: generateId(),
-      name: `AVVERSARIO ${number}`,
+      name: `OSPITE ${number}`, // <--- Forza il nome qui
       number: number,
       isOnField: false,
       isExpelled: false,
@@ -132,7 +121,6 @@ export const useMatch = () => {
     }));
   }, []);
 
-  // 3. SCAMBIA SQUADRE (SOLO IN SETUP)
   const swapTeams = useCallback(() => {
     setState(prev => ({
       ...prev,
@@ -142,7 +130,7 @@ export const useMatch = () => {
     toast.success("Squadre scambiate");
   }, []);
 
-  // 4. AUTO-NUMERAZIONE (GENERA LISTE)
+  // AUTO-NUMERAZIONE (Correzione nomi generici)
   const createPlayersWithNumbers = useCallback((count: number) => {
     const newHome = Array.from({ length: count }, (_, i) => ({
       id: generateId(),
@@ -155,7 +143,7 @@ export const useMatch = () => {
     }));
     const newAway = Array.from({ length: count }, (_, i) => ({
       id: generateId(),
-      name: `AVVERSARIO ${i + 1}`,
+      name: `OSPITE ${i + 1}`, // <--- Cambiato da AVVERSARIO a OSPITE per coerenza
       number: i + 1,
       isOnField: false,
       isExpelled: false,
@@ -167,9 +155,8 @@ export const useMatch = () => {
       homeTeam: { ...prev.homeTeam, players: newHome },
       awayTeam: { ...prev.awayTeam, players: newAway }
     }));
+    toast.success(`Generate formazioni da ${count} giocatori`);
   }, []);
-
-  // --- GESTIONE PARTITA ---
 
   const forceStarterSelection = useCallback(() => {
     setState(prev => ({ ...prev, needsStarterSelection: true, isMatchStarted: true }));
@@ -253,15 +240,11 @@ export const useMatch = () => {
   return {
     state, setHomeTeamName, setAwayTeamName, addPlayer, setStarters, confirmStarters,
     startPeriod, pauseTimer, resumeTimer, recordGoal, recordCard, resetMatch, 
-    forceStarterSelection, 
-    updatePlayerNumber, 
-    removePlayer, 
-    addOpponentPlayer, 
-    removeOpponentPlayer,
-    createPlayersWithNumbers, 
-    swapTeams,
+    forceStarterSelection, updatePlayerNumber, removePlayer, addOpponentPlayer, 
+    removeOpponentPlayer, createPlayersWithNumbers, swapTeams,
     bulkAddPlayers: (names: string[]) => {
       names.forEach(name => addPlayer(name));
-    }
+    },
+    undoLastEvent: () => {}, endPeriod: () => {}, endMatch: () => {}, recordOwnGoal: () => {}, recordSubstitution: () => {}
   };
 };
