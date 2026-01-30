@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Player } from '@/types/match';
 import { Plus, Trash2, Users, Shield, Check, Hash, Upload, Save, ArrowLeftRight, Trophy, ChevronUp, ChevronRight } from 'lucide-react';
@@ -10,6 +11,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTournament } from '@/hooks/useTournament';
 import { supabase } from '@/integrations/supabase/client';
 import { useLocation } from 'react-router-dom';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -828,7 +836,7 @@ export function RosterSetup({
                 </Button>
               </div>
 
-              {/* Opponents List - CORRETTA QUI */}
+              {/* Opponents List */}
               <div className="flex flex-wrap gap-2 max-h-[400px] overflow-y-auto">
                 {awayPlayers.map((player) => {
                   const isDuplicate = player.number !== null && duplicateAwayNumbers.has(player.number);
@@ -844,9 +852,7 @@ export function RosterSetup({
                       )}
                     >
                       <span className="font-bold">#{player.number}</span>
-                      {/* AGGIUNTA FONDAMENTALE: MOSTRA IL NOME */}
                       <span className="text-xs ml-1 opacity-70 truncate max-w-[100px]">{player.name}</span>
-                      
                       <button
                         onClick={() => onRemoveOpponentPlayer(player.id)}
                         className="ml-1 text-muted-foreground hover:text-destructive"
@@ -894,6 +900,109 @@ export function RosterSetup({
             </div>
           </div>
         </div>
+
+        {/* DIALOGS - REINSERITI */}
+        <Dialog open={autoNumberDialogOpen} onOpenChange={setAutoNumberDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {autoNumberTeam === 'home' ? 'Assegna Numeri' : 'Genera Avversari'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              <div className="space-y-2">
+                <Label>
+                  {autoNumberTeam === 'home' 
+                    ? 'Quanti numeri vuoi assegnare automaticamente?' 
+                    : 'Quanti giocatori avversari vuoi creare?'}
+                </Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="99"
+                  value={autoNumberCount}
+                  onChange={(e) => setAutoNumberCount(e.target.value)}
+                  placeholder="Es. 11"
+                  autoFocus
+                  onKeyDown={(e) => e.key === 'Enter' && handleAutoNumber()}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {autoNumberTeam === 'home' 
+                  ? 'Verranno assegnati i primi numeri liberi ai giocatori senza numero.'
+                  : 'Verranno creati giocatori "Ospite X" con i primi numeri liberi.'}
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAutoNumberDialogOpen(false)}>
+                Annulla
+              </Button>
+              <Button onClick={handleAutoNumber}>
+                Conferma
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={bulkImportDialogOpen} onOpenChange={setBulkImportDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Importa Giocatori</DialogTitle>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              <div className="space-y-2">
+                <Label>Incolla i nomi (uno per riga)</Label>
+                <Textarea
+                  value={bulkImportText}
+                  onChange={(e) => setBulkImportText(e.target.value)}
+                  placeholder={`ROSSI\nBIANCHI\nVERDI...`}
+                  className="min-h-[200px]"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setBulkImportDialogOpen(false)}>
+                Annulla
+              </Button>
+              <Button onClick={handleBulkImport}>
+                Importa
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showTournamentDialog} onOpenChange={setShowTournamentDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Avvia Torneo</DialogTitle>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              <div className="space-y-2">
+                <Label>Nome del Torneo</Label>
+                <Input
+                  value={tournamentName}
+                  onChange={(e) => setTournamentName(e.target.value)}
+                  placeholder="Es. Campionato Invernale 2025"
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                La modalità torneo salverà statistiche aggregate per ogni giocatore attraverso più partite.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setShowTournamentDialog(false);
+                setTournamentMode(false);
+              }}>
+                Annulla
+              </Button>
+              <Button onClick={handleStartTournament}>
+                Avvia Torneo
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
       </div>
     </div>
   );
