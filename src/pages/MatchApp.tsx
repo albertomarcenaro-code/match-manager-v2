@@ -6,6 +6,7 @@ import { MatchHeader } from '@/components/match/MatchHeader';
 import { TimerControls } from '@/components/match/TimerControls';
 import { TeamPanel } from '@/components/match/TeamPanel';
 import { StarterSelection } from '@/components/match/StarterSelection';
+import { EventTimeline } from '@/components/match/EventTimeline';
 import { Footer } from '@/components/layout/Footer';
 
 const MatchApp = () => {
@@ -113,6 +114,7 @@ const MatchApp = () => {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             <div className="lg:col-span-8 space-y-4">
+              {/* Timer Controls - always visible */}
               <TimerControls
                 state={state}
                 onStartPeriod={startPeriod}
@@ -122,7 +124,9 @@ const MatchApp = () => {
                 onEndMatch={endMatch}
                 onUndo={undoLastEvent}
               />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              
+              {/* Team Panels - side-by-side on all screens including mobile */}
+              <div className="grid grid-cols-2 gap-2 md:gap-4">
                 <TeamPanel
                   teamName={state.homeTeam.name}
                   players={state.homeTeam.players}
@@ -152,6 +156,15 @@ const MatchApp = () => {
                   onAddPlayer={(name, number) => addPlayerToMatch('away', name, number)}
                 />
               </div>
+            </div>
+            
+            {/* Event Timeline / Match Chronicle */}
+            <div className="lg:col-span-4">
+              <EventTimeline 
+                events={state.events}
+                homeTeamName={state.homeTeam.name}
+                awayTeamName={state.awayTeam.name}
+              />
             </div>
           </div>
         )}
