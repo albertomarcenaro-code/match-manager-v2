@@ -144,6 +144,7 @@ export const useMatch = () => {
   }, []);
 
   const createPlayersWithNumbers = useCallback((count: number) => {
+    // Only create HOME team players - away team is handled separately
     const newHome: Player[] = Array.from({ length: count }, (_, i) => ({
       id: generateId(),
       name: `GIOCATORE ${i + 1}`,
@@ -154,22 +155,11 @@ export const useMatch = () => {
       goals: 0,
       cards: { yellow: 0, red: 0 }
     }));
-    const newAway: Player[] = Array.from({ length: count }, (_, i) => ({
-      id: generateId(),
-      name: `OSPITE ${i + 1}`,
-      number: i + 1,
-      isOnField: false,
-      isStarter: false,
-      isExpelled: false,
-      goals: 0,
-      cards: { yellow: 0, red: 0 }
-    }));
     setState(prev => ({
       ...prev,
-      homeTeam: { ...prev.homeTeam, players: newHome },
-      awayTeam: { ...prev.awayTeam, players: newAway }
+      homeTeam: { ...prev.homeTeam, players: newHome }
     }));
-    toast.success(`Generate formazioni da ${count} giocatori`);
+    toast.success(`Creati ${count} giocatori di casa con numeri progressivi`);
   }, []);
 
   const forceStarterSelection = useCallback(() => {
