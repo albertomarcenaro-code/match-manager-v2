@@ -44,7 +44,11 @@ export default function Tournaments() {
     try {
       const { error } = await supabase
         .from('tournaments')
-        .insert([{ name: newTournamentName.trim(), user_id: user?.id }]);
+        .insert([{ 
+          name: newTournamentName.trim(), 
+          user_id: user?.id,
+          team_name: 'La mia squadra' // Required field with default value
+        }]);
       if (error) throw error;
       toast.success("Torneo creato!");
       setNewTournamentName('');

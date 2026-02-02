@@ -1,9 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
-import { MatchState, Player, TeamType, CardType } from '../types/match';
+import { MatchState, Player, TeamType, CardType, MatchEvent } from '../types/match';
 import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 const STORAGE_KEY = 'match_manager_state';
+
+const createEmptyPlayer = (): Player => ({
+  id: '',
+  name: '',
+  number: null,
+  isOnField: false,
+  isStarter: false,
+  isExpelled: false,
+  goals: 0,
+  cards: { yellow: 0, red: 0 }
+});
 
 const initialState: MatchState = {
   homeTeam: { name: 'Casa', players: [], score: 0 },
@@ -18,6 +29,7 @@ const initialState: MatchState = {
   isMatchStarted: false,
   isMatchEnded: false,
   needsStarterSelection: true,
+  periodScores: [],
 };
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -66,6 +78,7 @@ export const useMatch = () => {
       name: name.toUpperCase(), 
       number: null, 
       isOnField: false, 
+      isStarter: false,
       isExpelled: false, 
       goals: 0, 
       cards: { yellow: 0, red: 0 } 
@@ -104,13 +117,13 @@ export const useMatch = () => {
     }));
   }, []);
 
-  // AGGIUNTA OSPITE SINGOLO (Assicuriamo il nome)
   const addOpponentPlayer = useCallback((number: number) => {
     const newPlayer: Player = {
       id: generateId(),
-      name: `OSPITE ${number}`, // <--- Forza il nome qui
+      name: `OSPITE ${number}`,
       number: number,
       isOnField: false,
+      isStarter: false,
       isExpelled: false,
       goals: 0,
       cards: { yellow: 0, red: 0 }
@@ -130,22 +143,23 @@ export const useMatch = () => {
     toast.success("Squadre scambiate");
   }, []);
 
-  // AUTO-NUMERAZIONE (Correzione nomi generici)
   const createPlayersWithNumbers = useCallback((count: number) => {
-    const newHome = Array.from({ length: count }, (_, i) => ({
+    const newHome: Player[] = Array.from({ length: count }, (_, i) => ({
       id: generateId(),
       name: `GIOCATORE ${i + 1}`,
       number: i + 1,
       isOnField: false,
+      isStarter: false,
       isExpelled: false,
       goals: 0,
       cards: { yellow: 0, red: 0 }
     }));
-    const newAway = Array.from({ length: count }, (_, i) => ({
+    const newAway: Player[] = Array.from({ length: count }, (_, i) => ({
       id: generateId(),
-      name: `OSPITE ${i + 1}`, // <--- Cambiato da AVVERSARIO a OSPITE per coerenza
+      name: `OSPITE ${i + 1}`,
       number: i + 1,
       isOnField: false,
+      isStarter: false,
       isExpelled: false,
       goals: 0,
       cards: { yellow: 0, red: 0 }
@@ -171,7 +185,8 @@ export const useMatch = () => {
           ...prev[teamKey],
           players: prev[teamKey].players.map(p => ({
             ...p,
-            isOnField: playerIds.includes(p.id)
+            isOnField: playerIds.includes(p.id),
+            isStarter: playerIds.includes(p.id)
           }))
         }
       };
@@ -182,22 +197,69 @@ export const useMatch = () => {
     setState(prev => ({ ...prev, needsStarterSelection: false }));
   }, []);
 
-  const startPeriod = useCallback(() => {
+  const startPeriod = useCallback((duration?: number) => {
     setState(prev => ({
       ...prev,
       isRunning: true,
       isPaused: false,
       currentPeriod: prev.currentPeriod + 1,
-      isMatchStarted: true
+      isMatchStarted: true,
+      periodDuration: duration ?? prev.periodDuration,
+      elapsedTime: 0
     }));
   }, []);
 
   const pauseTimer = useCallback(() => setState(prev => ({ ...prev, isRunning: false, isPaused: true })), []);
   const resumeTimer = useCallback(() => setState(prev => ({ ...prev, isRunning: true, isPaused: false })), []);
 
+  const endPeriod = useCallback(() => {
+    setState(prev => {
+      const newPeriodScore = {
+        period: prev.currentPeriod,
+        homeScore: prev.homeTeam.score,
+        awayScore: prev.awayTeam.score
+      };
+      return {
+        ...prev,
+        isRunning: false,
+        isPaused: false,
+        periodScores: [...prev.periodScores, newPeriodScore],
+        needsStarterSelection: prev.currentPeriod < prev.totalPeriods
+      };
+    });
+  }, []);
+
+  const endMatch = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      isRunning: false,
+      isPaused: false,
+      isMatchEnded: true
+    }));
+  }, []);
+
+  const getPlayerById = (playerId: string, team: TeamType): Player | undefined => {
+    const teamData = team === 'home' ? state.homeTeam : state.awayTeam;
+    return teamData.players.find(p => p.id === playerId);
+  };
+
   const recordGoal = useCallback((team: TeamType, playerId: string) => {
     setState(prev => {
       const teamKey = team === 'home' ? 'homeTeam' : 'awayTeam';
+      const player = prev[teamKey].players.find(p => p.id === playerId);
+      const newEvent: MatchEvent = {
+        id: generateId(),
+        type: 'goal',
+        team,
+        playerId,
+        playerName: player?.name,
+        playerNumber: player?.number ?? undefined,
+        timestamp: prev.elapsedTime,
+        period: prev.currentPeriod,
+        homeScore: team === 'home' ? prev.homeTeam.score + 1 : prev.homeTeam.score,
+        awayScore: team === 'away' ? prev.awayTeam.score + 1 : prev.awayTeam.score,
+        description: `⚽ Gol di ${player?.name ?? 'Giocatore'}`
+      };
       return {
         ...prev,
         [teamKey]: {
@@ -205,46 +267,200 @@ export const useMatch = () => {
           score: prev[teamKey].score + 1,
           players: prev[teamKey].players.map(p => p.id === playerId ? { ...p, goals: p.goals + 1 } : p)
         },
-        events: [{ id: generateId(), type: 'goal', team, playerId, timestamp: prev.elapsedTime, period: prev.currentPeriod }, ...prev.events]
+        events: [newEvent, ...prev.events]
       };
     });
   }, []);
 
-  const recordCard = useCallback((team: TeamType, playerId: string, type: CardType) => {
+  const recordOwnGoal = useCallback((team: TeamType, playerId: string) => {
+    setState(prev => {
+      const scoringTeamKey = team === 'home' ? 'awayTeam' : 'homeTeam';
+      const ownTeamKey = team === 'home' ? 'homeTeam' : 'awayTeam';
+      const player = prev[ownTeamKey].players.find(p => p.id === playerId);
+      const newEvent: MatchEvent = {
+        id: generateId(),
+        type: 'own_goal',
+        team,
+        playerId,
+        playerName: player?.name,
+        playerNumber: player?.number ?? undefined,
+        timestamp: prev.elapsedTime,
+        period: prev.currentPeriod,
+        homeScore: team === 'home' ? prev.homeTeam.score : prev.homeTeam.score + 1,
+        awayScore: team === 'away' ? prev.awayTeam.score : prev.awayTeam.score + 1,
+        description: `🔴 Autogol di ${player?.name ?? 'Giocatore'}`
+      };
+      return {
+        ...prev,
+        [scoringTeamKey]: {
+          ...prev[scoringTeamKey],
+          score: prev[scoringTeamKey].score + 1,
+        },
+        events: [newEvent, ...prev.events]
+      };
+    });
+  }, []);
+
+  const recordCard = useCallback((team: TeamType, playerId: string, cardType: CardType) => {
     setState(prev => {
       const teamKey = team === 'home' ? 'homeTeam' : 'awayTeam';
+      const player = prev[teamKey].players.find(p => p.id === playerId);
+      const eventType = cardType === 'yellow' ? 'yellow_card' : 'red_card';
+      const newEvent: MatchEvent = {
+        id: generateId(),
+        type: eventType,
+        team,
+        playerId,
+        playerName: player?.name,
+        playerNumber: player?.number ?? undefined,
+        cardType,
+        timestamp: prev.elapsedTime,
+        period: prev.currentPeriod,
+        description: cardType === 'yellow' 
+          ? `🟨 Ammonizione a ${player?.name ?? 'Giocatore'}`
+          : `🟥 Espulsione di ${player?.name ?? 'Giocatore'}`
+      };
       return {
         ...prev,
         [teamKey]: {
           ...prev[teamKey],
           players: prev[teamKey].players.map(p => {
             if (p.id !== playerId) return p;
-            const newCards = { ...p.cards, [type]: p.cards[type] + 1 };
-            return { ...p, cards: newCards, isExpelled: type === 'red' || newCards.yellow >= 2 };
+            const newCards = { ...p.cards, [cardType]: p.cards[cardType] + 1 };
+            return { ...p, cards: newCards, isExpelled: cardType === 'red' || newCards.yellow >= 2 };
           })
         },
-        events: [{ id: generateId(), type: 'card', team, playerId, cardType: type, timestamp: prev.elapsedTime, period: prev.currentPeriod }, ...prev.events]
+        events: [newEvent, ...prev.events]
       };
     });
   }, []);
 
+  const recordSubstitution = useCallback((team: TeamType, playerOutId: string, playerInId: string) => {
+    setState(prev => {
+      const teamKey = team === 'home' ? 'homeTeam' : 'awayTeam';
+      const playerOut = prev[teamKey].players.find(p => p.id === playerOutId);
+      const playerIn = prev[teamKey].players.find(p => p.id === playerInId);
+      const newEvent: MatchEvent = {
+        id: generateId(),
+        type: 'substitution',
+        team,
+        playerOutId,
+        playerOutName: playerOut?.name,
+        playerOutNumber: playerOut?.number ?? undefined,
+        playerInId,
+        playerInName: playerIn?.name,
+        playerInNumber: playerIn?.number ?? undefined,
+        timestamp: prev.elapsedTime,
+        period: prev.currentPeriod,
+        description: `🔄 ${playerOut?.name ?? '?'} ↔ ${playerIn?.name ?? '?'}`
+      };
+      return {
+        ...prev,
+        [teamKey]: {
+          ...prev[teamKey],
+          players: prev[teamKey].players.map(p => {
+            if (p.id === playerOutId) return { ...p, isOnField: false };
+            if (p.id === playerInId) return { ...p, isOnField: true };
+            return p;
+          })
+        },
+        events: [newEvent, ...prev.events]
+      };
+    });
+  }, []);
+
+  const undoLastEvent = useCallback(() => {
+    setState(prev => {
+      if (prev.events.length === 0) return prev;
+      const lastEvent = prev.events[0];
+      const remainingEvents = prev.events.slice(1);
+      
+      let newState = { ...prev, events: remainingEvents };
+      
+      // Reverse the effect based on event type
+      if (lastEvent.type === 'goal' && lastEvent.playerId) {
+        const teamKey = lastEvent.team === 'home' ? 'homeTeam' : 'awayTeam';
+        newState = {
+          ...newState,
+          [teamKey]: {
+            ...newState[teamKey],
+            score: newState[teamKey].score - 1,
+            players: newState[teamKey].players.map(p => 
+              p.id === lastEvent.playerId ? { ...p, goals: p.goals - 1 } : p
+            )
+          }
+        };
+      }
+      
+      return newState;
+    });
+    toast.success("Ultimo evento annullato");
+  }, []);
+
   const resetMatch = useCallback((keepTeams = false) => {
     if (keepTeams) {
-      setState(prev => ({ ...initialState, homeTeam: { ...prev.homeTeam, score: 0 }, awayTeam: { ...prev.awayTeam, score: 0 } }));
+      setState(prev => ({
+        ...initialState,
+        homeTeam: { ...prev.homeTeam, score: 0, players: prev.homeTeam.players.map(p => ({ ...p, goals: 0, cards: { yellow: 0, red: 0 }, isExpelled: false, isOnField: false, isStarter: false })) },
+        awayTeam: { ...prev.awayTeam, score: 0, players: prev.awayTeam.players.map(p => ({ ...p, goals: 0, cards: { yellow: 0, red: 0 }, isExpelled: false, isOnField: false, isStarter: false })) }
+      }));
     } else {
       setState(initialState);
       localStorage.removeItem(STORAGE_KEY);
     }
   }, []);
 
+  const addPlayerToMatch = useCallback((team: TeamType, name: string, number: number) => {
+    const newPlayer: Player = {
+      id: generateId(),
+      name: name.toUpperCase(),
+      number,
+      isOnField: false,
+      isStarter: false,
+      isExpelled: false,
+      goals: 0,
+      cards: { yellow: 0, red: 0 }
+    };
+    setState(prev => {
+      const teamKey = team === 'home' ? 'homeTeam' : 'awayTeam';
+      return {
+        ...prev,
+        [teamKey]: {
+          ...prev[teamKey],
+          players: [...prev[teamKey].players, newPlayer]
+        }
+      };
+    });
+  }, []);
+
   return {
-    state, setHomeTeamName, setAwayTeamName, addPlayer, setStarters, confirmStarters,
-    startPeriod, pauseTimer, resumeTimer, recordGoal, recordCard, resetMatch, 
-    forceStarterSelection, updatePlayerNumber, removePlayer, addOpponentPlayer, 
-    removeOpponentPlayer, createPlayersWithNumbers, swapTeams,
+    state,
+    setHomeTeamName,
+    setAwayTeamName,
+    addPlayer,
+    setStarters,
+    confirmStarters,
+    startPeriod,
+    pauseTimer,
+    resumeTimer,
+    endPeriod,
+    endMatch,
+    recordGoal,
+    recordOwnGoal,
+    recordCard,
+    recordSubstitution,
+    resetMatch,
+    forceStarterSelection,
+    updatePlayerNumber,
+    removePlayer,
+    addOpponentPlayer,
+    removeOpponentPlayer,
+    createPlayersWithNumbers,
+    swapTeams,
+    undoLastEvent,
+    addPlayerToMatch,
     bulkAddPlayers: (names: string[]) => {
       names.forEach(name => addPlayer(name));
     },
-    undoLastEvent: () => {}, endPeriod: () => {}, endMatch: () => {}, recordOwnGoal: () => {}, recordSubstitution: () => {}
   };
 };

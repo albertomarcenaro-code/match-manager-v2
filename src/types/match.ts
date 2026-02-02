@@ -1,3 +1,6 @@
+export type TeamType = 'home' | 'away';
+export type CardType = 'yellow' | 'red';
+
 export interface Player {
   id: string;
   name: string;
@@ -5,6 +8,8 @@ export interface Player {
   isOnField: boolean;
   isStarter: boolean;
   isExpelled?: boolean;
+  goals: number;
+  cards: { yellow: number; red: number };
 }
 
 export interface Team {
@@ -42,6 +47,7 @@ export interface MatchEvent {
   homeScore?: number;
   awayScore?: number;
   description: string;
+  cardType?: CardType;
 }
 
 export interface PeriodScore {
