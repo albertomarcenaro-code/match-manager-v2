@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMatch } from '@/hooks/useMatch';
 import { RosterSetup } from '@/components/setup/RosterSetup';
@@ -11,8 +11,8 @@ import { Footer } from '@/components/layout/Footer';
 const MatchApp = () => {
   const { id } = useParams();
   const [phase, setPhase] = useState<'setup' | 'match'>('setup');
+  const timerRef = useRef<number | null>(null);
   
-  // 1. ESTRAIAMO TUTTE LE FUNZIONI REALI DALL'HOOK (Quelle che abbiamo appena scritto in useMatch)
   const {
     state, 
     setHomeTeamName, 
@@ -29,12 +29,35 @@ const MatchApp = () => {
     confirmStarters, 
     startPeriod, 
     pauseTimer, 
-    resumeTimer, 
-    recordGoal, 
-    recordCard, 
+    resumeTimer,
+    endPeriod,
+    endMatch,
+    recordGoal,
+    recordOwnGoal,
+    recordCard,
+    recordSubstitution,
     resetMatch, 
-    forceStarterSelection
+    forceStarterSelection,
+    undoLastEvent,
+    addPlayerToMatch
   } = useMatch();
+
+  // Timer effect
+  useEffect(() => {
+    if (state?.isRunning && !state?.isPaused) {
+      timerRef.current = window.setInterval(() => {
+        // Update elapsed time (handled internally by state)
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [state?.isRunning, state?.isPaused]);
 
   const handleRosterComplete = useCallback(() => {
     forceStarterSelection();
@@ -56,7 +79,6 @@ const MatchApp = () => {
             onHomeTeamNameChange={setHomeTeamName}
             onAwayTeamNameChange={setAwayTeamName}
             onComplete={handleRosterComplete}
-            // 2. COLLEGIAMO I PULSANTI ALLE FUNZIONI REALI (Niente più "() => {}")
             onAddPlayer={addPlayer}
             onUpdatePlayerNumber={updatePlayerNumber}
             onRemovePlayer={removePlayer}
@@ -81,6 +103,7 @@ const MatchApp = () => {
           <StarterSelection
             homePlayers={state.homeTeam.players}
             awayPlayers={state.awayTeam.players}
+            period={state.currentPeriod}
             onConfirm={(h, a) => {
               setStarters(h, true);
               setStarters(a, false);
@@ -91,28 +114,42 @@ const MatchApp = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             <div className="lg:col-span-8 space-y-4">
               <TimerControls
-                isRunning={state.isRunning}
-                isPaused={state.isPaused}
-                elapsedTime={state.elapsedTime}
+                state={state}
                 onStartPeriod={startPeriod}
-                onPauseTimer={pauseTimer}
-                onResumeTimer={resumeTimer}
-                isMatchStarted={state.isMatchStarted}
+                onPause={pauseTimer}
+                onResume={resumeTimer}
+                onEndPeriod={endPeriod}
+                onEndMatch={endMatch}
+                onUndo={undoLastEvent}
               />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <TeamPanel
-                  team="home"
-                  name={state.homeTeam.name}
+                  teamName={state.homeTeam.name}
                   players={state.homeTeam.players}
+                  isHome={true}
+                  isRunning={state.isRunning}
+                  events={state.events}
+                  isMatchEnded={state.isMatchEnded}
                   onGoal={(pid) => recordGoal('home', pid)}
-                  onCard={(pid, type) => recordCard('home', pid, type)}
+                  onOwnGoal={(pid) => recordOwnGoal('home', pid)}
+                  onSubstitution={(outId, inId) => recordSubstitution('home', outId, inId)}
+                  onYellowCard={(pid) => recordCard('home', pid, 'yellow')}
+                  onRedCard={(pid) => recordCard('home', pid, 'red')}
+                  onAddPlayer={(name, number) => addPlayerToMatch('home', name, number)}
                 />
                 <TeamPanel
-                  team="away"
-                  name={state.awayTeam.name}
+                  teamName={state.awayTeam.name}
                   players={state.awayTeam.players}
+                  isHome={false}
+                  isRunning={state.isRunning}
+                  events={state.events}
+                  isMatchEnded={state.isMatchEnded}
                   onGoal={(pid) => recordGoal('away', pid)}
-                  onCard={(pid, type) => recordCard('away', pid, type)}
+                  onOwnGoal={(pid) => recordOwnGoal('away', pid)}
+                  onSubstitution={(outId, inId) => recordSubstitution('away', outId, inId)}
+                  onYellowCard={(pid) => recordCard('away', pid, 'yellow')}
+                  onRedCard={(pid) => recordCard('away', pid, 'red')}
+                  onAddPlayer={(name, number) => addPlayerToMatch('away', name, number)}
                 />
               </div>
             </div>
