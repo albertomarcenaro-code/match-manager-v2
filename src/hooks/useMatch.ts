@@ -22,7 +22,7 @@ const initialState: MatchState = {
   events: [],
   currentPeriod: 0,
   totalPeriods: 2,
-  periodDuration: 25,
+  periodDuration: 15, // Default to 15 minutes
   elapsedTime: 0,
   isRunning: false,
   isPaused: false,
@@ -196,6 +196,13 @@ export const useMatch = () => {
       isMatchStarted: true,
       periodDuration: duration ?? prev.periodDuration,
       elapsedTime: 0
+    }));
+  }, []);
+
+  const updateElapsedTime = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      elapsedTime: prev.elapsedTime + 1
     }));
   }, []);
 
@@ -449,6 +456,7 @@ export const useMatch = () => {
     swapTeams,
     undoLastEvent,
     addPlayerToMatch,
+    updateElapsedTime,
     bulkAddPlayers: (names: string[]) => {
       names.forEach(name => addPlayer(name));
     },

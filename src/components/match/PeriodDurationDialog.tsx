@@ -56,7 +56,8 @@ export function PeriodDurationDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-xs">
+      {/* Position dialog higher on mobile to avoid keyboard overlap */}
+      <DialogContent className="max-w-xs top-[15%] translate-y-0 sm:top-[50%] sm:-translate-y-1/2">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
@@ -88,7 +89,7 @@ export function PeriodDurationDialog({
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="pb-safe">
           <Button variant="outline" onClick={onClose}>
             Annulla
           </Button>
