@@ -7,6 +7,9 @@ import { TimerControls } from '@/components/match/TimerControls';
 import { TeamPanel } from '@/components/match/TeamPanel';
 import { StarterSelection } from '@/components/match/StarterSelection';
 import { EventTimeline } from '@/components/match/EventTimeline';
+import { ExportButton } from '@/components/match/ExportButton';
+import { PDFExportButton } from '@/components/match/PDFExportButton';
+import { WhatsAppShareButton } from '@/components/match/WhatsAppShareButton';
 import { Footer } from '@/components/layout/Footer';
 
 const MatchApp = () => {
@@ -40,14 +43,15 @@ const MatchApp = () => {
     resetMatch, 
     forceStarterSelection,
     undoLastEvent,
-    addPlayerToMatch
+    addPlayerToMatch,
+    updateElapsedTime
   } = useMatch();
 
-  // Timer effect
+  // Timer effect - updates elapsed time every second when running
   useEffect(() => {
     if (state?.isRunning && !state?.isPaused) {
       timerRef.current = window.setInterval(() => {
-        // Update elapsed time (handled internally by state)
+        updateElapsedTime();
       }, 1000);
     } else {
       if (timerRef.current) {
@@ -58,7 +62,7 @@ const MatchApp = () => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [state?.isRunning, state?.isPaused]);
+  }, [state?.isRunning, state?.isPaused, updateElapsedTime]);
 
   const handleRosterComplete = useCallback(() => {
     forceStarterSelection();
@@ -159,12 +163,26 @@ const MatchApp = () => {
             </div>
             
             {/* Event Timeline / Match Chronicle */}
-            <div className="lg:col-span-4">
+            <div className="lg:col-span-4 space-y-4">
               <EventTimeline 
                 events={state.events}
                 homeTeamName={state.homeTeam.name}
                 awayTeamName={state.awayTeam.name}
               />
+              
+              {/* Export Buttons - visible when match is ended or paused */}
+              {(state.isMatchEnded || state.isPaused) && state.isMatchStarted && (
+                <div className="bg-card rounded-xl shadow-card p-4 space-y-3">
+                  <h3 className="text-sm font-semibold text-center text-muted-foreground">
+                    {state.isMatchEnded ? 'Esporta Report' : 'Azioni Rapide'}
+                  </h3>
+                  <div className="flex flex-col gap-2">
+                    <PDFExportButton state={state} />
+                    <ExportButton state={state} />
+                    <WhatsAppShareButton state={state} />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
