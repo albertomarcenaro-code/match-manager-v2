@@ -23,6 +23,13 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
     return `${mins}'${secs.toString().padStart(2, '0')}"`;
   };
 
+  // Format time played in seconds to MM:SS string
+  const formatMinutesPlayed = (totalSeconds: number) => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   /**
    * Calculate minutes played per period using the IN/OUT interval system.
    * - player_in event marks when a player enters the field
@@ -66,8 +73,9 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         if (event.type === 'player_out' && event.team === team && event.playerId) {
           const entryTime = playerEntryTime[event.playerId];
           if (entryTime !== null && entryTime !== undefined) {
-            const intervalMinutes = Math.floor((event.timestamp - entryTime) / 60);
-            minutes[event.playerId][period] += intervalMinutes;
+            // Store seconds for precision
+            const intervalSeconds = event.timestamp - entryTime;
+            minutes[event.playerId][period] += intervalSeconds;
             playerEntryTime[event.playerId] = null;
           }
         }
@@ -78,8 +86,9 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
           if (event.playerOutId) {
             const entryTime = playerEntryTime[event.playerOutId];
             if (entryTime !== null && entryTime !== undefined) {
-              const intervalMinutes = Math.floor((event.timestamp - entryTime) / 60);
-              minutes[event.playerOutId][period] += intervalMinutes;
+              // Store seconds for precision
+              const intervalSeconds = event.timestamp - entryTime;
+              minutes[event.playerOutId][period] += intervalSeconds;
             }
             playerEntryTime[event.playerOutId] = null;
           }
@@ -93,8 +102,9 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         if (event.type === 'red_card' && event.team === team && event.playerId) {
           const entryTime = playerEntryTime[event.playerId];
           if (entryTime !== null && entryTime !== undefined) {
-            const intervalMinutes = Math.floor((event.timestamp - entryTime) / 60);
-            minutes[event.playerId][period] += intervalMinutes;
+            // Store seconds for precision
+            const intervalSeconds = event.timestamp - entryTime;
+            minutes[event.playerId][period] += intervalSeconds;
           }
           playerEntryTime[event.playerId] = null;
         }
@@ -275,7 +285,7 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
       .filter(p => p.number !== null)
       .sort((a, b) => (a.number || 0) - (b.number || 0))
       .map(p => {
-        const mins = homeMinutes[p.id] || { total: 0 };
+        const secs = homeMinutes[p.id] || { total: 0 };
         const pStats = homeStats[p.id] || { goals: 0, yellowCards: 0, redCards: 0 };
         
         // Full name without truncation
@@ -285,10 +295,10 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         ];
         
         for (let i = 1; i <= periodsPlayed; i++) {
-          row.push((mins[i] || 0).toString());
+          row.push(formatMinutesPlayed(secs[i] || 0));
         }
         
-        row.push(mins.total.toString());
+        row.push(formatMinutesPlayed(secs.total));
         row.push(pStats.goals > 0 ? pStats.goals.toString() : '');
         
         let cards = '';
@@ -337,7 +347,7 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
       .filter(p => p.number !== null)
       .sort((a, b) => (a.number || 0) - (b.number || 0))
       .map(p => {
-        const mins = awayMinutes[p.id] || { total: 0 };
+        const secs = awayMinutes[p.id] || { total: 0 };
         const pStats = awayStats[p.id] || { goals: 0, yellowCards: 0, redCards: 0 };
         
         // Full name without truncation
@@ -348,10 +358,10 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         ];
         
         for (let i = 1; i <= periodsPlayed; i++) {
-          row.push((mins[i] || 0).toString());
+          row.push(formatMinutesPlayed(secs[i] || 0));
         }
         
-        row.push(mins.total.toString());
+        row.push(formatMinutesPlayed(secs.total));
         row.push(pStats.goals > 0 ? pStats.goals.toString() : '');
         
         let cards = '';
