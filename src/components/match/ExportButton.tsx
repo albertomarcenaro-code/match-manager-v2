@@ -15,9 +15,17 @@ interface PlayerMinutes {
 }
 
 export function ExportButton({ state }: ExportButtonProps) {
+  // Format time as MM:SS for all displays
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Format time played in seconds to MM:SS string
+  const formatMinutesPlayed = (totalSeconds: number) => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
@@ -64,8 +72,9 @@ export function ExportButton({ state }: ExportButtonProps) {
         if (event.type === 'player_out' && event.team === team && event.playerId) {
           const entryTime = playerEntryTime[event.playerId];
           if (entryTime !== null && entryTime !== undefined) {
-            const intervalMinutes = Math.floor((event.timestamp - entryTime) / 60);
-            minutes[event.playerId][period] += intervalMinutes;
+            // Store seconds for precision (not floored to minutes)
+            const intervalSeconds = event.timestamp - entryTime;
+            minutes[event.playerId][period] += intervalSeconds;
             playerEntryTime[event.playerId] = null;
           }
         }
@@ -76,8 +85,9 @@ export function ExportButton({ state }: ExportButtonProps) {
           if (event.playerOutId) {
             const entryTime = playerEntryTime[event.playerOutId];
             if (entryTime !== null && entryTime !== undefined) {
-              const intervalMinutes = Math.floor((event.timestamp - entryTime) / 60);
-              minutes[event.playerOutId][period] += intervalMinutes;
+              // Store seconds for precision
+              const intervalSeconds = event.timestamp - entryTime;
+              minutes[event.playerOutId][period] += intervalSeconds;
             }
             playerEntryTime[event.playerOutId] = null;
           }
@@ -91,8 +101,9 @@ export function ExportButton({ state }: ExportButtonProps) {
         if (event.type === 'red_card' && event.team === team && event.playerId) {
           const entryTime = playerEntryTime[event.playerId];
           if (entryTime !== null && entryTime !== undefined) {
-            const intervalMinutes = Math.floor((event.timestamp - entryTime) / 60);
-            minutes[event.playerId][period] += intervalMinutes;
+            // Store seconds for precision
+            const intervalSeconds = event.timestamp - entryTime;
+            minutes[event.playerId][period] += intervalSeconds;
           }
           playerEntryTime[event.playerId] = null;
         }
@@ -236,7 +247,7 @@ export function ExportButton({ state }: ExportButtonProps) {
     for (let i = 1; i <= periodsPlayed; i++) {
       periodHeaders.push(`T${i}`);
     }
-    periodHeaders.push('Minuti Totali');
+    periodHeaders.push('Tempo Totale');
 
     homeSheet.addRow([state.homeTeam.name]);
     homeSheet.getRow(1).font = { bold: true, size: 12 };
@@ -246,17 +257,17 @@ export function ExportButton({ state }: ExportButtonProps) {
     state.homeTeam.players
       .filter(p => p.number !== null)
       .forEach(p => {
-        const mins = homeMinutes[p.id] || { total: 0 };
-        const periodMins = [];
+        const secs = homeMinutes[p.id] || { total: 0 };
+        const periodTimes = [];
         for (let i = 1; i <= periodsPlayed; i++) {
-          periodMins.push(mins[i] || 0);
+          periodTimes.push(formatMinutesPlayed(secs[i] || 0));
         }
         homeSheet.addRow([
           p.number,
           p.name,
           p.isExpelled ? 'Espulso' : (p.isOnField ? 'In Campo' : 'Panchina'),
-          ...periodMins,
-          mins.total
+          ...periodTimes,
+          formatMinutesPlayed(secs.total)
         ]);
       });
 
@@ -272,17 +283,17 @@ export function ExportButton({ state }: ExportButtonProps) {
     state.awayTeam.players
       .filter(p => p.number !== null)
       .forEach(p => {
-        const mins = awayMinutes[p.id] || { total: 0 };
-        const periodMins = [];
+        const secs = awayMinutes[p.id] || { total: 0 };
+        const periodTimes = [];
         for (let i = 1; i <= periodsPlayed; i++) {
-          periodMins.push(mins[i] || 0);
+          periodTimes.push(formatMinutesPlayed(secs[i] || 0));
         }
         awaySheet.addRow([
           p.number,
           p.name || `#${p.number}`,
           p.isExpelled ? 'Espulso' : (p.isOnField ? 'In Campo' : 'Panchina'),
-          ...periodMins,
-          mins.total
+          ...periodTimes,
+          formatMinutesPlayed(secs.total)
         ]);
       });
 
