@@ -261,10 +261,20 @@ export const useMatch = () => {
 
   const endPeriod = useCallback(() => {
     setState(prev => {
+      // Calculate period score as delta from previous period
+      let prevHomeScore = 0;
+      let prevAwayScore = 0;
+      
+      if (prev.periodScores.length > 0) {
+        const lastPeriodScore = prev.periodScores[prev.periodScores.length - 1];
+        prevHomeScore = lastPeriodScore.homeScore;
+        prevAwayScore = lastPeriodScore.awayScore;
+      }
+      
       const newPeriodScore = {
         period: prev.currentPeriod,
-        homeScore: prev.homeTeam.score,
-        awayScore: prev.awayTeam.score
+        homeScore: prev.homeTeam.score - prevHomeScore,
+        awayScore: prev.awayTeam.score - prevAwayScore
       };
 
       // Create player_out events for all players on field (close their time intervals)
