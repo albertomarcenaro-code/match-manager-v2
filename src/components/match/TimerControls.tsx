@@ -144,11 +144,25 @@ export function TimerControls({
               <AlertDialogTitle>Terminare la partita?</AlertDialogTitle>
               <AlertDialogDescription>
                 La partita verrà conclusa con il punteggio finale: {state.homeTeam.score} - {state.awayTeam.score}
+                {state.isRunning && (
+                  <span className="block mt-2 text-muted-foreground">
+                    Il tempo corrente verrà automaticamente concluso.
+                  </span>
+                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Annulla</AlertDialogCancel>
-              <AlertDialogAction onClick={onEndMatch} className="bg-destructive hover:bg-destructive/90">
+              <AlertDialogAction 
+                onClick={() => {
+                  // If period is running, end it first, then end match
+                  if (state.isRunning) {
+                    onEndPeriod();
+                  }
+                  onEndMatch();
+                }} 
+                className="bg-destructive hover:bg-destructive/90"
+              >
                 Termina partita
               </AlertDialogAction>
             </AlertDialogFooter>

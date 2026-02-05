@@ -65,7 +65,9 @@ export function TeamPanel({
   const onFieldPlayers = players.filter(p => p.isOnField && !p.isExpelled);
   const benchPlayers = players.filter(p => !p.isOnField && !p.isExpelled);
   const expelledPlayers = players.filter(p => p.isExpelled);
-  const availableForSubstitution = benchPlayers; // Already excludes expelled players
+  // Only players with assigned jersey numbers can enter the field
+  const availableForSubstitution = benchPlayers.filter(p => p.number !== null);
+  
 
   // Get performance stats for a player
   const getPlayerStats = (playerId: string) => {
