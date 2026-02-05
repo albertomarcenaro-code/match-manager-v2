@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Player } from '@/types/match';
 import { Plus, Trash2, Users, Shield, Check, Hash, Upload, Save, ArrowLeftRight, Trophy, ChevronUp, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { playerSchema, validateOrThrow } from '@/lib/validations';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTournament } from '@/hooks/useTournament';
@@ -250,18 +251,21 @@ export function RosterSetup({
 
     try {
       for (const e of entries) {
-        const dbId = dbPlayerIdsByName[e.name];
+        // Validate player data before database operation
+        const validatedPlayer = validateOrThrow(playerSchema, { name: e.name, number: e.number });
+        
+        const dbId = dbPlayerIdsByName[validatedPlayer.name];
 
         if (dbId) {
           const { error } = await supabase
             .from('players')
-            .update({ number: e.number })
+            .update({ number: validatedPlayer.number })
             .eq('id', dbId);
           if (error) throw error;
         } else {
           const { data, error } = await supabase
             .from('players')
-            .insert({ user_id: user.id, name: e.name, number: e.number })
+            .insert({ user_id: user.id, name: validatedPlayer.name, number: validatedPlayer.number })
             .select('id, name');
 
           if (error) throw error;
