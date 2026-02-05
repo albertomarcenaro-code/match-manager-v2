@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Json } from '@/integrations/supabase/types';
+import { tournamentSchema, tournamentMatchSchema, tournamentPlayersArraySchema, validateOrThrow } from '@/lib/validations';
 
 const TOURNAMENT_STORAGE_KEY = 'tournament-state';
 
@@ -230,6 +231,10 @@ export function useTournament() {
 
     if (user && !isGuest) {
       try {
+        // Validate tournament data before database operation
+        const validatedTournament = validateOrThrow(tournamentSchema, { name, team_name: teamName });
+        const validatedPlayers = validateOrThrow(tournamentPlayersArraySchema, tournamentPlayers);
+
         // Deactivate all other tournaments for this user
         await supabase
           .from('tournaments')
@@ -240,9 +245,9 @@ export function useTournament() {
           .from('tournaments')
           .insert({
             user_id: user.id,
-            name,
-            team_name: teamName,
-            players: JSON.parse(JSON.stringify(tournamentPlayers)) as Json,
+            name: validatedTournament.name,
+            team_name: validatedTournament.team_name,
+            players: JSON.parse(JSON.stringify(validatedPlayers)) as Json,
             is_active: true,
           })
           .select()
@@ -255,6 +260,7 @@ export function useTournament() {
         }
       } catch (error) {
         console.error('Failed to save tournament to database:', error);
+        toast.error('Errore nella validazione dei dati del torneo');
       }
     }
 
@@ -341,15 +347,23 @@ export function useTournament() {
 
     if (user && !isGuest && dbTournamentId) {
       try {
+        // Validate match data before database operation
+        const validatedMatch = validateOrThrow(tournamentMatchSchema, {
+          home_team_name: homeTeamName,
+          away_team_name: awayTeamName,
+          home_score: homeScore,
+          away_score: awayScore,
+        });
+
         const { data, error } = await supabase
           .from('tournament_matches')
           .insert({
             tournament_id: dbTournamentId,
             user_id: user.id,
-            home_team_name: homeTeamName,
-            away_team_name: awayTeamName,
-            home_score: homeScore,
-            away_score: awayScore,
+            home_team_name: validatedMatch.home_team_name,
+            away_team_name: validatedMatch.away_team_name,
+            home_score: validatedMatch.home_score,
+            away_score: validatedMatch.away_score,
             player_stats: JSON.parse(JSON.stringify(playerStats)) as Json,
             events: JSON.parse(JSON.stringify(events)) as Json,
             period_scores: JSON.parse(JSON.stringify(periodScores)) as Json,
@@ -369,7 +383,7 @@ export function useTournament() {
         }
       } catch (error) {
         console.error('Failed to save match to database:', error);
-        toast.error('Partita salvata localmente');
+        toast.error('Errore nella validazione dei dati della partita');
       }
     }
 
