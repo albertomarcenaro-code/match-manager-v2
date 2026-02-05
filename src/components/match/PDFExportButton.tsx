@@ -229,15 +229,15 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
       doc.setFont('helvetica', 'italic');
       doc.text('Nessun tempo completato', centerX, y, { align: 'center' });
       y += 4;
-    } else {
-      state.periodScores.forEach((ps) => {
-        const homeScorers = getGoalScorers('home', ps.period);
-        const awayScorers = getGoalScorers('away', ps.period);
-        
-        // Period score centered
-        let text = `${ps.period}° TEMPO: ${ps.homeScore} - ${ps.awayScore}`;
-        doc.text(text, centerX, y, { align: 'center' });
-        y += 3;
+     } else {
+       state.periodScores.forEach((ps) => {
+         const homeScorers = getGoalScorers('home', ps.period);
+         const awayScorers = getGoalScorers('away', ps.period);
+         
+         // Period score centered - displays the DELTA (partial) score
+         let text = `${ps.period}° TEMPO: ${ps.homeScore} - ${ps.awayScore}`;
+         doc.text(text, centerX, y, { align: 'center' });
+         y += 3;
         
         // Scorers: home left-aligned, away right-aligned
         if (homeScorers.length > 0 || awayScorers.length > 0) {
