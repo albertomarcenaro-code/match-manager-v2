@@ -80,7 +80,7 @@ export default function Tournaments() {
         <div className="space-y-3">
           {loading ? <p>Caricamento...</p> : tournaments.map((t) => (
             <Card key={t.id} className="p-4 flex items-center justify-between">
-              <div className="flex-1 cursor-pointer" onClick={() => navigate(`/tournament/${t.id}`)}>
+              <div className="flex-1 cursor-pointer" onClick={() => navigate(`/tournaments/${t.id}`)}>
                 <h3 className="font-bold">{t.name}</h3>
               </div>
               <ChevronRight className="text-muted-foreground" />

@@ -70,6 +70,14 @@ const App = () => (
               } 
             />
             <Route 
+              path="/tournaments/:tournamentId" 
+              element={
+                <TournamentProtectedRoute>
+                  <Tournaments />
+                </TournamentProtectedRoute>
+              } 
+            />
+            <Route 
               path="/tournament-archive" 
               element={
                 <TournamentProtectedRoute>
