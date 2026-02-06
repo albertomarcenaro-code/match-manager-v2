@@ -10,6 +10,9 @@ export interface Player {
   isExpelled?: boolean;
   goals: number;
   cards: { yellow: number; red: number };
+  // Playtime tracking using timestamp/delta system
+  currentEntryTime: number | null; // timestamp when player entered field (null if not on field)
+  totalSecondsPlayed: number; // accumulated playtime in seconds
 }
 
 export interface Team {

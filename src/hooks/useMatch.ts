@@ -13,7 +13,9 @@ const createEmptyPlayer = (): Player => ({
   isStarter: false,
   isExpelled: false,
   goals: 0,
-  cards: { yellow: 0, red: 0 }
+  cards: { yellow: 0, red: 0 },
+  currentEntryTime: null,
+  totalSecondsPlayed: 0
 });
 
 const initialState: MatchState = {
@@ -81,7 +83,9 @@ export const useMatch = () => {
       isStarter: false,
       isExpelled: false, 
       goals: 0, 
-      cards: { yellow: 0, red: 0 } 
+      cards: { yellow: 0, red: 0 },
+      currentEntryTime: null,
+      totalSecondsPlayed: 0
     };
     setState(prev => ({
       ...prev,
@@ -126,7 +130,9 @@ export const useMatch = () => {
       isStarter: false,
       isExpelled: false,
       goals: 0,
-      cards: { yellow: 0, red: 0 }
+      cards: { yellow: 0, red: 0 },
+      currentEntryTime: null,
+      totalSecondsPlayed: 0
     };
     setState(prev => ({
       ...prev,
@@ -153,7 +159,9 @@ export const useMatch = () => {
       isStarter: false,
       isExpelled: false,
       goals: 0,
-      cards: { yellow: 0, red: 0 }
+      cards: { yellow: 0, red: 0 },
+      currentEntryTime: null,
+      totalSecondsPlayed: 0
     }));
     setState(prev => ({
       ...prev,
@@ -190,6 +198,7 @@ export const useMatch = () => {
   const startPeriod = useCallback((duration?: number) => {
     setState(prev => {
       const newPeriod = prev.currentPeriod + 1;
+      const periodStartTimestamp = Date.now(); // Capture the exact start time
       const homeStarters = prev.homeTeam.players.filter(p => p.isOnField && !p.isExpelled);
       const awayStarters = prev.awayTeam.players.filter(p => p.isOnField && !p.isExpelled);
       
@@ -236,6 +245,19 @@ export const useMatch = () => {
         ...prev.events
       ];
 
+      // Set currentEntryTime for all starters (playtime tracking)
+      const starterIds = new Set([...homeStarters.map(p => p.id), ...awayStarters.map(p => p.id)]);
+      
+      const updatedHomePlayers = prev.homeTeam.players.map(p => ({
+        ...p,
+        currentEntryTime: starterIds.has(p.id) ? periodStartTimestamp : p.currentEntryTime
+      }));
+      
+      const updatedAwayPlayers = prev.awayTeam.players.map(p => ({
+        ...p,
+        currentEntryTime: starterIds.has(p.id) ? periodStartTimestamp : p.currentEntryTime
+      }));
+
       return {
         ...prev,
         isRunning: true,
@@ -244,7 +266,9 @@ export const useMatch = () => {
         isMatchStarted: true,
         periodDuration: duration ?? prev.periodDuration,
         elapsedTime: 0,
-        events: newEvents
+        events: newEvents,
+        homeTeam: { ...prev.homeTeam, players: updatedHomePlayers },
+        awayTeam: { ...prev.awayTeam, players: updatedAwayPlayers }
       };
     });
   }, []);
@@ -261,6 +285,8 @@ export const useMatch = () => {
 
   const endPeriod = useCallback(() => {
     setState(prev => {
+      const periodEndTimestamp = Date.now(); // Capture the exact end time
+      
       // Calculate period score as delta from previous period
       let prevHomeScore = 0;
       let prevAwayScore = 0;
@@ -325,13 +351,40 @@ export const useMatch = () => {
         ...prev.events
       ];
 
+      // Calculate and add playtime for all players on field, then reset currentEntryTime
+      const updatedHomePlayers = prev.homeTeam.players.map(p => {
+        if (p.isOnField && p.currentEntryTime !== null) {
+          const addedSeconds = Math.floor((periodEndTimestamp - p.currentEntryTime) / 1000);
+          return {
+            ...p,
+            totalSecondsPlayed: p.totalSecondsPlayed + addedSeconds,
+            currentEntryTime: null
+          };
+        }
+        return { ...p, currentEntryTime: null };
+      });
+
+      const updatedAwayPlayers = prev.awayTeam.players.map(p => {
+        if (p.isOnField && p.currentEntryTime !== null) {
+          const addedSeconds = Math.floor((periodEndTimestamp - p.currentEntryTime) / 1000);
+          return {
+            ...p,
+            totalSecondsPlayed: p.totalSecondsPlayed + addedSeconds,
+            currentEntryTime: null
+          };
+        }
+        return { ...p, currentEntryTime: null };
+      });
+
       return {
         ...prev,
         isRunning: false,
         isPaused: false,
         periodScores: [...prev.periodScores, newPeriodScore],
         needsStarterSelection: prev.currentPeriod < prev.totalPeriods,
-        events: newEvents
+        events: newEvents,
+        homeTeam: { ...prev.homeTeam, players: updatedHomePlayers },
+        awayTeam: { ...prev.awayTeam, players: updatedAwayPlayers }
       };
     });
   }, []);
@@ -444,6 +497,7 @@ export const useMatch = () => {
 
   const recordSubstitution = useCallback((team: TeamType, playerOutId: string, playerInId: string) => {
     setState(prev => {
+      const substitutionTimestamp = Date.now(); // Capture exact substitution time
       const teamKey = team === 'home' ? 'homeTeam' : 'awayTeam';
       const playerOut = prev[teamKey].players.find(p => p.id === playerOutId);
       const playerIn = prev[teamKey].players.find(p => p.id === playerInId);
@@ -461,15 +515,37 @@ export const useMatch = () => {
         period: prev.currentPeriod,
         description: `🔄 ${playerOut?.name ?? '?'} ↔ ${playerIn?.name ?? '?'}`
       };
+      
+      // Update playtime for player out and set entry time for player in
+      const updatedPlayers = prev[teamKey].players.map(p => {
+        if (p.id === playerOutId) {
+          // Player OUT: Calculate added time and reset entry time
+          const addedSeconds = p.currentEntryTime !== null 
+            ? Math.floor((substitutionTimestamp - p.currentEntryTime) / 1000) 
+            : 0;
+          return { 
+            ...p, 
+            isOnField: false, 
+            totalSecondsPlayed: p.totalSecondsPlayed + addedSeconds,
+            currentEntryTime: null 
+          };
+        }
+        if (p.id === playerInId) {
+          // Player IN: Set current entry time
+          return { 
+            ...p, 
+            isOnField: true, 
+            currentEntryTime: substitutionTimestamp 
+          };
+        }
+        return p;
+      });
+      
       return {
         ...prev,
         [teamKey]: {
           ...prev[teamKey],
-          players: prev[teamKey].players.map(p => {
-            if (p.id === playerOutId) return { ...p, isOnField: false };
-            if (p.id === playerInId) return { ...p, isOnField: true };
-            return p;
-          })
+          players: updatedPlayers
         },
         events: [newEvent, ...prev.events]
       };
@@ -508,8 +584,8 @@ export const useMatch = () => {
     if (keepTeams) {
       setState(prev => ({
         ...initialState,
-        homeTeam: { ...prev.homeTeam, score: 0, players: prev.homeTeam.players.map(p => ({ ...p, goals: 0, cards: { yellow: 0, red: 0 }, isExpelled: false, isOnField: false, isStarter: false })) },
-        awayTeam: { ...prev.awayTeam, score: 0, players: prev.awayTeam.players.map(p => ({ ...p, goals: 0, cards: { yellow: 0, red: 0 }, isExpelled: false, isOnField: false, isStarter: false })) }
+        homeTeam: { ...prev.homeTeam, score: 0, players: prev.homeTeam.players.map(p => ({ ...p, goals: 0, cards: { yellow: 0, red: 0 }, isExpelled: false, isOnField: false, isStarter: false, currentEntryTime: null, totalSecondsPlayed: 0 })) },
+        awayTeam: { ...prev.awayTeam, score: 0, players: prev.awayTeam.players.map(p => ({ ...p, goals: 0, cards: { yellow: 0, red: 0 }, isExpelled: false, isOnField: false, isStarter: false, currentEntryTime: null, totalSecondsPlayed: 0 })) }
       }));
     } else {
       setState(initialState);
@@ -526,7 +602,9 @@ export const useMatch = () => {
       isStarter: false,
       isExpelled: false,
       goals: 0,
-      cards: { yellow: 0, red: 0 }
+      cards: { yellow: 0, red: 0 },
+      currentEntryTime: null,
+      totalSecondsPlayed: 0
     };
     setState(prev => {
       const teamKey = team === 'home' ? 'homeTeam' : 'awayTeam';
