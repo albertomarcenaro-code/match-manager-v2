@@ -285,8 +285,11 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
       .filter(p => p.number !== null)
       .sort((a, b) => (a.number || 0) - (b.number || 0))
       .map(p => {
-        const secs = homeMinutes[p.id] || { total: 0 };
+        const eventBasedSecs = homeMinutes[p.id] || { total: 0 };
         const pStats = homeStats[p.id] || { goals: 0, yellowCards: 0, redCards: 0 };
+        
+        // Use direct player tracking for total, event-based for per-period
+        const totalSeconds = p.totalSecondsPlayed || 0;
         
         // Full name without truncation
         const row: string[] = [
@@ -295,10 +298,10 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         ];
         
         for (let i = 1; i <= periodsPlayed; i++) {
-          row.push(formatMinutesPlayed(secs[i] || 0));
+          row.push(formatMinutesPlayed(eventBasedSecs[i] || 0));
         }
         
-        row.push(formatMinutesPlayed(secs.total));
+        row.push(formatMinutesPlayed(totalSeconds > 0 ? totalSeconds : eventBasedSecs.total));
         row.push(pStats.goals > 0 ? pStats.goals.toString() : '');
         
         let cards = '';
@@ -347,8 +350,11 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
       .filter(p => p.number !== null)
       .sort((a, b) => (a.number || 0) - (b.number || 0))
       .map(p => {
-        const secs = awayMinutes[p.id] || { total: 0 };
+        const eventBasedSecs = awayMinutes[p.id] || { total: 0 };
         const pStats = awayStats[p.id] || { goals: 0, yellowCards: 0, redCards: 0 };
+        
+        // Use direct player tracking for total, event-based for per-period
+        const totalSeconds = p.totalSecondsPlayed || 0;
         
         // Full name without truncation
         const displayName = p.name || `#${p.number}`;
@@ -358,10 +364,10 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
         ];
         
         for (let i = 1; i <= periodsPlayed; i++) {
-          row.push(formatMinutesPlayed(secs[i] || 0));
+          row.push(formatMinutesPlayed(eventBasedSecs[i] || 0));
         }
         
-        row.push(formatMinutesPlayed(secs.total));
+        row.push(formatMinutesPlayed(totalSeconds > 0 ? totalSeconds : eventBasedSecs.total));
         row.push(pStats.goals > 0 ? pStats.goals.toString() : '');
         
         let cards = '';

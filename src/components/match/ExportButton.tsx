@@ -257,17 +257,21 @@ export function ExportButton({ state }: ExportButtonProps) {
     state.homeTeam.players
       .filter(p => p.number !== null)
       .forEach(p => {
-        const secs = homeMinutes[p.id] || { total: 0 };
+        // Use the direct totalSecondsPlayed from player object (new timestamp/delta system)
+        const totalSeconds = p.totalSecondsPlayed || 0;
+        const eventBasedSecs = homeMinutes[p.id] || { total: 0 };
+        
+        // Prefer direct player tracking, fall back to event-based for per-period breakdown
         const periodTimes = [];
         for (let i = 1; i <= periodsPlayed; i++) {
-          periodTimes.push(formatMinutesPlayed(secs[i] || 0));
+          periodTimes.push(formatMinutesPlayed(eventBasedSecs[i] || 0));
         }
         homeSheet.addRow([
           p.number,
           p.name,
           p.isExpelled ? 'Espulso' : (p.isOnField ? 'In Campo' : 'Panchina'),
           ...periodTimes,
-          formatMinutesPlayed(secs.total)
+          formatMinutesPlayed(totalSeconds > 0 ? totalSeconds : eventBasedSecs.total)
         ]);
       });
 
@@ -283,17 +287,21 @@ export function ExportButton({ state }: ExportButtonProps) {
     state.awayTeam.players
       .filter(p => p.number !== null)
       .forEach(p => {
-        const secs = awayMinutes[p.id] || { total: 0 };
+        // Use the direct totalSecondsPlayed from player object (new timestamp/delta system)
+        const totalSeconds = p.totalSecondsPlayed || 0;
+        const eventBasedSecs = awayMinutes[p.id] || { total: 0 };
+        
+        // Prefer direct player tracking, fall back to event-based for per-period breakdown
         const periodTimes = [];
         for (let i = 1; i <= periodsPlayed; i++) {
-          periodTimes.push(formatMinutesPlayed(secs[i] || 0));
+          periodTimes.push(formatMinutesPlayed(eventBasedSecs[i] || 0));
         }
         awaySheet.addRow([
           p.number,
           p.name || `#${p.number}`,
           p.isExpelled ? 'Espulso' : (p.isOnField ? 'In Campo' : 'Panchina'),
           ...periodTimes,
-          formatMinutesPlayed(secs.total)
+          formatMinutesPlayed(totalSeconds > 0 ? totalSeconds : eventBasedSecs.total)
         ]);
       });
 

@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Trophy, Plus, Trash2, ChevronRight, Loader2 } from 'lucide-react';
+import { Trophy, Plus, Trash2, ChevronRight, Loader2, Home } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -64,9 +64,19 @@ export default function Tournaments() {
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
       <main className="flex-1 p-4 max-w-2xl mx-auto w-full pt-8">
-        <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
-          <Trophy className="text-yellow-500" /> I Tuoi Tornei
-        </h1>
+        <div className="flex items-center gap-4 mb-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/')}
+            title="Torna alla Home"
+          >
+            <Home className="h-5 w-5" />
+          </Button>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Trophy className="text-yellow-500" /> I Tuoi Tornei
+          </h1>
+        </div>
         <div className="flex gap-2 mb-8">
           <Input 
             placeholder="Nome nuovo torneo..." 

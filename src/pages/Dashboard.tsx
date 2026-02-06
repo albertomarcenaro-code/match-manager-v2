@@ -76,13 +76,13 @@ export default function Dashboard() {
             </Button>
           </Card>
 
-          {/* Box Nuova Partita Rapida */}
+          {/* Box Nuova Partita Singola */}
           <Card className="p-6 flex flex-col items-center text-center gap-4 hover:shadow-lg transition-shadow border-2 border-transparent hover:border-primary/20">
             <div className="p-4 bg-primary/10 rounded-full">
               <Plus className="h-8 w-8 text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-bold">Partita Rapida</h2>
+              <h2 className="text-xl font-bold">Partita Singola</h2>
               <p className="text-sm text-muted-foreground">Avvia subito una partita singola senza torneo.</p>
             </div>
             <Button onClick={handleQuickMatch} variant="outline" className="w-full">

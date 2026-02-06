@@ -4,14 +4,14 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Player } from '@/types/match';
-import { Plus, Trash2, Users, Shield, Check, Hash, Upload, Save, ArrowLeftRight, Trophy, ChevronUp, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, Users, Shield, Check, Hash, Upload, Save, ArrowLeftRight, Trophy, ChevronUp, ChevronRight, Home } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { playerSchema, validateOrThrow } from '@/lib/validations';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTournament } from '@/hooks/useTournament';
 import { supabase } from '@/integrations/supabase/client';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
@@ -73,6 +73,7 @@ export function RosterSetup({
   const { user, isGuest } = useAuth();
   const { tournament, startTournament } = useTournament();
   const location = useLocation();
+  const navigate = useNavigate();
   const navState = location.state as { mode?: string } | null;
   const isSingleMatchMode = navState?.mode === 'single';
    
@@ -589,8 +590,17 @@ export function RosterSetup({
   return (
     <div className="min-h-screen bg-background p-4 pb-24">
       <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="text-center py-6">
+        {/* Header with Home button */}
+        <div className="relative text-center py-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute left-0 top-6"
+            onClick={() => navigate('/')}
+            title="Torna alla Home"
+          >
+            <Home className="h-5 w-5" />
+          </Button>
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/10 text-secondary mb-4">
             {isTournamentMode ? <Trophy className="h-5 w-5" /> : <Shield className="h-5 w-5" />}
             <span className="font-semibold">{pageTitle}</span>
