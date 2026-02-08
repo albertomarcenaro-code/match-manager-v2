@@ -15,7 +15,8 @@ const createEmptyPlayer = (): Player => ({
   goals: 0,
   cards: { yellow: 0, red: 0 },
   currentEntryTime: null,
-  totalSecondsPlayed: 0
+  totalSecondsPlayed: 0,
+  secondsPlayedPerPeriod: {}
 });
 
 const initialState: MatchState = {
@@ -32,6 +33,10 @@ const initialState: MatchState = {
   isMatchEnded: false,
   needsStarterSelection: true,
   periodScores: [],
+  // Timestamp-delta timer system
+  periodStartTimestamp: null,
+  accumulatedPauseTime: 0,
+  pauseStartTimestamp: null,
 };
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -85,7 +90,8 @@ export const useMatch = () => {
       goals: 0, 
       cards: { yellow: 0, red: 0 },
       currentEntryTime: null,
-      totalSecondsPlayed: 0
+      totalSecondsPlayed: 0,
+      secondsPlayedPerPeriod: {}
     };
     setState(prev => ({
       ...prev,
@@ -132,7 +138,8 @@ export const useMatch = () => {
       goals: 0,
       cards: { yellow: 0, red: 0 },
       currentEntryTime: null,
-      totalSecondsPlayed: 0
+      totalSecondsPlayed: 0,
+      secondsPlayedPerPeriod: {}
     };
     setState(prev => ({
       ...prev,
@@ -161,7 +168,8 @@ export const useMatch = () => {
       goals: 0,
       cards: { yellow: 0, red: 0 },
       currentEntryTime: null,
-      totalSecondsPlayed: 0
+      totalSecondsPlayed: 0,
+      secondsPlayedPerPeriod: {}
     }));
     setState(prev => ({
       ...prev,
@@ -268,24 +276,58 @@ export const useMatch = () => {
         elapsedTime: 0,
         events: newEvents,
         homeTeam: { ...prev.homeTeam, players: updatedHomePlayers },
-        awayTeam: { ...prev.awayTeam, players: updatedAwayPlayers }
+        awayTeam: { ...prev.awayTeam, players: updatedAwayPlayers },
+        // Timestamp-delta timer system
+        periodStartTimestamp: periodStartTimestamp,
+        accumulatedPauseTime: 0,
+        pauseStartTimestamp: null,
       };
     });
   }, []);
 
+  // Timestamp-delta timer: Calculate elapsed time from timestamps (fixes background freezing)
   const updateElapsedTime = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      elapsedTime: prev.elapsedTime + 1
-    }));
+    setState(prev => {
+      if (!prev.isRunning || prev.isPaused || prev.periodStartTimestamp === null) {
+        return prev;
+      }
+      
+      const now = Date.now();
+      const totalElapsedMs = now - prev.periodStartTimestamp - prev.accumulatedPauseTime;
+      const elapsedSeconds = Math.floor(totalElapsedMs / 1000);
+      
+      return {
+        ...prev,
+        elapsedTime: Math.max(0, elapsedSeconds)
+      };
+    });
   }, []);
 
-  const pauseTimer = useCallback(() => setState(prev => ({ ...prev, isRunning: false, isPaused: true })), []);
-  const resumeTimer = useCallback(() => setState(prev => ({ ...prev, isRunning: true, isPaused: false })), []);
+  const pauseTimer = useCallback(() => setState(prev => ({ 
+    ...prev, 
+    isRunning: false, 
+    isPaused: true,
+    pauseStartTimestamp: Date.now() // Record when pause started
+  })), []);
+  
+  const resumeTimer = useCallback(() => setState(prev => {
+    const pauseDuration = prev.pauseStartTimestamp 
+      ? Date.now() - prev.pauseStartTimestamp 
+      : 0;
+    
+    return { 
+      ...prev, 
+      isRunning: true, 
+      isPaused: false,
+      accumulatedPauseTime: prev.accumulatedPauseTime + pauseDuration,
+      pauseStartTimestamp: null
+    };
+  }), []);
 
   const endPeriod = useCallback(() => {
     setState(prev => {
       const periodEndTimestamp = Date.now(); // Capture the exact end time
+      const currentPeriod = prev.currentPeriod;
       
       // Calculate period score as delta from previous period
       let prevHomeScore = 0;
@@ -298,7 +340,7 @@ export const useMatch = () => {
       }
       
       const newPeriodScore = {
-        period: prev.currentPeriod,
+        period: currentPeriod,
         homeScore: prev.homeTeam.score - prevHomeScore,
         awayScore: prev.awayTeam.score - prevAwayScore
       };
@@ -315,7 +357,7 @@ export const useMatch = () => {
         playerName: p.name,
         playerNumber: p.number ?? undefined,
         timestamp: prev.elapsedTime,
-        period: prev.currentPeriod,
+        period: currentPeriod,
         description: `Fine tempo: ${p.name}`
       }));
 
@@ -327,7 +369,7 @@ export const useMatch = () => {
         playerName: p.name,
         playerNumber: p.number ?? undefined,
         timestamp: prev.elapsedTime,
-        period: prev.currentPeriod,
+        period: currentPeriod,
         description: `Fine tempo: ${p.name}`
       }));
 
@@ -337,10 +379,10 @@ export const useMatch = () => {
         type: 'period_end',
         team: 'home',
         timestamp: prev.elapsedTime,
-        period: prev.currentPeriod,
+        period: currentPeriod,
         homeScore: prev.homeTeam.score,
         awayScore: prev.awayTeam.score,
-        description: `--- FINE ${prev.currentPeriod}° TEMPO - Parziale: ${prev.homeTeam.score}-${prev.awayTeam.score} ---`
+        description: `--- FINE ${currentPeriod}° TEMPO - Parziale: ${prev.homeTeam.score}-${prev.awayTeam.score} ---`
       };
 
       // Events are stored newest-first
@@ -352,12 +394,17 @@ export const useMatch = () => {
       ];
 
       // Calculate and add playtime for all players on field, then reset currentEntryTime
+      // Also update per-period stats
       const updatedHomePlayers = prev.homeTeam.players.map(p => {
         if (p.isOnField && p.currentEntryTime !== null) {
           const addedSeconds = Math.floor((periodEndTimestamp - p.currentEntryTime) / 1000);
+          const updatedPerPeriod = { ...p.secondsPlayedPerPeriod };
+          updatedPerPeriod[currentPeriod] = (updatedPerPeriod[currentPeriod] || 0) + addedSeconds;
+          
           return {
             ...p,
             totalSecondsPlayed: p.totalSecondsPlayed + addedSeconds,
+            secondsPlayedPerPeriod: updatedPerPeriod,
             currentEntryTime: null
           };
         }
@@ -367,9 +414,13 @@ export const useMatch = () => {
       const updatedAwayPlayers = prev.awayTeam.players.map(p => {
         if (p.isOnField && p.currentEntryTime !== null) {
           const addedSeconds = Math.floor((periodEndTimestamp - p.currentEntryTime) / 1000);
+          const updatedPerPeriod = { ...p.secondsPlayedPerPeriod };
+          updatedPerPeriod[currentPeriod] = (updatedPerPeriod[currentPeriod] || 0) + addedSeconds;
+          
           return {
             ...p,
             totalSecondsPlayed: p.totalSecondsPlayed + addedSeconds,
+            secondsPlayedPerPeriod: updatedPerPeriod,
             currentEntryTime: null
           };
         }
@@ -381,10 +432,14 @@ export const useMatch = () => {
         isRunning: false,
         isPaused: false,
         periodScores: [...prev.periodScores, newPeriodScore],
-        needsStarterSelection: prev.currentPeriod < prev.totalPeriods,
+        needsStarterSelection: currentPeriod < prev.totalPeriods,
         events: newEvents,
         homeTeam: { ...prev.homeTeam, players: updatedHomePlayers },
-        awayTeam: { ...prev.awayTeam, players: updatedAwayPlayers }
+        awayTeam: { ...prev.awayTeam, players: updatedAwayPlayers },
+        // Reset timer state for next period
+        periodStartTimestamp: null,
+        accumulatedPauseTime: 0,
+        pauseStartTimestamp: null,
       };
     });
   }, []);
@@ -394,7 +449,10 @@ export const useMatch = () => {
       ...prev,
       isRunning: false,
       isPaused: false,
-      isMatchEnded: true
+      isMatchEnded: true,
+      periodStartTimestamp: null,
+      accumulatedPauseTime: 0,
+      pauseStartTimestamp: null,
     }));
   }, []);
 
@@ -498,6 +556,7 @@ export const useMatch = () => {
   const recordSubstitution = useCallback((team: TeamType, playerOutId: string, playerInId: string) => {
     setState(prev => {
       const substitutionTimestamp = Date.now(); // Capture exact substitution time
+      const currentPeriod = prev.currentPeriod;
       const teamKey = team === 'home' ? 'homeTeam' : 'awayTeam';
       const playerOut = prev[teamKey].players.find(p => p.id === playerOutId);
       const playerIn = prev[teamKey].players.find(p => p.id === playerInId);
@@ -512,7 +571,7 @@ export const useMatch = () => {
         playerInName: playerIn?.name,
         playerInNumber: playerIn?.number ?? undefined,
         timestamp: prev.elapsedTime,
-        period: prev.currentPeriod,
+        period: currentPeriod,
         description: `🔄 ${playerOut?.name ?? '?'} ↔ ${playerIn?.name ?? '?'}`
       };
       
@@ -523,10 +582,14 @@ export const useMatch = () => {
           const addedSeconds = p.currentEntryTime !== null 
             ? Math.floor((substitutionTimestamp - p.currentEntryTime) / 1000) 
             : 0;
+          const updatedPerPeriod = { ...p.secondsPlayedPerPeriod };
+          updatedPerPeriod[currentPeriod] = (updatedPerPeriod[currentPeriod] || 0) + addedSeconds;
+          
           return { 
             ...p, 
             isOnField: false, 
             totalSecondsPlayed: p.totalSecondsPlayed + addedSeconds,
+            secondsPlayedPerPeriod: updatedPerPeriod,
             currentEntryTime: null 
           };
         }
@@ -584,8 +647,8 @@ export const useMatch = () => {
     if (keepTeams) {
       setState(prev => ({
         ...initialState,
-        homeTeam: { ...prev.homeTeam, score: 0, players: prev.homeTeam.players.map(p => ({ ...p, goals: 0, cards: { yellow: 0, red: 0 }, isExpelled: false, isOnField: false, isStarter: false, currentEntryTime: null, totalSecondsPlayed: 0 })) },
-        awayTeam: { ...prev.awayTeam, score: 0, players: prev.awayTeam.players.map(p => ({ ...p, goals: 0, cards: { yellow: 0, red: 0 }, isExpelled: false, isOnField: false, isStarter: false, currentEntryTime: null, totalSecondsPlayed: 0 })) }
+        homeTeam: { ...prev.homeTeam, score: 0, players: prev.homeTeam.players.map(p => ({ ...p, goals: 0, cards: { yellow: 0, red: 0 }, isExpelled: false, isOnField: false, isStarter: false, currentEntryTime: null, totalSecondsPlayed: 0, secondsPlayedPerPeriod: {} })) },
+        awayTeam: { ...prev.awayTeam, score: 0, players: prev.awayTeam.players.map(p => ({ ...p, goals: 0, cards: { yellow: 0, red: 0 }, isExpelled: false, isOnField: false, isStarter: false, currentEntryTime: null, totalSecondsPlayed: 0, secondsPlayedPerPeriod: {} })) }
       }));
     } else {
       setState(initialState);
@@ -604,7 +667,8 @@ export const useMatch = () => {
       goals: 0,
       cards: { yellow: 0, red: 0 },
       currentEntryTime: null,
-      totalSecondsPlayed: 0
+      totalSecondsPlayed: 0,
+      secondsPlayedPerPeriod: {}
     };
     setState(prev => {
       const teamKey = team === 'home' ? 'homeTeam' : 'awayTeam';

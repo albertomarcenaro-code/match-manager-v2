@@ -1,17 +1,10 @@
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
-import { MatchState, MatchEvent } from '@/types/match';
+import { MatchState } from '@/types/match';
 import ExcelJS from 'exceljs';
 
 interface ExportButtonProps {
   state: MatchState;
-}
-
-interface PlayerMinutes {
-  [playerId: string]: {
-    [period: number]: number;
-    total: number;
-  };
 }
 
 export function ExportButton({ state }: ExportButtonProps) {
@@ -29,100 +22,13 @@ export function ExportButton({ state }: ExportButtonProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  /**
-   * Calculate minutes played per period using the IN/OUT interval system.
-   * - player_in event marks when a player enters the field
-   * - player_out event marks when a player leaves the field
-   * - substitution events also create implicit IN/OUT
-   * - Each period is tracked independently with exact intervals
-   */
-  const calculatePlayerMinutes = (team: 'home' | 'away', periodsPlayed: number): PlayerMinutes => {
-    const minutes: PlayerMinutes = {};
-    const players = team === 'home' ? state.homeTeam.players : state.awayTeam.players;
-    
-    // Initialize all players with 0 for each period
-    players.forEach(p => {
-      minutes[p.id] = { total: 0 };
-      for (let i = 1; i <= periodsPlayed; i++) {
-        minutes[p.id][i] = 0;
-      }
-    });
-
-    // Process each period independently
-    for (let period = 1; period <= periodsPlayed; period++) {
-      const periodEvents = state.events.filter(e => e.period === period);
-      const periodEnd = periodEvents.find(e => e.type === 'period_end');
-      
-      // Period duration in seconds
-      const periodDurationSeconds = periodEnd 
-        ? periodEnd.timestamp 
-        : (period === state.currentPeriod ? state.elapsedTime : state.periodDuration * 60);
-
-      // Track intervals for each player: entry time when they went on field
-      const playerEntryTime: { [id: string]: number | null } = {};
-
-      // Process all events in chronological order
-      periodEvents.forEach(event => {
-        // Player enters field
-        if (event.type === 'player_in' && event.team === team && event.playerId) {
-          playerEntryTime[event.playerId] = event.timestamp;
-        }
-        
-        // Player leaves field
-        if (event.type === 'player_out' && event.team === team && event.playerId) {
-          const entryTime = playerEntryTime[event.playerId];
-          if (entryTime !== null && entryTime !== undefined) {
-            // Store seconds for precision (not floored to minutes)
-            const intervalSeconds = event.timestamp - entryTime;
-            minutes[event.playerId][period] += intervalSeconds;
-            playerEntryTime[event.playerId] = null;
-          }
-        }
-        
-        // Substitution: playerOut leaves, playerIn enters
-        if (event.type === 'substitution' && event.team === team) {
-          // Player going out
-          if (event.playerOutId) {
-            const entryTime = playerEntryTime[event.playerOutId];
-            if (entryTime !== null && entryTime !== undefined) {
-              // Store seconds for precision
-              const intervalSeconds = event.timestamp - entryTime;
-              minutes[event.playerOutId][period] += intervalSeconds;
-            }
-            playerEntryTime[event.playerOutId] = null;
-          }
-          // Player coming in
-          if (event.playerInId) {
-            playerEntryTime[event.playerInId] = event.timestamp;
-          }
-        }
-        
-        // Red card: player leaves field immediately
-        if (event.type === 'red_card' && event.team === team && event.playerId) {
-          const entryTime = playerEntryTime[event.playerId];
-          if (entryTime !== null && entryTime !== undefined) {
-            // Store seconds for precision
-            const intervalSeconds = event.timestamp - entryTime;
-            minutes[event.playerId][period] += intervalSeconds;
-          }
-          playerEntryTime[event.playerId] = null;
-        }
-      });
-
-      // Note: player_out events at period end already close all intervals
-      // So we don't need to calculate remaining time here
+  // Get per-period playtime directly from player object (no need to recalculate from events)
+  const getPlayerPerPeriodMinutes = (player: MatchState['homeTeam']['players'][0], periodsPlayed: number) => {
+    const periodTimes: number[] = [];
+    for (let i = 1; i <= periodsPlayed; i++) {
+      periodTimes.push(player.secondsPlayedPerPeriod?.[i] || 0);
     }
-
-    // Calculate totals
-    Object.keys(minutes).forEach(id => {
-      let total = 0;
-      for (let i = 1; i <= periodsPlayed; i++) {
-        total += minutes[id][i] || 0;
-      }
-      minutes[id].total = total;
-    });
-
-    return minutes;
+    return periodTimes;
   };
 
   const getScorersForPeriod = (period: number): { home: string; away: string } => {
@@ -161,13 +67,29 @@ export function ExportButton({ state }: ExportButtonProps) {
     };
   };
 
+  // Get starters for a period
+  const getStartersForPeriod = (period: number): { home: string[]; away: string[] } => {
+    const periodStartEvents = state.events.filter(
+      e => e.type === 'player_in' && e.period === period && e.timestamp === 0
+    );
+    
+    const homeStarters = periodStartEvents
+      .filter(e => e.team === 'home')
+      .map(e => e.playerName?.split('(')[0].trim() || `#${e.playerNumber}`)
+      .filter(Boolean);
+    
+    const awayStarters = periodStartEvents
+      .filter(e => e.team === 'away')
+      .map(e => e.playerName?.split('(')[0].trim() || `#${e.playerNumber}`)
+      .filter(Boolean);
+    
+    return { home: homeStarters, away: awayStarters };
+  };
+
   const handleExport = async () => {
     const periodsPlayed = state.periodScores.length > 0 
       ? Math.max(...state.periodScores.map(ps => ps.period))
       : state.currentPeriod;
-
-    const homeMinutes = calculatePlayerMinutes('home', periodsPlayed);
-    const awayMinutes = calculatePlayerMinutes('away', periodsPlayed);
 
     // Create workbook
     const workbook = new ExcelJS.Workbook();
@@ -185,15 +107,38 @@ export function ExportButton({ state }: ExportButtonProps) {
     summarySheet.addRow(['PUNTEGGI PARZIALI']);
     summarySheet.addRow(['Tempo', 'Punteggio', `Marcatori ${state.homeTeam.name}`, `Marcatori ${state.awayTeam.name}`]);
     
-    state.periodScores.forEach(ps => {
-      const scorers = getScorersForPeriod(ps.period);
+    // Ensure all periods are shown, even with 0-0 scores
+    for (let period = 1; period <= periodsPlayed; period++) {
+      const ps = state.periodScores.find(p => p.period === period);
+      const homeScore = ps?.homeScore ?? 0;
+      const awayScore = ps?.awayScore ?? 0;
+      const scorers = getScorersForPeriod(period);
+      const starters = getStartersForPeriod(period);
+      
+      // Period score row
       summarySheet.addRow([
-        `${ps.period}° Tempo`,
-        `${ps.homeScore} - ${ps.awayScore}`,
+        `${period}° Tempo`,
+        `${homeScore} - ${awayScore}`,
         scorers.home,
         scorers.away
       ]);
-    });
+      
+      // Starters rows (separate lines for home and away)
+      if (starters.home.length > 0 || starters.away.length > 0) {
+        summarySheet.addRow([
+          '',
+          'Titolari Casa:',
+          starters.home.join(', ') || '-',
+          ''
+        ]);
+        summarySheet.addRow([
+          '',
+          'Titolari Ospiti:',
+          '',
+          starters.away.join(', ') || '-'
+        ]);
+      }
+    }
 
     // Style the header
     summarySheet.getRow(1).font = { bold: true, size: 14 };
@@ -257,21 +202,16 @@ export function ExportButton({ state }: ExportButtonProps) {
     state.homeTeam.players
       .filter(p => p.number !== null)
       .forEach(p => {
-        // Use the direct totalSecondsPlayed from player object (new timestamp/delta system)
+        // Use direct per-period tracking from player object
+        const periodTimes = getPlayerPerPeriodMinutes(p, periodsPlayed).map(formatMinutesPlayed);
         const totalSeconds = p.totalSecondsPlayed || 0;
-        const eventBasedSecs = homeMinutes[p.id] || { total: 0 };
         
-        // Prefer direct player tracking, fall back to event-based for per-period breakdown
-        const periodTimes = [];
-        for (let i = 1; i <= periodsPlayed; i++) {
-          periodTimes.push(formatMinutesPlayed(eventBasedSecs[i] || 0));
-        }
         homeSheet.addRow([
           p.number,
           p.name,
           p.isExpelled ? 'Espulso' : (p.isOnField ? 'In Campo' : 'Panchina'),
           ...periodTimes,
-          formatMinutesPlayed(totalSeconds > 0 ? totalSeconds : eventBasedSecs.total)
+          formatMinutesPlayed(totalSeconds)
         ]);
       });
 
@@ -287,21 +227,16 @@ export function ExportButton({ state }: ExportButtonProps) {
     state.awayTeam.players
       .filter(p => p.number !== null)
       .forEach(p => {
-        // Use the direct totalSecondsPlayed from player object (new timestamp/delta system)
+        // Use direct per-period tracking from player object
+        const periodTimes = getPlayerPerPeriodMinutes(p, periodsPlayed).map(formatMinutesPlayed);
         const totalSeconds = p.totalSecondsPlayed || 0;
-        const eventBasedSecs = awayMinutes[p.id] || { total: 0 };
         
-        // Prefer direct player tracking, fall back to event-based for per-period breakdown
-        const periodTimes = [];
-        for (let i = 1; i <= periodsPlayed; i++) {
-          periodTimes.push(formatMinutesPlayed(eventBasedSecs[i] || 0));
-        }
         awaySheet.addRow([
           p.number,
           p.name || `#${p.number}`,
           p.isExpelled ? 'Espulso' : (p.isOnField ? 'In Campo' : 'Panchina'),
           ...periodTimes,
-          formatMinutesPlayed(totalSeconds > 0 ? totalSeconds : eventBasedSecs.total)
+          formatMinutesPlayed(totalSeconds)
         ]);
       });
 
