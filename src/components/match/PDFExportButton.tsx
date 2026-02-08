@@ -8,12 +8,7 @@ interface PDFExportButtonProps {
   state: MatchState;
 }
 
-interface PlayerMinutes {
-  [playerId: string]: {
-    [period: number]: number;
-    total: number;
-  };
-}
+// Note: PlayerMinutes interface removed since we now use direct player.secondsPlayedPerPeriod
 
 export function PDFExportButton({ state }: PDFExportButtonProps) {
   // Format time as mm'ss" always including seconds
@@ -30,100 +25,13 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  /**
-   * Calculate minutes played per period using the IN/OUT interval system.
-   * - player_in event marks when a player enters the field
-   * - player_out event marks when a player leaves the field
-   * - substitution events also create implicit IN/OUT
-   * - Each period is tracked independently with exact intervals
-   */
-  const calculatePlayerMinutes = (team: 'home' | 'away', periodsPlayed: number): PlayerMinutes => {
-    const minutes: PlayerMinutes = {};
-    const players = team === 'home' ? state.homeTeam.players : state.awayTeam.players;
-    
-    // Initialize all players with 0 for each period
-    players.forEach(p => {
-      minutes[p.id] = { total: 0 };
-      for (let i = 1; i <= periodsPlayed; i++) {
-        minutes[p.id][i] = 0;
-      }
-    });
-
-    // Process each period independently
-    for (let period = 1; period <= periodsPlayed; period++) {
-      const periodEvents = state.events.filter(e => e.period === period);
-      const periodEnd = periodEvents.find(e => e.type === 'period_end');
-      
-      // Period duration in seconds
-      const periodDurationSeconds = periodEnd 
-        ? periodEnd.timestamp 
-        : (period === state.currentPeriod ? state.elapsedTime : state.periodDuration * 60);
-
-      // Track intervals for each player: entry time when they went on field
-      const playerEntryTime: { [id: string]: number | null } = {};
-
-      // Process all events in chronological order
-      periodEvents.forEach(event => {
-        // Player enters field
-        if (event.type === 'player_in' && event.team === team && event.playerId) {
-          playerEntryTime[event.playerId] = event.timestamp;
-        }
-        
-        // Player leaves field
-        if (event.type === 'player_out' && event.team === team && event.playerId) {
-          const entryTime = playerEntryTime[event.playerId];
-          if (entryTime !== null && entryTime !== undefined) {
-            // Store seconds for precision
-            const intervalSeconds = event.timestamp - entryTime;
-            minutes[event.playerId][period] += intervalSeconds;
-            playerEntryTime[event.playerId] = null;
-          }
-        }
-        
-        // Substitution: playerOut leaves, playerIn enters
-        if (event.type === 'substitution' && event.team === team) {
-          // Player going out
-          if (event.playerOutId) {
-            const entryTime = playerEntryTime[event.playerOutId];
-            if (entryTime !== null && entryTime !== undefined) {
-              // Store seconds for precision
-              const intervalSeconds = event.timestamp - entryTime;
-              minutes[event.playerOutId][period] += intervalSeconds;
-            }
-            playerEntryTime[event.playerOutId] = null;
-          }
-          // Player coming in
-          if (event.playerInId) {
-            playerEntryTime[event.playerInId] = event.timestamp;
-          }
-        }
-        
-        // Red card: player leaves field immediately
-        if (event.type === 'red_card' && event.team === team && event.playerId) {
-          const entryTime = playerEntryTime[event.playerId];
-          if (entryTime !== null && entryTime !== undefined) {
-            // Store seconds for precision
-            const intervalSeconds = event.timestamp - entryTime;
-            minutes[event.playerId][period] += intervalSeconds;
-          }
-          playerEntryTime[event.playerId] = null;
-        }
-      });
-
-      // Note: player_out events at period end already close all intervals
-      // So we don't need to calculate remaining time here
+  // Get per-period playtime directly from player object (no need to recalculate from events)
+  const getPlayerPerPeriodMinutes = (player: MatchState['homeTeam']['players'][0], periodsPlayed: number) => {
+    const periodTimes: number[] = [];
+    for (let i = 1; i <= periodsPlayed; i++) {
+      periodTimes.push(player.secondsPlayedPerPeriod?.[i] || 0);
     }
-
-    // Calculate totals
-    Object.keys(minutes).forEach(id => {
-      let total = 0;
-      for (let i = 1; i <= periodsPlayed; i++) {
-        total += minutes[id][i] || 0;
-      }
-      minutes[id].total = total;
-    });
-
-    return minutes;
+    return periodTimes;
   };
 
   const getPlayerStats = (team: 'home' | 'away') => {
@@ -183,11 +91,6 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
       ? Math.max(...state.periodScores.map(ps => ps.period))
       : state.currentPeriod;
 
-    const homeMinutes = calculatePlayerMinutes('home', periodsPlayed);
-    const awayMinutes = calculatePlayerMinutes('away', periodsPlayed);
-    const homeStats = getPlayerStats('home');
-    const awayStats = getPlayerStats('away');
-
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 6;
@@ -225,19 +128,24 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(80, 80, 80);
 
-    if (state.periodScores.length === 0) {
+    if (state.periodScores.length === 0 && periodsPlayed === 0) {
       doc.setFont('helvetica', 'italic');
       doc.text('Nessun tempo completato', centerX, y, { align: 'center' });
       y += 4;
-     } else {
-       state.periodScores.forEach((ps) => {
-         const homeScorers = getGoalScorers('home', ps.period);
-         const awayScorers = getGoalScorers('away', ps.period);
-         
-         // Period score centered - displays the DELTA (partial) score
-         let text = `${ps.period}° TEMPO: ${ps.homeScore} - ${ps.awayScore}`;
-         doc.text(text, centerX, y, { align: 'center' });
-         y += 3;
+    } else {
+      // Show all periods including 0-0 scores
+      for (let period = 1; period <= periodsPlayed; period++) {
+        const ps = state.periodScores.find(p => p.period === period);
+        const homeScore = ps?.homeScore ?? 0;
+        const awayScore = ps?.awayScore ?? 0;
+        const homeScorers = getGoalScorers('home', period);
+        const awayScorers = getGoalScorers('away', period);
+        
+        // Period score centered - displays the DELTA (partial) score
+        // Force "0" to render as string, not treated as falsey
+        const text = `${period}° TEMPO: ${String(homeScore)} - ${String(awayScore)}`;
+        doc.text(text, centerX, y, { align: 'center' });
+        y += 3;
         
         // Scorers: home left-aligned, away right-aligned
         if (homeScorers.length > 0 || awayScorers.length > 0) {
@@ -250,7 +158,7 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
           }
           doc.setFontSize(6);
           y += 3;
-        } else if (ps.homeScore === 0 && ps.awayScore === 0) {
+        } else if (homeScore === 0 && awayScore === 0) {
           doc.setFontSize(5);
           doc.setFont('helvetica', 'italic');
           doc.text('Nessun gol', centerX, y, { align: 'center' });
@@ -258,7 +166,7 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
           doc.setFontSize(6);
           y += 3;
         }
-      });
+      }
     }
     // Separator
     y += 1;
@@ -281,14 +189,13 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
     doc.setTextColor(39, 70, 63);
     doc.text(state.homeTeam.name.toUpperCase(), margin, y);
 
+    const homeStats = getPlayerStats('home');
     const homeRosterData = state.homeTeam.players
       .filter(p => p.number !== null)
       .sort((a, b) => (a.number || 0) - (b.number || 0))
       .map(p => {
-        const eventBasedSecs = homeMinutes[p.id] || { total: 0 };
         const pStats = homeStats[p.id] || { goals: 0, yellowCards: 0, redCards: 0 };
-        
-        // Use direct player tracking for total, event-based for per-period
+        const periodTimes = getPlayerPerPeriodMinutes(p, periodsPlayed);
         const totalSeconds = p.totalSecondsPlayed || 0;
         
         // Full name without truncation
@@ -297,11 +204,11 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
           p.name,
         ];
         
-        for (let i = 1; i <= periodsPlayed; i++) {
-          row.push(formatMinutesPlayed(eventBasedSecs[i] || 0));
+        for (let i = 0; i < periodsPlayed; i++) {
+          row.push(formatMinutesPlayed(periodTimes[i] || 0));
         }
         
-        row.push(formatMinutesPlayed(totalSeconds > 0 ? totalSeconds : eventBasedSecs.total));
+        row.push(formatMinutesPlayed(totalSeconds));
         row.push(pStats.goals > 0 ? pStats.goals.toString() : '');
         
         let cards = '';
@@ -346,14 +253,13 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
     doc.setTextColor(75, 85, 99);
     doc.text(state.awayTeam.name.toUpperCase(), pageWidth / 2 + margin / 2, y);
 
+    const awayStats = getPlayerStats('away');
     const awayRosterData = state.awayTeam.players
       .filter(p => p.number !== null)
       .sort((a, b) => (a.number || 0) - (b.number || 0))
       .map(p => {
-        const eventBasedSecs = awayMinutes[p.id] || { total: 0 };
         const pStats = awayStats[p.id] || { goals: 0, yellowCards: 0, redCards: 0 };
-        
-        // Use direct player tracking for total, event-based for per-period
+        const periodTimes = getPlayerPerPeriodMinutes(p, periodsPlayed);
         const totalSeconds = p.totalSecondsPlayed || 0;
         
         // Full name without truncation
@@ -363,11 +269,11 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
           displayName,
         ];
         
-        for (let i = 1; i <= periodsPlayed; i++) {
-          row.push(formatMinutesPlayed(eventBasedSecs[i] || 0));
+        for (let i = 0; i < periodsPlayed; i++) {
+          row.push(formatMinutesPlayed(periodTimes[i] || 0));
         }
         
-        row.push(formatMinutesPlayed(totalSeconds > 0 ? totalSeconds : eventBasedSecs.total));
+        row.push(formatMinutesPlayed(totalSeconds));
         row.push(pStats.goals > 0 ? pStats.goals.toString() : '');
         
         let cards = '';
@@ -417,7 +323,7 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
       e => e.type !== 'player_in' && e.type !== 'player_out' && e.type !== 'period_start' && e.type !== 'period_end'
     );
 
-    // Add grouped period starts
+    // Add grouped period starts with SEPARATE lines for home and away starters
     const periodStartEvents = state.events.filter(e => e.type === 'period_start');
     periodStartEvents.forEach(pse => {
       const starters = state.events.filter(
@@ -426,10 +332,34 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
       if (starters.length > 0) {
         const homeStarters = starters.filter(e => e.team === 'home').map(e => e.playerName?.split('(')[0].trim()).filter(Boolean);
         const awayStarters = starters.filter(e => e.team === 'away').map(e => e.playerName?.split('(')[0].trim()).filter(Boolean);
+        
+        // Add period start event
         significantEvents.unshift({
           ...pse,
-          description: `Inizio ${pse.period}° tempo - Casa: ${homeStarters.join(', ') || '-'} | Ospiti: ${awayStarters.join(', ') || '-'}`,
+          description: `Inizio ${pse.period}° tempo`,
         });
+        
+        // Add home starters as separate entry
+        if (homeStarters.length > 0) {
+          significantEvents.push({
+            ...pse,
+            id: `${pse.id}-home-starters`,
+            type: 'period_start' as const,
+            team: 'home' as const,
+            description: `Titolari ${state.homeTeam.name}: ${homeStarters.join(', ')}`,
+          });
+        }
+        
+        // Add away starters as separate entry
+        if (awayStarters.length > 0) {
+          significantEvents.push({
+            ...pse,
+            id: `${pse.id}-away-starters`,
+            type: 'period_start' as const,
+            team: 'away' as const,
+            description: `Titolari ${state.awayTeam.name}: ${awayStarters.join(', ')}`,
+          });
+        }
       }
     });
 

@@ -13,6 +13,7 @@ export interface Player {
   // Playtime tracking using timestamp/delta system
   currentEntryTime: number | null; // timestamp when player entered field (null if not on field)
   totalSecondsPlayed: number; // accumulated playtime in seconds
+  secondsPlayedPerPeriod: { [period: number]: number }; // playtime per period for accurate partials
 }
 
 export interface Team {
@@ -66,12 +67,16 @@ export interface MatchState {
   currentPeriod: number;
   periodDuration: number; // in minutes
   totalPeriods: number;
-  elapsedTime: number; // seconds
+  elapsedTime: number; // seconds (calculated from timestamp-delta)
   isRunning: boolean;
   isPaused: boolean;
   isMatchStarted: boolean;
   isMatchEnded: boolean;
   periodScores: PeriodScore[];
   needsStarterSelection: boolean;
+  // Timestamp-delta timer system (fixes background freezing)
+  periodStartTimestamp: number | null; // when the period timer started
+  accumulatedPauseTime: number; // total ms spent paused in current period
+  pauseStartTimestamp: number | null; // when the current pause started (null if not paused)
 }
 
