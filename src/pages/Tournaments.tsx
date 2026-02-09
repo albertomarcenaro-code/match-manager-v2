@@ -27,7 +27,7 @@ export default function Tournaments() {
     try {
       const { data, error } = await supabase
         .from('tournaments')
-        .select('id, name, created_at') // Selezioniamo solo colonne sicure per ora
+        .select('id, name, created_at')
         .order('created_at', { ascending: false });
       if (error) throw error;
       setTournaments(data || []);
@@ -47,7 +47,7 @@ export default function Tournaments() {
         .insert([{ 
           name: newTournamentName.trim(), 
           user_id: user?.id,
-          team_name: 'La mia squadra' // Required field with default value
+          team_name: 'La mia squadra'
         }]);
       if (error) throw error;
       toast.success("Torneo creato!");
@@ -68,7 +68,7 @@ export default function Tournaments() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/dashboard')}
             title="Torna alla Home"
           >
             <Home className="h-5 w-5" />
