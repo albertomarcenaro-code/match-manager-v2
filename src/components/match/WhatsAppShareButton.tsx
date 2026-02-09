@@ -15,31 +15,46 @@ export const WhatsAppShareButton = ({ state }: WhatsAppShareButtonProps) => {
     message += `Parziali:\n`;
 
     // 2. Costruzione dinamica dei tempi con marcatori
-    // Usiamo un array basato sui periodi totali o quelli giocati
-    const totalPeriods = state.totalPeriods || (state.periodScores?.length || 0);
+    // Use periodsPlayed (from periodScores) to show only completed periods
+    const periodsPlayed = state.periodScores?.length || 0;
 
-    for (let i = 1; i <= totalPeriods; i++) {
+    for (let i = 1; i <= periodsPlayed; i++) {
       // Troviamo il punteggio del periodo i-esimo
       const periodScore = state.periodScores?.find(ps => ps.period === i);
-      const scoreText = periodScore ? `${periodScore.homeScore}-${periodScore.awayScore}` : "0-0";
+      
+      // FIXED: Explicitly handle 0 values - use String() to ensure "0" is not treated as falsey
+      const homeScore = periodScore?.homeScore ?? 0;
+      const awayScore = periodScore?.awayScore ?? 0;
+      const scoreText = `${String(homeScore)}-${String(awayScore)}`;
 
-      // Filtriamo i goal di questo tempo e formattiamo: Nome (Squadra)
-      const periodScorers = state.events
-        .filter(e => e.type === 'goal' && e.period === i)
-        .map(e => {
-          const teamName = e.team === 'home' ? state.homeTeam.name : state.awayTeam.name;
-          return `${e.playerName} (${teamName})`;
-        });
+      // FIXED: Filter strictly for confirmed GOAL events only (not own_goal counted twice)
+      const periodGoals = state.events.filter(e => e.type === 'goal' && e.period === i);
+      const periodOwnGoals = state.events.filter(e => e.type === 'own_goal' && e.period === i);
+      
+      // Format regular goals
+      const scorers: string[] = [];
+      periodGoals.forEach(e => {
+        const teamName = e.team === 'home' ? state.homeTeam.name : state.awayTeam.name;
+        scorers.push(`${e.playerName || 'N/D'} (${teamName})`);
+      });
+      
+      // Format own goals - they count for the opposite team
+      periodOwnGoals.forEach(e => {
+        const scoringTeam = e.team === 'home' ? state.awayTeam.name : state.homeTeam.name;
+        scorers.push(`AG ${e.playerName || 'N/D'} (${scoringTeam})`);
+      });
 
       // Raggruppiamo per contare i gol multipli dello stesso giocatore (es: x2)
       const counts: Record<string, number> = {};
-      periodScorers.forEach(s => { counts[s] = (counts[s] || 0) + 1; });
+      scorers.forEach(s => { counts[s] = (counts[s] || 0) + 1; });
       
       const formattedScorers = Object.entries(counts)
         .map(([nameWithTeam, count]) => count > 1 ? `${nameWithTeam} (x${count})` : nameWithTeam)
         .join(', ');
 
-      message += `${i}°T:  ${scoreText}   | ${formattedScorers}\n`;
+      // FIXED: Always show period even if 0-0 with no scorers
+      const scorersText = formattedScorers || '-';
+      message += `${i}°T:  ${scoreText}   | ${scorersText}\n`;
     }
 
     // 3. Chiusura semplice
