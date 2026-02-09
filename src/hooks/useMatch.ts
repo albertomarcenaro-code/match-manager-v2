@@ -303,13 +303,15 @@ export const useMatch = () => {
     });
   }, []);
 
+  // FIXED: Pause should keep isRunning=true but set isPaused=true
+  // This allows the timer to resume correctly without resetting
   const pauseTimer = useCallback(() => setState(prev => ({ 
     ...prev, 
-    isRunning: false, 
     isPaused: true,
     pauseStartTimestamp: Date.now() // Record when pause started
   })), []);
   
+  // FIXED: Resume calculates pause duration and accumulates it
   const resumeTimer = useCallback(() => setState(prev => {
     const pauseDuration = prev.pauseStartTimestamp 
       ? Date.now() - prev.pauseStartTimestamp 
@@ -317,7 +319,6 @@ export const useMatch = () => {
     
     return { 
       ...prev, 
-      isRunning: true, 
       isPaused: false,
       accumulatedPauseTime: prev.accumulatedPauseTime + pauseDuration,
       pauseStartTimestamp: null
@@ -427,12 +428,14 @@ export const useMatch = () => {
         return { ...p, currentEntryTime: null };
       });
 
+      // FIXED: Always set needsStarterSelection = true after ANY period ends
+      // This ensures user is prompted for starters before 2nd, 3rd, 4th periods etc.
       return {
         ...prev,
         isRunning: false,
         isPaused: false,
         periodScores: [...prev.periodScores, newPeriodScore],
-        needsStarterSelection: currentPeriod < prev.totalPeriods,
+        needsStarterSelection: true, // Always require starter selection for next period
         events: newEvents,
         homeTeam: { ...prev.homeTeam, players: updatedHomePlayers },
         awayTeam: { ...prev.awayTeam, players: updatedAwayPlayers },
@@ -560,6 +563,15 @@ export const useMatch = () => {
       const teamKey = team === 'home' ? 'homeTeam' : 'awayTeam';
       const playerOut = prev[teamKey].players.find(p => p.id === playerOutId);
       const playerIn = prev[teamKey].players.find(p => p.id === playerInId);
+      
+      // FIXED: Format substitution description with clear format
+      // Format: 🔄 MIN [MM:SS]: ENTRA [Name In] (#Num) - ESCE [Name Out] (#Num)
+      const mins = Math.floor(prev.elapsedTime / 60);
+      const secs = prev.elapsedTime % 60;
+      const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+      const inNum = playerIn?.number !== null ? `#${playerIn?.number}` : '';
+      const outNum = playerOut?.number !== null ? `#${playerOut?.number}` : '';
+      
       const newEvent: MatchEvent = {
         id: generateId(),
         type: 'substitution',
@@ -572,7 +584,7 @@ export const useMatch = () => {
         playerInNumber: playerIn?.number ?? undefined,
         timestamp: prev.elapsedTime,
         period: currentPeriod,
-        description: `🔄 ${playerOut?.name ?? '?'} ↔ ${playerIn?.name ?? '?'}`
+        description: `🔄 MIN ${timeStr}: ENTRA ${playerIn?.name ?? '?'} (${inNum}) - ESCE ${playerOut?.name ?? '?'} (${outNum})`
       };
       
       // Update playtime for player out and set entry time for player in

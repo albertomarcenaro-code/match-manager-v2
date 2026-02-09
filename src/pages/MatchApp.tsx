@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useMatch } from '@/hooks/useMatch';
 import { RosterSetup } from '@/components/setup/RosterSetup';
 import { MatchHeader } from '@/components/match/MatchHeader';
@@ -11,9 +11,11 @@ import { ExportButton } from '@/components/match/ExportButton';
 import { PDFExportButton } from '@/components/match/PDFExportButton';
 import { WhatsAppShareButton } from '@/components/match/WhatsAppShareButton';
 import { Footer } from '@/components/layout/Footer';
-
+import { Button } from '@/components/ui/button';
+import { Home } from 'lucide-react';
 const MatchApp = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [phase, setPhase] = useState<'setup' | 'match'>('setup');
   const timerRef = useRef<number | null>(null);
   
@@ -102,6 +104,18 @@ const MatchApp = () => {
   // --- FASE DI MATCH ---
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Header with Home button */}
+      <header className="bg-card border-b border-border p-2 flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate('/')}
+          title="Torna alla Home"
+        >
+          <Home className="h-5 w-5" />
+        </Button>
+        <span className="text-sm font-medium text-muted-foreground">Match Manager</span>
+      </header>
       <main className="flex-1 p-4 max-w-6xl mx-auto w-full space-y-4">
         <MatchHeader state={state} />
         {state.needsStarterSelection ? (
