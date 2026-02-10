@@ -330,20 +330,15 @@ export const useMatch = () => {
       const periodEndTimestamp = Date.now(); // Capture the exact end time
       const currentPeriod = prev.currentPeriod;
       
-      // Calculate period score as delta from previous period
-      let prevHomeScore = 0;
-      let prevAwayScore = 0;
-      
-      if (prev.periodScores.length > 0) {
-        const lastPeriodScore = prev.periodScores[prev.periodScores.length - 1];
-        prevHomeScore = lastPeriodScore.homeScore;
-        prevAwayScore = lastPeriodScore.awayScore;
-      }
+      // Calculate period score as delta: goals in THIS period only
+      // Sum all previous period deltas to get cumulative score before this period
+      const cumulativeHomeBefore = prev.periodScores.reduce((sum, ps) => sum + ps.homeScore, 0);
+      const cumulativeAwayBefore = prev.periodScores.reduce((sum, ps) => sum + ps.awayScore, 0);
       
       const newPeriodScore = {
         period: currentPeriod,
-        homeScore: prev.homeTeam.score - prevHomeScore,
-        awayScore: prev.awayTeam.score - prevAwayScore
+        homeScore: prev.homeTeam.score - cumulativeHomeBefore,
+        awayScore: prev.awayTeam.score - cumulativeAwayBefore
       };
 
       // Create player_out events for all players on field (close their time intervals)
