@@ -23,15 +23,12 @@ export default function Dashboard() {
     navigate("/tournaments");
   };
 
-  // FUNZIONE CORRETTA: Crea un ID unico per evitare l'errore 404
-  const handleQuickMatch = () => {
+ const handleQuickMatch = () => {
     localStorage.removeItem('tournament-state'); 
-    
-    // Generiamo un ID temporaneo basato sulla data attuale
     const quickId = "quick-" + Date.now();
     
-    // Navighiamo verso la rotta dinamica che abbiamo impostato in App.tsx
-    navigate(`/match/${quickId}`);
+    // Ora puntiamo alla nuova pagina di setup che gestisce i nomi dei giocatori
+    navigate(`/match-setup/${quickId}`, { state: { mode: 'single' } });
   };
 
   return (
