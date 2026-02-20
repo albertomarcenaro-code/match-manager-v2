@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 
+
 // Importazione pagine
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
@@ -14,6 +15,7 @@ import MatchApp from "./pages/MatchApp";
 import TournamentArchive from "./pages/TournamentArchive";
 import Tournaments from "./pages/Tournaments";
 import NotFound from "./pages/NotFound";
+import MatchSetup from "./pages/MatchSetup";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +52,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/match-setup/:id" element={<ProtectedRoute><MatchSetup /></ProtectedRoute>} />
             
             {/* --- SEZIONE MODIFICATA --- */}
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
