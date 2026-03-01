@@ -46,10 +46,10 @@ export default function MatchSetup() {
           awayPlayers={awayPlayers}
           onHomeTeamNameChange={setHomeTeamName}
           onAwayTeamNameChange={setAwayTeamName}
-          onAddPlayer={(name) => setHomePlayers([...homePlayers, { id: crypto.randomUUID(), name: name.toUpperCase(), number: null }])}
+          onAddPlayer={(name) => setHomePlayers([...homePlayers, { id: crypto.randomUUID(), name: name.toUpperCase(), number: null, isOnField: false, isStarter: false, isExpelled: false, goals: 0, cards: { yellow: 0, red: 0 }, currentEntryTime: null, totalSecondsPlayed: 0, secondsPlayedPerPeriod: {} }])}
           onUpdatePlayerNumber={(pid, num) => setHomePlayers(homePlayers.map(p => p.id === pid ? {...p, number: num} : p))}
           onRemovePlayer={(pid) => setHomePlayers(homePlayers.filter(p => p.id !== pid))}
-          onAddOpponentPlayer={(num) => setAwayPlayers([...awayPlayers, { id: crypto.randomUUID(), name: `AVV ${num}`, number: num }])}
+          onAddOpponentPlayer={(num) => setAwayPlayers([...awayPlayers, { id: crypto.randomUUID(), name: `AVV ${num}`, number: num, isOnField: false, isStarter: false, isExpelled: false, goals: 0, cards: { yellow: 0, red: 0 }, currentEntryTime: null, totalSecondsPlayed: 0, secondsPlayedPerPeriod: {} }])}
           onRemoveOpponentPlayer={(pid) => setAwayPlayers(awayPlayers.filter(p => p.id !== pid))}
           onComplete={handleComplete}
         />
