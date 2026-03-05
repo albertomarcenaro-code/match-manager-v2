@@ -46,11 +46,25 @@ export default function MatchSetup() {
           awayPlayers={awayPlayers}
           onHomeTeamNameChange={setHomeTeamName}
           onAwayTeamNameChange={setAwayTeamName}
-          onAddPlayer={(name) => setHomePlayers([...homePlayers, { id: crypto.randomUUID(), name: name.toUpperCase(), number: null, isOnField: false, isStarter: false, isExpelled: false, goals: 0, cards: { yellow: 0, red: 0 }, currentEntryTime: null, totalSecondsPlayed: 0, secondsPlayedPerPeriod: {} }])}
-          onUpdatePlayerNumber={(pid, num) => setHomePlayers(homePlayers.map(p => p.id === pid ? {...p, number: num} : p))}
-          onRemovePlayer={(pid) => setHomePlayers(homePlayers.filter(p => p.id !== pid))}
-          onAddOpponentPlayer={(num) => setAwayPlayers([...awayPlayers, { id: crypto.randomUUID(), name: `AVV ${num}`, number: num, isOnField: false, isStarter: false, isExpelled: false, goals: 0, cards: { yellow: 0, red: 0 }, currentEntryTime: null, totalSecondsPlayed: 0, secondsPlayedPerPeriod: {} }])}
-          onRemoveOpponentPlayer={(pid) => setAwayPlayers(awayPlayers.filter(p => p.id !== pid))}
+          onAddPlayer={(name) => setHomePlayers(prev => [...prev, { id: crypto.randomUUID(), name: name.toUpperCase(), number: null, isOnField: false, isStarter: false, isExpelled: false, goals: 0, cards: { yellow: 0, red: 0 }, currentEntryTime: null, totalSecondsPlayed: 0, secondsPlayedPerPeriod: {} }])}
+          onUpdatePlayerNumber={(pid, num) => setHomePlayers(prev => prev.map(p => p.id === pid ? {...p, number: num} : p))}
+          onRemovePlayer={(pid) => setHomePlayers(prev => prev.filter(p => p.id !== pid))}
+          onAddOpponentPlayer={(num) => setAwayPlayers(prev => [...prev, { id: crypto.randomUUID(), name: `AVV ${num}`, number: num, isOnField: false, isStarter: false, isExpelled: false, goals: 0, cards: { yellow: 0, red: 0 }, currentEntryTime: null, totalSecondsPlayed: 0, secondsPlayedPerPeriod: {} }])}
+          onRemoveOpponentPlayer={(pid) => setAwayPlayers(prev => prev.filter(p => p.id !== pid))}
+          onAddAwayPlayerFull={(name, number) => setAwayPlayers(prev => [...prev, { id: crypto.randomUUID(), name: name.toUpperCase(), number, isOnField: false, isStarter: false, isExpelled: false, goals: 0, cards: { yellow: 0, red: 0 }, currentEntryTime: null, totalSecondsPlayed: 0, secondsPlayedPerPeriod: {} }])}
+          onUpdateAwayPlayerName={(pid, name) => setAwayPlayers(prev => prev.map(p => p.id === pid ? {...p, name} : p))}
+          onUpdateAwayPlayerNumber={(pid, num) => setAwayPlayers(prev => prev.map(p => p.id === pid ? {...p, number: num} : p))}
+          onBulkAddAwayPlayers={(players) => setAwayPlayers(prev => [...prev, ...players.map(pl => ({ id: crypto.randomUUID(), name: pl.name.toUpperCase(), number: pl.number, isOnField: false, isStarter: false, isExpelled: false, goals: 0, cards: { yellow: 0, red: 0 }, currentEntryTime: null, totalSecondsPlayed: 0, secondsPlayedPerPeriod: {} }))])}
+          onCreatePlayersWithNumbers={(count) => {
+            setHomePlayers(prev => {
+              if (prev.length > 0) {
+                return prev.map((p, i) => ({...p, number: i + 1}));
+              }
+              return Array.from({length: count}, (_, i) => ({
+                id: crypto.randomUUID(), name: `GIOCATORE CASA ${i+1}`, number: i+1, isOnField: false, isStarter: false, isExpelled: false, goals: 0, cards: { yellow: 0, red: 0 }, currentEntryTime: null, totalSecondsPlayed: 0, secondsPlayedPerPeriod: {}
+              }));
+            });
+          }}
           onComplete={handleComplete}
         />
       </main>
