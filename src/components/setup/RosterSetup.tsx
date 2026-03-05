@@ -49,6 +49,11 @@ interface RosterSetupProps {
   onCreatePlayersWithNumbers?: (count: number) => void;
   pendingTournamentName?: string | null;
   isTournamentMode?: boolean;
+  // New: full away player management
+  onAddAwayPlayerFull?: (name: string, number: number | null) => void;
+  onUpdateAwayPlayerName?: (playerId: string, name: string) => void;
+  onUpdateAwayPlayerNumber?: (playerId: string, number: number | null) => void;
+  onBulkAddAwayPlayers?: (players: { name: string; number: number | null }[]) => void;
 }
 
 export function RosterSetup({
@@ -69,6 +74,10 @@ export function RosterSetup({
   onCreatePlayersWithNumbers,
   pendingTournamentName,
   isTournamentMode = false,
+  onAddAwayPlayerFull,
+  onUpdateAwayPlayerName,
+  onUpdateAwayPlayerNumber,
+  onBulkAddAwayPlayers,
 }: RosterSetupProps) {
   const { user, isGuest } = useAuth();
   const { tournament, startTournament } = useTournament();
@@ -84,6 +93,7 @@ export function RosterSetup({
   const [autoNumberTeam, setAutoNumberTeam] = useState<'home' | 'away'>('home');
   const [bulkImportDialogOpen, setBulkImportDialogOpen] = useState(false);
   const [bulkImportText, setBulkImportText] = useState('');
+  const [bulkImportTeam, setBulkImportTeam] = useState<'home' | 'away'>('home');
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [tournamentMode, setTournamentMode] = useState(tournament.isActive && !isSingleMatchMode);
@@ -357,13 +367,27 @@ export function RosterSetup({
     const lines = bulkImportText.split('\n').filter(line => line.trim());
     let importedCount = 0;
      
-    lines.forEach(line => {
-      const name = line.trim().toUpperCase();
-      if (name && !homePlayers.some(p => p.name === name)) {
-        onAddPlayer(name);
-        importedCount++;
-      }
-    });
+    if (bulkImportTeam === 'home') {
+      lines.forEach(line => {
+        const name = line.trim().toUpperCase();
+        if (name && !homePlayers.some(p => p.name === name)) {
+          onAddPlayer(name);
+          importedCount++;
+        }
+      });
+    } else {
+      lines.forEach((line, idx) => {
+        const name = line.trim().toUpperCase();
+        if (name && !awayPlayers.some(p => p.name === name)) {
+          if (onAddAwayPlayerFull) {
+            onAddAwayPlayerFull(name, null);
+          } else {
+            onAddOpponentPlayer(idx + 1);
+          }
+          importedCount++;
+        }
+      });
+    }
 
     if (importedCount > 0) {
       toast.success(`Importati ${importedCount} giocatori`);
@@ -482,69 +506,47 @@ export function RosterSetup({
 
   const handleAutoNumber = () => {
     const count = parseInt(autoNumberCount, 10);
-    if (isNaN(count) || count <= 0) {
-      toast.error('Inserisci un numero valido');
+    if (isNaN(count) || count <= 0 || count > 99) {
+      toast.error('Inserisci un numero valido (1-99)');
       return;
     }
      
     if (autoNumberTeam === 'home') {
-      if (homePlayers.length === 0) {
-        if (onCreatePlayersWithNumbers) {
-          onCreatePlayersWithNumbers(count);
-          toast.success(`Creati ${count} giocatori con numeri progressivi`);
+      // Always clear and regenerate: create N players with "Giocatore Casa N" and number N
+      // First remove existing players
+      homePlayers.forEach(p => onRemovePlayer(p.id));
+      
+      // Then create new ones
+      setTimeout(() => {
+        for (let i = 1; i <= count; i++) {
+          onAddPlayer(`Giocatore Casa ${i}`);
+        }
+        // Assign numbers after a tick to let state settle
+        setTimeout(() => {
+          // Numbers will be assigned via onCreatePlayersWithNumbers or manually
+          if (onCreatePlayersWithNumbers) {
+            onCreatePlayersWithNumbers(count);
+          }
+        }, 50);
+      }, 50);
+
+      toast.success(`Generati ${count} giocatori di casa`);
+    } else {
+      // Away team: clear and regenerate
+      awayPlayers.forEach(p => onRemoveOpponentPlayer(p.id));
+      
+      setTimeout(() => {
+        if (onAddAwayPlayerFull) {
+          for (let i = 1; i <= count; i++) {
+            onAddAwayPlayerFull(`Giocatore Ospite ${i}`, i);
+          }
         } else {
           for (let i = 1; i <= count; i++) {
-            onAddPlayer(`Giocatore ${i}`);
+            onAddOpponentPlayer(i);
           }
-          toast.success(`Creati ${count} giocatori (assegna i numeri manualmente)`);
         }
-        
-        setAutoNumberDialogOpen(false);
-        setAutoNumberCount('');
-        return;
-      }
-      
-      const playersWithoutNumbers = homePlayers.filter(p => p.number === null);
-      
-      if (playersWithoutNumbers.length === 0) {
-        toast.info('Tutti i giocatori hanno già un numero assegnato');
-        setAutoNumberDialogOpen(false);
-        setAutoNumberCount('');
-        return;
-      }
-
-      const toAssign = Math.min(count, playersWithoutNumbers.length);
-      const usedNumbers = new Set(homePlayers.filter(p => p.number !== null).map(p => p.number));
-      let nextNumber = 1;
-      
-      for (let i = 0; i < toAssign; i++) {
-        while (usedNumbers.has(nextNumber)) {
-          nextNumber++;
-        }
-        const player = playersWithoutNumbers[i];
-        onUpdatePlayerNumber(player.id, nextNumber);
-        queueRosterNumberSave({ ...player, number: nextNumber }, nextNumber);
-        usedNumbers.add(nextNumber);
-        nextNumber++;
-      }
-
-      toast.success(`Assegnati numeri a ${toAssign} giocatori`);
-    } else {
-      const usedNumbers = new Set(awayPlayers.map(p => p.number).filter(n => n !== null));
-      let nextNumber = 1;
-      let created = 0;
-      
-      for (let i = 0; i < count; i++) {
-        while (usedNumbers.has(nextNumber)) {
-          nextNumber++;
-        }
-        onAddOpponentPlayer(nextNumber);
-        usedNumbers.add(nextNumber);
-        nextNumber++;
-        created++;
-      }
-
-      toast.success(`Creati ${created} giocatori avversari con numeri progressivi`);
+        toast.success(`Generati ${count} giocatori ospiti`);
+      }, 50);
     }
      
     setAutoNumberDialogOpen(false);
@@ -704,11 +706,14 @@ export function RosterSetup({
                 </Button>
                 {!isGuest && (
                   <Button 
-                    onClick={() => setBulkImportDialogOpen(true)} 
+                    onClick={() => {
+                      setBulkImportTeam('home');
+                      setBulkImportDialogOpen(true);
+                    }} 
                     size="icon" 
                     variant="outline"
                     className="flex-shrink-0"
-                    title="Importa da Excel"
+                    title="Importa lista nomi"
                   >
                     <Upload className="h-5 w-5" />
                   </Button>
@@ -838,20 +843,32 @@ export function RosterSetup({
                 </Button>
                 <Button 
                   onClick={() => {
+                    setBulkImportTeam('away');
+                    setBulkImportDialogOpen(true);
+                  }} 
+                  size="icon" 
+                  variant="outline"
+                  className="flex-shrink-0"
+                  title="Importa lista nomi ospiti"
+                >
+                  <Upload className="h-5 w-5" />
+                </Button>
+                <Button 
+                  onClick={() => {
                     setAutoNumberTeam('away');
                     setAutoNumberDialogOpen(true);
                   }} 
                   size="icon" 
                   variant="outline"
                   className="flex-shrink-0"
-                  title="Auto-numerazione ospiti"
+                  title="Auto-genera ospiti"
                 >
                   <Hash className="h-5 w-5" />
                 </Button>
               </div>
 
-              {/* Opponents List */}
-              <div className="flex flex-wrap gap-2 max-h-[400px] overflow-y-auto">
+              {/* Opponents List - Editable */}
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
                 {awayPlayers.map((player) => {
                   const isDuplicate = player.number !== null && duplicateAwayNumbers.has(player.number);
                   
@@ -859,26 +876,55 @@ export function RosterSetup({
                     <div
                       key={player.id}
                       className={cn(
-                        "flex items-center gap-1 px-3 py-2 rounded-lg border",
+                        "flex items-center gap-2 p-2 rounded-lg border",
                         isDuplicate
                           ? "bg-destructive/10 border-destructive"
-                          : "bg-muted border-border"
+                          : player.number !== null
+                            ? "bg-muted/80 border-border"
+                            : "bg-muted/50 border-border"
                       )}
                     >
-                      <span className="font-bold">#{player.number}</span>
-                      <span className="text-xs ml-1 opacity-70 truncate max-w-[100px]">{player.name}</span>
-                      <button
+                      <Input
+                        type="number"
+                        min="1"
+                        value={player.number ?? ''}
+                        onChange={(e) => {
+                          const numVal = e.target.value === '' ? null : parseInt(e.target.value, 10);
+                          if (numVal !== null && isNaN(numVal)) return;
+                          if (onUpdateAwayPlayerNumber) {
+                            onUpdateAwayPlayerNumber(player.id, numVal);
+                          }
+                        }}
+                        placeholder="#"
+                        className={cn(
+                          "w-14 text-center",
+                          isDuplicate && "border-destructive focus-visible:ring-destructive"
+                        )}
+                      />
+                      <Input
+                        value={player.name}
+                        onChange={(e) => {
+                          if (onUpdateAwayPlayerName) {
+                            onUpdateAwayPlayerName(player.id, e.target.value);
+                          }
+                        }}
+                        placeholder="Nome"
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => onRemoveOpponentPlayer(player.id)}
-                        className="ml-1 text-muted-foreground hover:text-destructive"
+                        className="text-muted-foreground hover:text-destructive flex-shrink-0"
                       >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   );
                 })}
                 {awayPlayers.length === 0 && (
-                  <p className="w-full text-center text-sm text-muted-foreground py-4">
-                    Nessun numero inserito
+                  <p className="text-center text-sm text-muted-foreground py-4">
+                    Nessun giocatore inserito
                   </p>
                 )}
               </div>
@@ -915,21 +961,17 @@ export function RosterSetup({
           </div>
         </div>
 
-        {/* DIALOGS - REINSERITI */}
+        {/* DIALOGS */}
         <Dialog open={autoNumberDialogOpen} onOpenChange={setAutoNumberDialogOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
-                {autoNumberTeam === 'home' ? 'Assegna Numeri' : 'Genera Avversari'}
+                {autoNumberTeam === 'home' ? 'Genera Squadra di Casa' : 'Genera Squadra Ospite'}
               </DialogTitle>
             </DialogHeader>
             <div className="py-4 space-y-4">
               <div className="space-y-2">
-                <Label>
-                  {autoNumberTeam === 'home' 
-                    ? 'Quanti numeri vuoi assegnare automaticamente?' 
-                    : 'Quanti giocatori avversari vuoi creare?'}
-                </Label>
+                <Label>Quanti giocatori vuoi inserire?</Label>
                 <Input
                   type="number"
                   min="1"
@@ -943,16 +985,21 @@ export function RosterSetup({
               </div>
               <p className="text-sm text-muted-foreground">
                 {autoNumberTeam === 'home' 
-                  ? 'Verranno assegnati i primi numeri liberi ai giocatori senza numero.'
-                  : 'Verranno creati giocatori "Ospite X" con i primi numeri liberi.'}
+                  ? 'Verranno generati giocatori "Giocatore Casa 1", "Giocatore Casa 2", ecc. con numeri progressivi. Potrai modificare nomi e numeri dopo la generazione.'
+                  : 'Verranno generati giocatori "Giocatore Ospite 1", "Giocatore Ospite 2", ecc. con numeri progressivi. Potrai modificare nomi e numeri dopo la generazione.'}
               </p>
+              {(autoNumberTeam === 'home' ? homePlayers.length : awayPlayers.length) > 0 && (
+                <p className="text-sm text-warning font-medium">
+                  ⚠️ I giocatori esistenti verranno sostituiti.
+                </p>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setAutoNumberDialogOpen(false)}>
                 Annulla
               </Button>
               <Button onClick={handleAutoNumber}>
-                Conferma
+                Genera
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -961,7 +1008,9 @@ export function RosterSetup({
         <Dialog open={bulkImportDialogOpen} onOpenChange={setBulkImportDialogOpen}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>Importa Giocatori</DialogTitle>
+              <DialogTitle>
+                Importa Giocatori - {bulkImportTeam === 'home' ? 'Squadra di Casa' : 'Squadra Ospite'}
+              </DialogTitle>
             </DialogHeader>
             <div className="py-4 space-y-4">
               <div className="space-y-2">
@@ -973,6 +1022,9 @@ export function RosterSetup({
                   className="min-h-[200px]"
                 />
               </div>
+              <p className="text-sm text-muted-foreground">
+                I numeri di maglia potranno essere assegnati dopo l'importazione.
+              </p>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setBulkImportDialogOpen(false)}>
