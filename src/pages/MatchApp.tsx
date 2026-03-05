@@ -59,19 +59,11 @@ const MatchApp = () => {
         if (config.homeTeam?.name) setHomeTeamName(config.homeTeam.name);
         if (config.awayTeam?.name) setAwayTeamName(config.awayTeam.name);
         
-        // Add home players
+        // Add home players with numbers directly
         if (config.homeTeam?.players?.length > 0) {
           config.homeTeam.players.forEach((p: Player) => {
-            addPlayer(p.name);
+            addPlayerToMatch('home', p.name, p.number ?? 0);
           });
-          // Apply numbers after adding
-          setTimeout(() => {
-            config.homeTeam.players.forEach((p: Player) => {
-              if (p.number !== null) {
-                updatePlayerNumber(p.id, p.number);
-              }
-            });
-          }, 50);
         }
         
         // Add away players
