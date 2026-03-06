@@ -192,35 +192,35 @@ export function TeamPanel({
         "p-3 text-center",
         isHome ? "gradient-home text-team-home-foreground" : "gradient-away text-team-away-foreground"
       )}>
-        <h3 className="font-bold team-name-fluid">{teamName}</h3>
+        <h3 className="font-bold text-xs sm:text-sm md:text-base truncate">{teamName}</h3>
       </div>
 
       {/* Action Buttons - Vertical Layout (FIRST when match is running) */}
       {isRunning && (
-        <div className="p-3 border-b border-border flex flex-col gap-2">
+        <div className="p-2 border-b border-border flex flex-col gap-1.5">
           {/* ROW 1: GOL */}
-          <Button
-            size="sm"
-            className={cn(
-              "w-full gap-2",
-              isHome 
-                ? "bg-team-home hover:bg-team-home/90 text-team-home-foreground" 
-                : "bg-team-away hover:bg-team-away/90 text-team-away-foreground"
-            )}
-            onClick={() => setActionType('goal')}
-          >
-            <Target className="h-4 w-4" />
-            GOL
-          </Button>
+           <Button
+203:             size="sm"
+204:             className={cn(
+205:               "w-full gap-1 h-7 text-xs",
+206:               isHome 
+207:                 ? "bg-team-home hover:bg-team-home/90 text-team-home-foreground" 
+208:                 : "bg-team-away hover:bg-team-away/90 text-team-away-foreground"
+209:             )}
+210:             onClick={() => setActionType('goal')}
+211:           >
+212:             <Target className="h-3 w-3" />
+213:             GOL
+214:           </Button>
           
           {/* ROW 2: AUTOGOL - Now opens selector */}
           <Button
             size="sm"
             variant="outline"
-            className="w-full gap-2"
+            className="w-full gap-1 h-7 text-xs"
             onClick={() => setActionType('ownGoal')}
           >
-            <Target className="h-4 w-4 rotate-180" />
+            <Target className="h-3 w-3 rotate-180" />
             AUTOGOL
           </Button>
           
@@ -228,10 +228,10 @@ export function TeamPanel({
           <Button
             size="sm"
             variant="outline"
-            className="w-full gap-2 text-warning hover:text-warning border-warning/50 hover:border-warning hover:bg-warning/10"
+            className="w-full gap-1 h-7 text-xs text-warning hover:text-warning border-warning/50 hover:border-warning hover:bg-warning/10"
             onClick={() => setActionType('yellowCard')}
           >
-            <Square className="h-4 w-4 fill-warning" />
+            <Square className="h-3 w-3 fill-warning" />
             GIALLO
           </Button>
           
@@ -239,10 +239,10 @@ export function TeamPanel({
           <Button
             size="sm"
             variant="outline"
-            className="w-full gap-2 text-destructive hover:text-destructive border-destructive/50 hover:border-destructive hover:bg-destructive/10"
+            className="w-full gap-1 h-7 text-xs text-destructive hover:text-destructive border-destructive/50 hover:border-destructive hover:bg-destructive/10"
             onClick={() => setActionType('redCard')}
           >
-            <Square className="h-4 w-4 fill-destructive" />
+            <Square className="h-3 w-3 fill-destructive" />
             ROSSO
           </Button>
           
@@ -250,31 +250,31 @@ export function TeamPanel({
           <Button
             size="sm"
             variant="outline"
-            className="w-full gap-2 mt-1"
+            className="w-full gap-1 h-7 text-xs"
             onClick={() => setActionType('substitution')}
           >
-            <RefreshCw className="h-4 w-4" />
-            SOSTITUZIONE
+            <RefreshCw className="h-3 w-3" />
+            SOST.
           </Button>
         </div>
       )}
 
       {/* Players List */}
-      <div className="p-3 space-y-2">
+      <div className="p-2 space-y-1.5">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           In campo ({onFieldPlayers.length})
         </p>
         {/* Show 5 players before scroll */}
-        <div className="space-y-1 max-h-[220px] overflow-y-auto">
+        <div className="space-y-1 max-h-[200px] overflow-y-auto">
           {onFieldPlayers.map(player => (
             <div
               key={player.id}
-              className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-on-field/10 border border-on-field/20"
+              className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-on-field/10 border border-on-field/20"
             >
-              <span className="w-7 h-7 flex items-center justify-center rounded-full bg-on-field text-on-field-foreground text-xs font-bold flex-shrink-0">
+              <span className="w-6 h-6 flex items-center justify-center rounded-full bg-on-field text-on-field-foreground text-[10px] font-bold flex-shrink-0">
                 {player.number}
               </span>
-              <span className="flex-1 text-xs font-medium truncate">
+              <span className="flex-1 text-[11px] font-medium truncate">
                 {player.name}
               </span>
               {renderBadges(player.id)}
@@ -327,16 +327,16 @@ export function TeamPanel({
           )}
         </div>
         {benchPlayers.length > 0 && (
-          <div className="space-y-1 max-h-[120px] overflow-y-auto">
+          <div className="space-y-1 max-h-[100px] overflow-y-auto">
             {benchPlayers.map(player => (
               <div
                 key={player.id}
-                className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-on-bench/10 border border-on-bench/20"
+                className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-on-bench/10 border border-on-bench/20"
               >
-                <span className="w-7 h-7 flex items-center justify-center rounded-full bg-on-bench text-on-bench-foreground text-xs font-bold flex-shrink-0">
+                <span className="w-6 h-6 flex items-center justify-center rounded-full bg-on-bench text-on-bench-foreground text-[10px] font-bold flex-shrink-0">
                   {player.number}
                 </span>
-                <span className="flex-1 text-xs font-medium truncate">
+                <span className="flex-1 text-[11px] font-medium truncate">
                   {player.name}
                 </span>
                 {renderBadges(player.id)}
@@ -350,19 +350,19 @@ export function TeamPanel({
             <p className="text-xs font-medium text-destructive uppercase tracking-wider pt-2">
               Espulsi ({expelledPlayers.length})
             </p>
-            <div className="space-y-1 max-h-[80px] overflow-y-auto">
+            <div className="space-y-1 max-h-[70px] overflow-y-auto">
               {expelledPlayers.map(player => (
                 <div
                   key={player.id}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-destructive/10 border border-destructive/30 opacity-60"
+                  className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-destructive/10 border border-destructive/30 opacity-60"
                 >
-                  <span className="w-7 h-7 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs font-bold flex-shrink-0">
+                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex-shrink-0">
                     {player.number}
                   </span>
-                  <span className="flex-1 text-xs font-medium truncate line-through">
+                  <span className="flex-1 text-[11px] font-medium truncate line-through">
                     {player.name}
                   </span>
-                  <span className="w-3 h-4 bg-destructive rounded-sm flex-shrink-0" title="Espulso" />
+                  <span className="w-2.5 h-3.5 bg-destructive rounded-sm flex-shrink-0" title="Espulso" />
                 </div>
               ))}
             </div>
