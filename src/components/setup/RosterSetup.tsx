@@ -66,6 +66,7 @@ export function RosterSetup({
   onAwayTeamNameChange,
   onAddPlayer,
   onUpdatePlayerNumber,
+  onUpdateHomePlayerName,
   onRemovePlayer,
   onAddOpponentPlayer,
   onRemoveOpponentPlayer,
@@ -513,30 +514,54 @@ export function RosterSetup({
     }
      
     if (autoNumberTeam === 'home') {
-      // Always clear and regenerate: create N players with "Giocatore Casa N" and number N
-      // First remove existing players
-      homePlayers.forEach(p => onRemovePlayer(p.id));
-      
-      // Then create new ones
-      setTimeout(() => {
+      // Fix #2: Non-destructive auto-numbering for home team
+      const existing = homePlayers.length;
+      if (existing > 0) {
+        // Assign numbers 1..N to existing players (up to count)
+        homePlayers.slice(0, count).forEach((p, i) => {
+          onUpdatePlayerNumber(p.id, i + 1);
+        });
+        // If count > existing, create additional placeholder players
+        if (count > existing) {
+          for (let i = existing + 1; i <= count; i++) {
+            onAddPlayer(`Giocatore Casa ${i}`);
+          }
+          // Assign numbers to newly created players after state settles
+          setTimeout(() => {
+            if (onCreatePlayersWithNumbers) {
+              onCreatePlayersWithNumbers(count);
+            }
+          }, 50);
+        }
+      } else {
+        // No existing players: generate all from scratch
         for (let i = 1; i <= count; i++) {
           onAddPlayer(`Giocatore Casa ${i}`);
         }
-        // Assign numbers after a tick to let state settle
         setTimeout(() => {
-          // Numbers will be assigned via onCreatePlayersWithNumbers or manually
           if (onCreatePlayersWithNumbers) {
             onCreatePlayersWithNumbers(count);
           }
         }, 50);
-      }, 50);
-
-      toast.success(`Generati ${count} giocatori di casa`);
+      }
+      toast.success(`${count} giocatori di casa pronti`);
     } else {
-      // Away team: clear and regenerate
-      awayPlayers.forEach(p => onRemoveOpponentPlayer(p.id));
-      
-      setTimeout(() => {
+      // Fix #2: Non-destructive auto-numbering for away team
+      const existing = awayPlayers.length;
+      if (existing > 0) {
+        // Assign numbers 1..N to existing players
+        awayPlayers.slice(0, count).forEach((p, i) => {
+          if (onUpdateAwayPlayerNumber) {
+            onUpdateAwayPlayerNumber(p.id, i + 1);
+          }
+        });
+        // Create additional placeholder players if needed
+        if (count > existing && onAddAwayPlayerFull) {
+          for (let i = existing + 1; i <= count; i++) {
+            onAddAwayPlayerFull(`Giocatore Ospite ${i}`, i);
+          }
+        }
+      } else {
         if (onAddAwayPlayerFull) {
           for (let i = 1; i <= count; i++) {
             onAddAwayPlayerFull(`Giocatore Ospite ${i}`, i);
@@ -546,8 +571,8 @@ export function RosterSetup({
             onAddOpponentPlayer(i);
           }
         }
-        toast.success(`Generati ${count} giocatori ospiti`);
-      }, 50);
+      }
+      toast.success(`${count} giocatori ospiti pronti`);
     }
      
     setAutoNumberDialogOpen(false);
@@ -788,7 +813,17 @@ export function RosterSetup({
                         ) : null}
                       </div>
 
-                      <span className="flex-1 font-medium truncate">{player.name}</span>
+                      {/* Fix #1: Editable home player name input, aligned with away team logic */}
+                      <Input
+                        value={player.name}
+                        onChange={(e) => {
+                          if (onUpdateHomePlayerName) {
+                            onUpdateHomePlayerName(player.id, e.target.value);
+                          }
+                        }}
+                        placeholder="Nome"
+                        className="flex-1"
+                      />
                       <Button
                         variant="ghost"
                         size="icon"
