@@ -1025,8 +1025,8 @@ export function RosterSetup({
                   : 'Verranno generati giocatori "Giocatore Ospite 1", "Giocatore Ospite 2", ecc. con numeri progressivi. Potrai modificare nomi e numeri dopo la generazione.'}
               </p>
               {(autoNumberTeam === 'home' ? homePlayers.length : awayPlayers.length) > 0 && (
-                <p className="text-sm text-warning font-medium">
-                  ⚠️ I giocatori esistenti verranno sostituiti.
+                <p className="text-sm text-primary font-medium">
+                  ℹ️ I nomi esistenti verranno mantenuti, i numeri assegnati da 1 a N.
                 </p>
               )}
             </div>
