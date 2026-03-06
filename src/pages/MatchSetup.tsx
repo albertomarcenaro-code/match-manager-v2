@@ -48,6 +48,7 @@ export default function MatchSetup() {
           onAwayTeamNameChange={setAwayTeamName}
           onAddPlayer={(name) => setHomePlayers(prev => [...prev, { id: crypto.randomUUID(), name: name.toUpperCase(), number: null, isOnField: false, isStarter: false, isExpelled: false, goals: 0, cards: { yellow: 0, red: 0 }, currentEntryTime: null, totalSecondsPlayed: 0, secondsPlayedPerPeriod: {} }])}
           onUpdatePlayerNumber={(pid, num) => setHomePlayers(prev => prev.map(p => p.id === pid ? {...p, number: num} : p))}
+          onUpdateHomePlayerName={(pid, name) => setHomePlayers(prev => prev.map(p => p.id === pid ? {...p, name} : p))}
           onRemovePlayer={(pid) => setHomePlayers(prev => prev.filter(p => p.id !== pid))}
           onAddOpponentPlayer={(num) => setAwayPlayers(prev => [...prev, { id: crypto.randomUUID(), name: `AVV ${num}`, number: num, isOnField: false, isStarter: false, isExpelled: false, goals: 0, cards: { yellow: 0, red: 0 }, currentEntryTime: null, totalSecondsPlayed: 0, secondsPlayedPerPeriod: {} }])}
           onRemoveOpponentPlayer={(pid) => setAwayPlayers(prev => prev.filter(p => p.id !== pid))}

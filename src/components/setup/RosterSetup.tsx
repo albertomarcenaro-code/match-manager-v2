@@ -40,6 +40,7 @@ interface RosterSetupProps {
   onAwayTeamNameChange: (name: string) => void;
   onAddPlayer: (name: string) => void;
   onUpdatePlayerNumber: (playerId: string, number: number | null) => void;
+  onUpdateHomePlayerName?: (playerId: string, name: string) => void;
   onRemovePlayer: (playerId: string) => void;
   onAddOpponentPlayer: (number: number) => void;
   onRemoveOpponentPlayer: (playerId: string) => void;
