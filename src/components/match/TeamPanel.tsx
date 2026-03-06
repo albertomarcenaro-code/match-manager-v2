@@ -199,19 +199,19 @@ export function TeamPanel({
       {isRunning && (
         <div className="p-2 border-b border-border flex flex-col gap-1.5">
           {/* ROW 1: GOL */}
-           <Button
-203:             size="sm"
-204:             className={cn(
-205:               "w-full gap-1 h-7 text-xs",
-206:               isHome 
-207:                 ? "bg-team-home hover:bg-team-home/90 text-team-home-foreground" 
-208:                 : "bg-team-away hover:bg-team-away/90 text-team-away-foreground"
-209:             )}
-210:             onClick={() => setActionType('goal')}
-211:           >
-212:             <Target className="h-3 w-3" />
-213:             GOL
-214:           </Button>
+          <Button
+            size="sm"
+            className={cn(
+              "w-full gap-1 h-7 text-xs",
+              isHome 
+                ? "bg-team-home hover:bg-team-home/90 text-team-home-foreground" 
+                : "bg-team-away hover:bg-team-away/90 text-team-away-foreground"
+            )}
+            onClick={() => setActionType('goal')}
+          >
+            <Target className="h-3 w-3" />
+            GOL
+          </Button>
           
           {/* ROW 2: AUTOGOL - Now opens selector */}
           <Button
