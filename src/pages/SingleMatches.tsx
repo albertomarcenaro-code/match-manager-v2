@@ -79,8 +79,10 @@ export default function SingleMatches() {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   useEffect(() => {
-    setMatchHistory(getMatchHistory());
-  }, []);
+    if (!isGuest && user) {
+      setMatchHistory(getMatchHistory());
+    }
+  }, [user, isGuest]);
 
   const handleCreate = () => {
     const id = "quick-" + Date.now();
