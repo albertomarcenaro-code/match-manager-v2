@@ -1166,6 +1166,51 @@ export function RosterSetup({
           </DialogContent>
         </Dialog>
 
+        {/* Saved Teams Import Dialog */}
+        <Dialog open={savedTeamsDialogOpen} onOpenChange={setSavedTeamsDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>
+                Carica Squadra Salvata - {savedTeamsTarget === 'home' ? 'Casa' : 'Ospite'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-2 space-y-2 max-h-[400px] overflow-y-auto">
+              {loadingSavedTeams ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+                  Caricamento...
+                </div>
+              ) : savedTeams.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p className="text-sm">Nessuna squadra salvata.</p>
+                  <Button variant="link" size="sm" onClick={() => { setSavedTeamsDialogOpen(false); navigate('/my-teams'); }}>
+                    Vai a "Le Mie Squadre" per crearne una
+                  </Button>
+                </div>
+              ) : (
+                savedTeams.map(team => (
+                  <Button
+                    key={team.id}
+                    variant="outline"
+                    className="w-full justify-start text-left h-auto py-3 px-4"
+                    onClick={() => handleLoadSavedTeam(team)}
+                  >
+                    <div>
+                      <p className="font-semibold text-sm">{team.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {team.category ? `${team.category} · ` : ''}{team.players.length} giocatori
+                      </p>
+                    </div>
+                  </Button>
+                ))
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSavedTeamsDialogOpen(false)}>Chiudi</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
       </div>
     </div>
   );
