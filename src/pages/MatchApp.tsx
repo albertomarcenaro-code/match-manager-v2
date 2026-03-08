@@ -13,6 +13,7 @@ import { RosterSetup } from '@/components/setup/RosterSetup';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Users, UserCheck, Play, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Header } from '@/components/layout/Header';
 
 const MatchApp = () => {
   const { id } = useParams();
@@ -86,6 +87,9 @@ const MatchApp = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Global Header */}
+      <Header />
+
       {/* Unified top navigation bar with Home + Tabs */}
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/40">
         <div className="max-w-6xl mx-auto px-3">
@@ -181,13 +185,19 @@ const MatchApp = () => {
               </div>
             ) : (
               <>
-                {/* Timer Controls */}
+                 {/* Timer Controls */}
                 <TimerControls
                   state={state}
                   onStartPeriod={startPeriod}
                   onPause={pauseTimer}
                   onResume={resumeTimer}
-                  onEndPeriod={endPeriod}
+                  onEndPeriod={() => {
+                    endPeriod();
+                    // Auto-navigate to Starters tab for next period setup
+                    if (!state.isMatchEnded) {
+                      setActiveTab('starters');
+                    }
+                  }}
                   onEndMatch={() => {
                     if (state.isRunning) endPeriod();
                     endMatch();
