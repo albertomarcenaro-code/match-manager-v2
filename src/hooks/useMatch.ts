@@ -535,6 +535,7 @@ export const useMatch = () => {
       isRunning: false,
       isPaused: false,
       isMatchEnded: true,
+      needsStarterSelection: false,
       periodStartTimestamp: null,
       accumulatedPauseTime: 0,
       pauseStartTimestamp: null,

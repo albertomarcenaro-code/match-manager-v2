@@ -255,9 +255,9 @@ const MatchApp = () => {
                       </p>
                     </div>
                     <div className="grid grid-cols-3 gap-3 p-4 bg-card rounded-xl shadow-card">
-                      <ExportButton state={state} className="w-full h-12" />
-                      <PDFExportButton state={state} className="w-full h-12" />
-                      <WhatsAppShareButton state={state} className="w-full h-12" />
+                      <div className="w-full"><ExportButton state={state} /></div>
+                      <div className="w-full"><PDFExportButton state={state} /></div>
+                      <div className="w-full"><WhatsAppShareButton state={state} /></div>
                     </div>
                   </div>
                 )}
