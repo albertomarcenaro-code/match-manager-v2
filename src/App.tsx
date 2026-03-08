@@ -52,9 +52,9 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/match-setup/:id" element={<ProtectedRoute><MatchSetup /></ProtectedRoute>} />
+            {/* match-setup now redirects to unified match page */}
+            <Route path="/match-setup/:id" element={<ProtectedRoute><MatchApp /></ProtectedRoute>} />
             
-            {/* --- SEZIONE MODIFICATA --- */}
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             
             {/* Rotta specifica per un match esistente */}

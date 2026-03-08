@@ -776,44 +776,19 @@ export function RosterSetup({
                             : "bg-muted/50 border-border"
                       )}
                     >
-                      <div className="flex items-center gap-1">
-                        <Input
-                          type="number"
-                          min="1"
-                          value={player.number ?? ''}
-                          onChange={(e) => handleUpdateNumber(player.id, e.target.value)}
-                          onBlur={() => queueRosterNumberSave(player, player.number ?? null)}
-                          placeholder="#"
-                          className={cn(
-                            "w-14 text-center",
-                            isDuplicate && "border-destructive focus-visible:ring-destructive"
-                          )}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-primary"
-                          onClick={() => handleQuickNumber(player.id)}
-                          title="Assegna numero successivo"
-                        >
-                          <ChevronUp className="h-4 w-4" />
-                        </Button>
-                      </div>
-
-                      <div className="min-w-[60px] text-[11px] leading-tight">
-                        {status === 'saving' ? (
-                          <span className="text-muted-foreground">Salvo…</span>
-                        ) : status === 'saved' ? (
-                          <span className="inline-flex items-center gap-1 text-primary">
-                            <Check className="h-3 w-3" />
-                            Salvato
-                          </span>
-                        ) : status === 'error' ? (
-                          <span className="text-destructive">Errore</span>
-                        ) : null}
-                      </div>
-
-                      {/* Fix #1: Editable home player name input, aligned with away team logic */}
+                      {/* FIX #2: Symmetric layout - same structure as away team */}
+                      <Input
+                        type="number"
+                        min="1"
+                        value={player.number ?? ''}
+                        onChange={(e) => handleUpdateNumber(player.id, e.target.value)}
+                        onBlur={() => queueRosterNumberSave(player, player.number ?? null)}
+                        placeholder="#"
+                        className={cn(
+                          "w-14 text-center",
+                          isDuplicate && "border-destructive focus-visible:ring-destructive"
+                        )}
+                      />
                       <Input
                         value={player.name}
                         onChange={(e) => {
