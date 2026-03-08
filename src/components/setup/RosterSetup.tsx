@@ -951,6 +951,17 @@ export function RosterSetup({
                 >
                   <Hash className="h-5 w-5" />
                 </Button>
+                {user && !isGuest && (
+                  <Button 
+                    onClick={() => handleOpenSavedTeams('away')} 
+                    size="icon" 
+                    variant="outline"
+                    className="flex-shrink-0"
+                    title="Carica squadra salvata"
+                  >
+                    <FolderOpen className="h-5 w-5" />
+                  </Button>
+                )}
               </div>
 
               {/* Opponents List - Editable */}
