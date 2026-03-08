@@ -23,16 +23,21 @@ export default function Tournaments() {
   }, [user]);
 
   const loadTournaments = async () => {
+    if (!user) return;
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from('tournaments')
         .select('id, name, created_at')
         .order('created_at', { ascending: false });
-      if (error) throw error;
+      if (error) {
+        console.error('Tournament load error:', error);
+        toast.error('Errore nel caricamento dei tornei');
+      }
       setTournaments(data || []);
     } catch (error: any) {
-      console.error(error);
+      console.error('Tournament load exception:', error);
+      setTournaments([]);
     } finally {
       setLoading(false);
     }
