@@ -14,6 +14,7 @@ import Dashboard from "./pages/Dashboard";
 import MatchApp from "./pages/MatchApp";
 import TournamentArchive from "./pages/TournamentArchive";
 import Tournaments from "./pages/Tournaments";
+import MyTeams from "./pages/MyTeams";
 import NotFound from "./pages/NotFound";
 import MatchSetup from "./pages/MatchSetup";
 
