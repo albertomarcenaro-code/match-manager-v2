@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useRef } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMatch } from '@/hooks/useMatch';
 import { MatchHeader } from '@/components/match/MatchHeader';
 import { TeamPanel } from '@/components/match/TeamPanel';
@@ -14,10 +14,17 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Users, UserCheck, Play, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/layout/Header';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 const MatchApp = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { user, isGuest } = useAuth();
+  const tournamentId = searchParams.get('tournamentId');
+  const savedToDbRef = useRef(false);
 
   const {
     state,
