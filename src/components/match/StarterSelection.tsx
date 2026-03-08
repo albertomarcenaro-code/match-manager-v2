@@ -28,6 +28,8 @@ export function StarterSelection({
   );
 
   const toggleHome = (playerId: string) => {
+    const player = eligibleHomePlayers.find(p => p.id === playerId);
+    if (player?.isExpelled) return;
     const newSet = new Set(selectedHome);
     if (newSet.has(playerId)) {
       newSet.delete(playerId);
@@ -38,6 +40,8 @@ export function StarterSelection({
   };
 
   const toggleAway = (playerId: string) => {
+    const player = awayPlayers.find(p => p.id === playerId);
+    if (player?.isExpelled) return;
     const newSet = new Set(selectedAway);
     if (newSet.has(playerId)) {
       newSet.delete(playerId);
