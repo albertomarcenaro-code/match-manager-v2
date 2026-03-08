@@ -291,7 +291,7 @@ export default function TournamentDetail() {
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <Button size="sm" variant="outline" className="h-8 w-8 p-0"
-                    onClick={() => navigate(`/match/${m.id}`)}>
+                    onClick={() => navigate(`/match-summary/${m.id}?source=db&backTo=/tournament/${tournamentId}`)}>
                     <Eye className="h-3.5 w-3.5" />
                   </Button>
                   <Button size="sm" variant="ghost"
