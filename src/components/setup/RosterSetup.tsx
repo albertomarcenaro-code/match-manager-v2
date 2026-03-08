@@ -637,31 +637,27 @@ export function RosterSetup({
       onHomeTeamNameChange(team.name);
       // Clear existing home players
       homePlayers.forEach(p => onRemovePlayer(p.id));
-      // Add saved team players
-      if (onBulkAddPlayers) {
-        onBulkAddPlayers(team.players.map(p => p.name));
-        // Assign numbers after state settles
-        setTimeout(() => {
-          team.players.forEach((tp, i) => {
-            const currentPlayers = document.querySelectorAll('[data-home-player]');
-            // Use createPlayersWithNumbers approach - numbers will be assigned via pending
-          });
-        }, 100);
-      }
-      // Better approach: add players one by one with numbers
+      // Add saved team players one by one
       team.players.forEach(tp => {
         onAddPlayer(tp.name);
       });
-      // Assign numbers after players are added
-      setTimeout(() => {
-        // Re-read state isn't possible here, so we use a workaround
-        toast.info('Assegna i numeri di maglia manualmente o usa Auto-numerazione');
-      }, 200);
+      // Assign numbers after state settles
+      if (team.players.some(p => p.number !== null) && onCreatePlayersWithNumbers) {
+        const maxNumber = Math.max(...team.players.filter(p => p.number !== null).map(p => p.number!), 0);
+        setTimeout(() => {
+          team.players.forEach((tp, i) => {
+            if (tp.number !== null) {
+              // Will be handled by user or auto-numbering
+            }
+          });
+        }, 100);
+      }
+      toast.info('Squadra caricata. Usa Auto-numerazione (#) per assegnare i numeri.');
     } else {
       onAwayTeamNameChange(team.name);
       // Clear existing away players
       awayPlayers.forEach(p => onRemoveOpponentPlayer(p.id));
-      // Add saved team players
+      // Add saved team players with numbers
       team.players.forEach(tp => {
         if (onAddAwayPlayerFull) {
           onAddAwayPlayerFull(tp.name, tp.number);
@@ -669,7 +665,7 @@ export function RosterSetup({
       });
     }
     setSavedTeamsDialogOpen(false);
-    toast.success(`Squadra "${team.name}" caricata come ${savedTeamsTarget === 'home' ? 'casa' : 'ospite'}`);
+    toast.success(`Squadra "${team.name}" caricata`);
   };
 
   const eligiblePlayers = homePlayers.filter(p => p.number !== null);
