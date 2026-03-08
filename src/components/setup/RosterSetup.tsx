@@ -101,6 +101,11 @@ export function RosterSetup({
   const [tournamentMode, setTournamentMode] = useState(tournament.isActive && !isSingleMatchMode);
   const [tournamentName, setTournamentName] = useState(tournament.name || '');
   const [showTournamentDialog, setShowTournamentDialog] = useState(false);
+  // Saved teams import
+  const [savedTeamsDialogOpen, setSavedTeamsDialogOpen] = useState(false);
+  const [savedTeamsTarget, setSavedTeamsTarget] = useState<'home' | 'away'>('home');
+  const [savedTeams, setSavedTeams] = useState<{ id: string; name: string; category: string; players: { name: string; number: number | null }[] }[]>([]);
+  const [loadingSavedTeams, setLoadingSavedTeams] = useState(false);
 
   // Priorità: se esiste una rosa già salvata localmente (es. chiusura app / reload), NON sovrascrivere con dati dal backend.
   const hasLocalRoster = useMemo(() => {
