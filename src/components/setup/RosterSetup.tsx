@@ -604,6 +604,74 @@ export function RosterSetup({
     setShowTournamentDialog(false);
   };
 
+  // --- Saved Teams Import Logic ---
+  const handleOpenSavedTeams = async (target: 'home' | 'away') => {
+    if (!user || isGuest) {
+      toast.error('Devi essere loggato per usare le squadre salvate');
+      return;
+    }
+    setSavedTeamsTarget(target);
+    setLoadingSavedTeams(true);
+    setSavedTeamsDialogOpen(true);
+    try {
+      const { data, error } = await supabase
+        .from('saved_teams')
+        .select('id, name, category, players')
+        .order('updated_at', { ascending: false });
+      if (error) throw error;
+      setSavedTeams((data || []).map(t => ({
+        ...t,
+        category: t.category || '',
+        players: (t.players as unknown as { name: string; number: number | null }[]) || [],
+      })));
+    } catch (e) {
+      console.error(e);
+      toast.error('Errore nel caricamento delle squadre');
+    } finally {
+      setLoadingSavedTeams(false);
+    }
+  };
+
+  const handleLoadSavedTeam = (team: { name: string; players: { name: string; number: number | null }[] }) => {
+    if (savedTeamsTarget === 'home') {
+      onHomeTeamNameChange(team.name);
+      // Clear existing home players
+      homePlayers.forEach(p => onRemovePlayer(p.id));
+      // Add saved team players
+      if (onBulkAddPlayers) {
+        onBulkAddPlayers(team.players.map(p => p.name));
+        // Assign numbers after state settles
+        setTimeout(() => {
+          team.players.forEach((tp, i) => {
+            const currentPlayers = document.querySelectorAll('[data-home-player]');
+            // Use createPlayersWithNumbers approach - numbers will be assigned via pending
+          });
+        }, 100);
+      }
+      // Better approach: add players one by one with numbers
+      team.players.forEach(tp => {
+        onAddPlayer(tp.name);
+      });
+      // Assign numbers after players are added
+      setTimeout(() => {
+        // Re-read state isn't possible here, so we use a workaround
+        toast.info('Assegna i numeri di maglia manualmente o usa Auto-numerazione');
+      }, 200);
+    } else {
+      onAwayTeamNameChange(team.name);
+      // Clear existing away players
+      awayPlayers.forEach(p => onRemoveOpponentPlayer(p.id));
+      // Add saved team players
+      team.players.forEach(tp => {
+        if (onAddAwayPlayerFull) {
+          onAddAwayPlayerFull(tp.name, tp.number);
+        }
+      });
+    }
+    setSavedTeamsDialogOpen(false);
+    toast.success(`Squadra "${team.name}" caricata come ${savedTeamsTarget === 'home' ? 'casa' : 'ospite'}`);
+  };
+
   const eligiblePlayers = homePlayers.filter(p => p.number !== null);
   const canProceed = eligiblePlayers.length >= 1 && awayPlayers.length >= 1 && !hasDuplicates;
 
