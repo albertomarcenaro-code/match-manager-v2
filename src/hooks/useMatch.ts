@@ -630,7 +630,25 @@ export const useMatch = () => {
           players: prev[teamKey].players.map(p => {
             if (p.id !== playerId) return p;
             const newCards = { ...p.cards, [cardType]: p.cards[cardType] + 1 };
-            return { ...p, cards: newCards, isExpelled: cardType === 'red' || newCards.yellow >= 2 };
+            const expelled = cardType === 'red' || newCards.yellow >= 2;
+            if (expelled) {
+              // Expelled: remove from field immediately and finalize playtime
+              const now = Date.now();
+              const addedSeconds = p.currentEntryTime !== null ? Math.floor((now - p.currentEntryTime) / 1000) : 0;
+              const updatedPerPeriod = { ...p.secondsPlayedPerPeriod };
+              const cp = prev.currentPeriod;
+              updatedPerPeriod[cp] = (updatedPerPeriod[cp] || 0) + addedSeconds;
+              return { 
+                ...p, 
+                cards: newCards, 
+                isExpelled: true, 
+                isOnField: false,
+                totalSecondsPlayed: p.totalSecondsPlayed + addedSeconds,
+                secondsPlayedPerPeriod: updatedPerPeriod,
+                currentEntryTime: null
+              };
+            }
+            return { ...p, cards: newCards };
           })
         },
         events: [newEvent, ...prev.events]
