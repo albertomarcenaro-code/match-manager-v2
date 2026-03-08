@@ -86,6 +86,9 @@ const MatchApp = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Global Header */}
+      <Header />
+
       {/* Unified top navigation bar with Home + Tabs */}
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/40">
         <div className="max-w-6xl mx-auto px-3">
