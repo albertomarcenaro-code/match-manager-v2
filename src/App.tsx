@@ -13,6 +13,7 @@ import SingleMatches from "./pages/SingleMatches";
 import MatchApp from "./pages/MatchApp";
 import TournamentArchive from "./pages/TournamentArchive";
 import Tournaments from "./pages/Tournaments";
+import TournamentDetail from "./pages/TournamentDetail";
 import MyTeams from "./pages/MyTeams";
 import NotFound from "./pages/NotFound";
 
