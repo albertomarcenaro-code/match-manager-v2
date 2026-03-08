@@ -181,13 +181,19 @@ const MatchApp = () => {
               </div>
             ) : (
               <>
-                {/* Timer Controls */}
+                 {/* Timer Controls */}
                 <TimerControls
                   state={state}
                   onStartPeriod={startPeriod}
                   onPause={pauseTimer}
                   onResume={resumeTimer}
-                  onEndPeriod={endPeriod}
+                  onEndPeriod={() => {
+                    endPeriod();
+                    // Auto-navigate to Starters tab for next period setup
+                    if (!state.isMatchEnded) {
+                      setActiveTab('starters');
+                    }
+                  }}
                   onEndMatch={() => {
                     if (state.isRunning) endPeriod();
                     endMatch();
