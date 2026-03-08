@@ -25,7 +25,15 @@
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#f0f2f5;">
+        <div style="text-align:center;">
+          <div style="width:48px;height:48px;border:4px solid #e5e7eb;border-top-color:#2ea35f;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;"></div>
+          <p style="font-family:'DM Sans',sans-serif;color:#1a3a5c;font-size:14px;margin:0;">Caricamento...</p>
+        </div>
+      </div>
+    </div>
+    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
