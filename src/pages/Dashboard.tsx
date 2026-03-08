@@ -27,7 +27,6 @@ function getMatchHistory(): MatchSummary[] {
       try {
         const data = JSON.parse(localStorage.getItem(key) || '');
         const matchId = key.replace('match_state_', '');
-        // Extract timestamp from ID
         const tsMatch = matchId.match(/\d+$/);
         const timestamp = tsMatch ? parseInt(tsMatch[0]) : 0;
         history.push({
@@ -46,6 +45,16 @@ function getMatchHistory(): MatchSummary[] {
   return history.sort((a, b) => b.timestamp - a.timestamp);
 }
 
+const formatDate = (ts: number) => {
+  if (!ts) return '';
+  try {
+    return new Date(ts).toLocaleDateString('it-IT', {
+      day: '2-digit', month: '2-digit', year: '2-digit',
+      hour: '2-digit', minute: '2-digit',
+    });
+  } catch { return ''; }
+};
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { isGuest } = useAuth();
@@ -58,7 +67,7 @@ export default function Dashboard() {
   const handleTournamentClick = () => {
     if (isGuest) {
       toast.error("Accesso limitato", {
-        description: "Devi essere registrato per creare e gestire i tornei nel database.",
+        description: "Devi essere registrato per creare e gestire i tornei.",
         duration: 4000,
       });
       return;
@@ -73,39 +82,22 @@ export default function Dashboard() {
 
   const handleDeleteMatch = (matchId: string) => {
     localStorage.removeItem(`match_state_${matchId}`);
-    // Also remove from match list
     try {
       const list: string[] = JSON.parse(localStorage.getItem('match_list') || '[]');
-      const updated = list.filter(id => id !== matchId);
-      localStorage.setItem('match_list', JSON.stringify(updated));
+      localStorage.setItem('match_list', JSON.stringify(list.filter(id => id !== matchId)));
     } catch {}
     setMatchHistory(prev => prev.filter(m => m.id !== matchId));
     toast.success("Partita eliminata");
   };
 
-  const formatDate = (ts: number) => {
-    if (!ts) return '';
-    try {
-      return new Date(ts).toLocaleDateString('it-IT', {
-        day: '2-digit',
-        month: '2-digit',
-        year: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return '';
-    }
-  };
-
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
-      <main className="flex-1 p-6 max-w-4xl mx-auto w-full">
-        <h1 className="text-3xl font-bold mb-8">Benvenuto</h1>
+      <main className="flex-1 p-4 sm:p-6 max-w-4xl mx-auto w-full">
+        <h1 className="text-3xl font-bold mb-6">Benvenuto</h1>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Box Gestione Tornei */}
+          {/* Tornei Card */}
           <Card className={`p-6 flex flex-col items-center text-center gap-4 transition-all border-2 relative ${
             isGuest 
               ? "opacity-80 border-muted bg-muted/5 shadow-none" 
@@ -123,48 +115,55 @@ export default function Dashboard() {
               <h2 className="text-xl font-bold">I Tuoi Tornei</h2>
               <p className="text-sm text-muted-foreground">
                 {isGuest 
-                  ? "Registrati per sbloccare la creazione di tornei e classifiche." 
+                  ? "Registrati per sbloccare tornei e classifiche." 
                   : "Crea, modifica e gestisci le partite dei tuoi tornei."}
               </p>
             </div>
-            <Button 
-              onClick={handleTournamentClick} 
-              className="w-full"
-              variant={isGuest ? "secondary" : "default"}
-            >
+            <Button onClick={handleTournamentClick} className="w-full" variant={isGuest ? "secondary" : "default"}>
               {isGuest ? "Solo per utenti registrati" : "Vai ai Tornei"}
             </Button>
           </Card>
 
-          {/* Box Nuova Partita Singola */}
+          {/* Partite Singole Card - now symmetric with Tornei */}
           <Card className="p-6 flex flex-col items-center text-center gap-4 hover:shadow-lg transition-shadow border-2 border-transparent hover:border-primary/20">
             <div className="p-4 bg-primary/10 rounded-full">
               <Plus className="h-8 w-8 text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-bold">Partita Singola</h2>
-              <p className="text-sm text-muted-foreground">Avvia subito una partita singola senza torneo.</p>
+              <h2 className="text-xl font-bold">Partite Singole</h2>
+              <p className="text-sm text-muted-foreground">
+                {matchHistory.length > 0 
+                  ? `${matchHistory.length} partite salvate` 
+                  : "Avvia una partita singola senza torneo."}
+              </p>
             </div>
-            <Button onClick={handleQuickMatch} variant="outline" className="w-full">
-              Inizia Partita
+            <Button onClick={handleQuickMatch} variant="outline" className="w-full gap-2">
+              <Plus className="h-4 w-4" /> Nuova Partita
             </Button>
           </Card>
         </div>
 
-        {/* Match History Section */}
-        {matchHistory.length > 0 && (
-          <div className="mt-10">
-            <div className="flex items-center gap-2 mb-4">
-              <History className="h-5 w-5 text-muted-foreground" />
-              <h2 className="text-xl font-bold">Storico Partite Singole</h2>
-            </div>
+        {/* Match History - always visible below the cards */}
+        <div className="mt-8">
+          <div className="flex items-center gap-2 mb-4">
+            <History className="h-5 w-5 text-muted-foreground" />
+            <h2 className="text-xl font-bold">Storico Partite Singole</h2>
+          </div>
+
+          {matchHistory.length === 0 ? (
+            <Card className="p-8 text-center">
+              <p className="text-muted-foreground text-sm">
+                Nessuna partita salvata. Avvia una nuova partita singola per iniziare.
+              </p>
+            </Card>
+          ) : (
             <div className="space-y-3">
               {matchHistory.map((match) => (
-                <Card key={match.id} className="p-4 flex items-center gap-4">
+                <Card key={match.id} className="p-4 flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 text-sm font-semibold">
                       <span className="truncate">{match.homeTeam}</span>
-                      <span className="text-lg font-bold text-primary">
+                      <span className="text-lg font-bold text-primary whitespace-nowrap">
                         {match.homeScore} - {match.awayScore}
                       </span>
                       <span className="truncate">{match.awayTeam}</span>
@@ -180,9 +179,7 @@ export default function Dashboard() {
                         {match.isEnded ? 'Terminata' : match.isStarted ? 'In corso' : 'Da iniziare'}
                       </span>
                       {match.timestamp > 0 && (
-                        <span className="text-xs text-muted-foreground">
-                          {formatDate(match.timestamp)}
-                        </span>
+                        <span className="text-xs text-muted-foreground">{formatDate(match.timestamp)}</span>
                       )}
                     </div>
                   </div>
@@ -211,8 +208,8 @@ export default function Dashboard() {
                 </Card>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </main>
       <Footer />
     </div>

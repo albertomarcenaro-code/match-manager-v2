@@ -1,9 +1,6 @@
 import { MatchState, MatchEvent } from '@/types/match';
 import { cn } from '@/lib/utils';
 import { useTournament } from '@/hooks/useTournament';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Home } from 'lucide-react';
 
 interface MatchHeaderProps {
   state: MatchState;
@@ -11,9 +8,7 @@ interface MatchHeaderProps {
 }
 
 export function MatchHeader({ state, isTournamentMode }: MatchHeaderProps) {
-  const navigate = useNavigate();
   const tournamentData = useTournament();
-  // Accesso sicuro ai dati per evitare crash
   const tournament = tournamentData?.tournament;
 
   const formatTime = (seconds: number) => {
@@ -37,40 +32,18 @@ export function MatchHeader({ state, isTournamentMode }: MatchHeaderProps) {
   return (
     <div className="bg-card rounded-xl shadow-card overflow-hidden border border-border/50">
       
-      {/* Barra superiore dinamica con pulsante Home */}
+      {/* Top label bar - no Home button here anymore */}
       {isTournamentMode && tournament?.isActive ? (
-        <div className="bg-secondary/10 py-2 px-4 border-b border-secondary/20 flex justify-between items-center">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => navigate('/dashboard')}
-            title="Torna alla Dashboard"
-          >
-            <Home className="h-4 w-4" />
-          </Button>
+        <div className="bg-secondary/10 py-2 px-4 border-b border-secondary/20 flex justify-center items-center">
           <span className="text-[10px] font-bold uppercase tracking-widest text-secondary">
             Torneo: {tournament.name}
           </span>
-          <span className="text-[10px] font-medium text-muted-foreground uppercase">
-            {tournament.matches?.length || 0} Partite salvate
-          </span>
         </div>
       ) : (
-        <div className="bg-muted/30 py-2 px-4 border-b border-border/50 flex justify-between items-center">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => navigate('/dashboard')}
-            title="Torna alla Dashboard"
-          >
-            <Home className="h-4 w-4" />
-          </Button>
+        <div className="bg-muted/30 py-1.5 px-4 border-b border-border/50 flex justify-center items-center">
           <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            Modalità Partita Rapida
+            Partita Rapida
           </span>
-          <div className="w-7" /> {/* Spacer for alignment */}
         </div>
       )}
 
