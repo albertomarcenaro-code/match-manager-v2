@@ -18,11 +18,13 @@ export function StarterSelection({
   onConfirm,
 }: StarterSelectionProps) {
   const eligibleHomePlayers = homePlayers.filter(p => p.number !== null);
+  const eligibleAwayPlayers = awayPlayers.filter(p => !p.isExpelled);
+  const nonExpelledHome = eligibleHomePlayers.filter(p => !p.isExpelled);
   const [selectedHome, setSelectedHome] = useState<Set<string>>(
-    new Set(eligibleHomePlayers.filter(p => p.isStarter || p.isOnField).map(p => p.id))
+    new Set(nonExpelledHome.filter(p => p.isStarter || p.isOnField).map(p => p.id))
   );
   const [selectedAway, setSelectedAway] = useState<Set<string>>(
-    new Set(awayPlayers.filter(p => p.isStarter || p.isOnField).map(p => p.id))
+    new Set(eligibleAwayPlayers.filter(p => p.isStarter || p.isOnField).map(p => p.id))
   );
 
   const toggleHome = (playerId: string) => {
