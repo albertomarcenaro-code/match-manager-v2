@@ -14,6 +14,7 @@ import MatchApp from "./pages/MatchApp";
 import TournamentArchive from "./pages/TournamentArchive";
 import Tournaments from "./pages/Tournaments";
 import TournamentDetail from "./pages/TournamentDetail";
+import MatchSummary from "./pages/MatchSummary";
 import MyTeams from "./pages/MyTeams";
 import NotFound from "./pages/NotFound";
 
