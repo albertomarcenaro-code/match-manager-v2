@@ -201,6 +201,7 @@ const MatchApp = () => {
                   onEndMatch={() => {
                     if (state.isRunning) endPeriod();
                     endMatch();
+                    setActiveTab('live');
                   }}
                   onUndo={undoLastEvent}
                 />
