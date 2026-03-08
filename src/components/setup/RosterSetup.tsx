@@ -790,20 +790,18 @@ export function RosterSetup({
                 <Button onClick={handleAddPlayer} size="icon" className="flex-shrink-0">
                   <Plus className="h-5 w-5" />
                 </Button>
-                {!isGuest && (
-                  <Button 
-                    onClick={() => {
-                      setBulkImportTeam('home');
-                      setBulkImportDialogOpen(true);
-                    }} 
-                    size="icon" 
-                    variant="outline"
-                    className="flex-shrink-0"
-                    title="Importa lista nomi"
-                  >
-                    <Upload className="h-5 w-5" />
-                  </Button>
-                )}
+                <Button 
+                  onClick={() => {
+                    setBulkImportTeam('home');
+                    setBulkImportDialogOpen(true);
+                  }} 
+                  size="icon" 
+                  variant="outline"
+                  className="flex-shrink-0"
+                  title="Importa lista nomi"
+                >
+                  <Upload className="h-5 w-5" />
+                </Button>
                 <Button 
                   onClick={() => {
                     setAutoNumberTeam('home');
