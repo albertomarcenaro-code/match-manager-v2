@@ -139,30 +139,24 @@ export default function Tournaments() {
         ) : (
           <div className="space-y-3">
             {tournaments.map((t) => (
-              <Card key={t.id} className="p-4 flex items-center gap-3">
-                <div
-                  className="flex-1 cursor-pointer min-w-0"
-                    onClick={() => navigate(`/tournament/${t.id}`)}
-                >
+              <Card
+                key={t.id}
+                className="p-4 flex items-center gap-3 cursor-pointer transition-all hover:shadow-md hover:bg-accent/50 active:scale-[0.99]"
+                onClick={() => navigate(`/tournament/${t.id}`)}
+              >
+                <div className="flex-1 min-w-0">
                   <h3 className="font-bold truncate">{t.name}</h3>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <Button
                     size="sm"
-                    variant="outline"
-                    className="gap-1 h-8 text-xs"
-                    onClick={() => navigate(`/tournament/${t.id}`)}
-                  >
-                    <ChevronRight className="h-3 w-3" /> Apri
-                  </Button>
-                  <Button
-                    size="sm"
                     variant="ghost"
                     className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => setDeleteTarget(t.id)}
+                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(t.id); }}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </div>
               </Card>
             ))}

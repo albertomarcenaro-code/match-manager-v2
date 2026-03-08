@@ -5,7 +5,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
-  Trophy, Plus, Trash2, ChevronLeft, Loader2, BarChart3, Eye,
+  Trophy, Plus, Trash2, ChevronLeft, Loader2, BarChart3, Eye, Download,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,6 +17,10 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import ExcelJS from "exceljs";
 
 interface TournamentData {
   id: string;
@@ -36,6 +40,15 @@ interface TournamentMatchRow {
   tournament_id: string;
 }
 
+interface PlayerAggStats {
+  name: string;
+  goals: number;
+  yellowCards: number;
+  redCards: number;
+  minutes: number;
+  matchesPlayed: number;
+}
+
 export default function TournamentDetail() {
   const { id: tournamentId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -48,11 +61,8 @@ export default function TournamentDetail() {
   const [showStats, setShowStats] = useState(false);
 
   useEffect(() => {
-    if (user && tournamentId) {
-      loadTournament();
-    } else {
-      setLoading(false);
-    }
+    if (user && tournamentId) loadTournament();
+    else setLoading(false);
   }, [user, tournamentId]);
 
   const loadTournament = async () => {
@@ -65,7 +75,6 @@ export default function TournamentDetail() {
         .eq("id", tournamentId)
         .eq("user_id", user.id)
         .single();
-
       if (tError) throw tError;
       setTournament(tData as TournamentData);
 
@@ -75,7 +84,6 @@ export default function TournamentDetail() {
         .eq("tournament_id", tournamentId)
         .eq("user_id", user.id)
         .order("match_date", { ascending: false });
-
       if (mError) throw mError;
       setMatches((mData || []) as TournamentMatchRow[]);
     } catch (error: any) {
@@ -120,45 +128,88 @@ export default function TournamentDetail() {
     } catch { return ""; }
   };
 
-  // Aggregate stats from all match_data
   const computeGlobalStats = () => {
-    let totalGoals = 0;
-    let totalYellow = 0;
-    let totalRed = 0;
-    let wins = 0;
-    let draws = 0;
-    let losses = 0;
-    const playerGoals: Record<string, number> = {};
+    let wins = 0, draws = 0, losses = 0;
+    const playerMap: Record<string, PlayerAggStats> = {};
 
     for (const m of matches) {
-      totalGoals += m.home_score + m.away_score;
-
-      // Determine result (home is "our" team)
       if (m.home_score > m.away_score) wins++;
       else if (m.home_score === m.away_score) draws++;
       else losses++;
 
-      // Parse events from match_data if available
       if (m.match_data && typeof m.match_data === "object") {
-        const events = (m.match_data as any).events || [];
+        const md = m.match_data as any;
+        const events = md.events || [];
+        const homePlayers = md.homePlayers || [];
+
+        // Aggregate player minutes from homePlayers roster data
+        for (const p of homePlayers) {
+          const name = p.name || "Sconosciuto";
+          if (!playerMap[name]) {
+            playerMap[name] = { name, goals: 0, yellowCards: 0, redCards: 0, minutes: 0, matchesPlayed: 0 };
+          }
+          const totalSec = p.totalSecondsPlayed || 0;
+          if (totalSec > 0 || p.isOnField) {
+            playerMap[name].minutes += Math.round(totalSec / 60);
+            playerMap[name].matchesPlayed += 1;
+          }
+        }
+
+        // Aggregate events
         for (const ev of events) {
           if (ev.type === "goal" && ev.team === "home") {
             const name = ev.playerName || "Sconosciuto";
-            playerGoals[name] = (playerGoals[name] || 0) + 1;
+            if (!playerMap[name]) {
+              playerMap[name] = { name, goals: 0, yellowCards: 0, redCards: 0, minutes: 0, matchesPlayed: 0 };
+            }
+            playerMap[name].goals += 1;
           }
-          if (ev.type === "card") {
-            if (ev.cardType === "yellow") totalYellow++;
-            if (ev.cardType === "red") totalRed++;
+          if (ev.type === "card" && ev.team === "home") {
+            const name = ev.playerName || "Sconosciuto";
+            if (!playerMap[name]) {
+              playerMap[name] = { name, goals: 0, yellowCards: 0, redCards: 0, minutes: 0, matchesPlayed: 0 };
+            }
+            if (ev.cardType === "yellow") playerMap[name].yellowCards += 1;
+            if (ev.cardType === "red") playerMap[name].redCards += 1;
           }
         }
       }
     }
 
-    const topScorers = Object.entries(playerGoals)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
+    const players = Object.values(playerMap).sort((a, b) => b.minutes - a.minutes);
+    return { wins, draws, losses, players };
+  };
 
-    return { totalGoals, totalYellow, totalRed, wins, draws, losses, topScorers };
+  const exportExcel = async () => {
+    const stats = computeGlobalStats();
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Statistiche Torneo");
+
+    ws.columns = [
+      { header: "Giocatore", key: "name", width: 25 },
+      { header: "Presenze", key: "matchesPlayed", width: 12 },
+      { header: "Minuti", key: "minutes", width: 12 },
+      { header: "Gol", key: "goals", width: 10 },
+      { header: "Ammonizioni", key: "yellowCards", width: 14 },
+      { header: "Espulsioni", key: "redCards", width: 12 },
+    ];
+
+    // Style header
+    ws.getRow(1).font = { bold: true };
+
+    for (const p of stats.players) {
+      ws.addRow(p);
+    }
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${tournament?.name || "torneo"}_statistiche.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Report Excel scaricato!");
   };
 
   if (loading) {
@@ -239,20 +290,13 @@ export default function TournamentDetail() {
                   <p className="text-xs text-muted-foreground mt-1">{formatDate(m.match_date)}</p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 w-8 p-0"
-                    onClick={() => navigate(`/match/${m.id}`)}
-                  >
+                  <Button size="sm" variant="outline" className="h-8 w-8 p-0"
+                    onClick={() => navigate(`/match/${m.id}`)}>
                     <Eye className="h-3.5 w-3.5" />
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
+                  <Button size="sm" variant="ghost"
                     className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => setDeleteTarget(m.id)}
-                  >
+                    onClick={() => setDeleteTarget(m.id)}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -281,7 +325,7 @@ export default function TournamentDetail() {
 
       {/* Global Stats Dialog */}
       <Dialog open={showStats} onOpenChange={setShowStats}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5" /> Statistiche Globali
@@ -304,40 +348,44 @@ export default function TournamentDetail() {
               </Card>
             </div>
 
-            {/* Totals */}
-            <div className="grid grid-cols-3 gap-3 text-center">
-              <Card className="p-3">
-                <p className="text-2xl font-bold">{stats.totalGoals}</p>
-                <p className="text-xs text-muted-foreground">Gol Totali</p>
-              </Card>
-              <Card className="p-3">
-                <p className="text-2xl font-bold text-yellow-500">{stats.totalYellow}</p>
-                <p className="text-xs text-muted-foreground">Ammonizioni</p>
-              </Card>
-              <Card className="p-3">
-                <p className="text-2xl font-bold text-destructive">{stats.totalRed}</p>
-                <p className="text-xs text-muted-foreground">Espulsioni</p>
-              </Card>
-            </div>
-
-            {/* Top Scorers */}
-            {stats.topScorers.length > 0 && (
-              <div>
-                <h3 className="font-semibold text-sm mb-2">Classifica Marcatori</h3>
-                <div className="space-y-1">
-                  {stats.topScorers.map(([name, goals], i) => (
-                    <div key={name} className="flex items-center justify-between text-sm px-2 py-1 rounded bg-muted/50">
-                      <span className="font-medium">{i + 1}. {name}</span>
-                      <span className="font-bold">{goals} ⚽</span>
-                    </div>
-                  ))}
+            {/* Player stats table */}
+            {stats.players.length > 0 ? (
+              <>
+                <h3 className="font-semibold text-sm">Rendimento Giocatori</h3>
+                <div className="rounded-md border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Giocatore</TableHead>
+                        <TableHead className="text-xs text-center">Pres.</TableHead>
+                        <TableHead className="text-xs text-center">Min</TableHead>
+                        <TableHead className="text-xs text-center">⚽</TableHead>
+                        <TableHead className="text-xs text-center">🟨</TableHead>
+                        <TableHead className="text-xs text-center">🟥</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stats.players.map((p) => (
+                        <TableRow key={p.name}>
+                          <TableCell className="text-xs font-medium py-2">{p.name}</TableCell>
+                          <TableCell className="text-xs text-center py-2">{p.matchesPlayed}</TableCell>
+                          <TableCell className="text-xs text-center py-2">{p.minutes}'</TableCell>
+                          <TableCell className="text-xs text-center py-2">{p.goals || "-"}</TableCell>
+                          <TableCell className="text-xs text-center py-2">{p.yellowCards || "-"}</TableCell>
+                          <TableCell className="text-xs text-center py-2">{p.redCards || "-"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
-              </div>
-            )}
 
-            {matches.length === 0 && (
+                <Button onClick={exportExcel} variant="outline" className="w-full gap-2">
+                  <Download className="h-4 w-4" /> Scarica Report Excel
+                </Button>
+              </>
+            ) : (
               <p className="text-center text-muted-foreground text-sm">
-                Nessuna partita disputata per calcolare le statistiche.
+                Nessun dato disponibile per le statistiche.
               </p>
             )}
           </div>
