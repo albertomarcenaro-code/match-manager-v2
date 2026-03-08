@@ -65,6 +65,15 @@ const App = () => (
             <Route path="/match" element={<Navigate to="/dashboard" replace />} />
             {/* --------------------------- */}
             
+            {/* My Teams page - registered users only */}
+            <Route 
+              path="/my-teams" 
+              element={
+                <TournamentProtectedRoute>
+                  <MyTeams />
+                </TournamentProtectedRoute>
+              } 
+            />
             <Route 
               path="/tournaments" 
               element={
