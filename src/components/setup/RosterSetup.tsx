@@ -689,19 +689,10 @@ export function RosterSetup({
   const pageTitle = shouldShowTournamentName ? tournament.name : 'Configurazione Partita';
 
   return (
-    <div className="min-h-screen bg-background p-4 pb-24">
+    <div className="bg-background p-4 pb-24">
       <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header with Home button */}
-        <div className="relative text-center py-6">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute left-0 top-6"
-            onClick={() => navigate('/')}
-            title="Torna alla Home"
-          >
-            <Home className="h-5 w-5" />
-          </Button>
+        {/* Header - Home button removed (now in match nav bar) */}
+        <div className="text-center py-4">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/10 text-secondary mb-4">
             {isTournamentMode ? <Trophy className="h-5 w-5" /> : <Shield className="h-5 w-5" />}
             <span className="font-semibold">{pageTitle}</span>
