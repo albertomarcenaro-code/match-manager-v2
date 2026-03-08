@@ -201,6 +201,7 @@ const MatchApp = () => {
                   onEndMatch={() => {
                     if (state.isRunning) endPeriod();
                     endMatch();
+                    setActiveTab('live');
                   }}
                   onUndo={undoLastEvent}
                 />
@@ -244,12 +245,20 @@ const MatchApp = () => {
                   awayTeamName={state.awayTeam.name}
                 />
 
-                {/* Export buttons when match ended */}
+                {/* Final Report section when match ended */}
                 {state.isMatchEnded && (
-                  <div className="flex flex-wrap gap-3 justify-center p-4 bg-card rounded-xl shadow-card">
-                    <ExportButton state={state} />
-                    <PDFExportButton state={state} />
-                    <WhatsAppShareButton state={state} />
+                  <div className="space-y-4">
+                    <div className="text-center">
+                      <h2 className="text-lg font-bold text-foreground">Riepilogo Finale</h2>
+                      <p className="text-sm text-muted-foreground">
+                        {state.homeTeam.name} {state.homeTeam.score} - {state.awayTeam.score} {state.awayTeam.name}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 p-4 bg-card rounded-xl shadow-card">
+                      <div className="w-full"><ExportButton state={state} /></div>
+                      <div className="w-full"><PDFExportButton state={state} /></div>
+                      <div className="w-full"><WhatsAppShareButton state={state} /></div>
+                    </div>
                   </div>
                 )}
               </>

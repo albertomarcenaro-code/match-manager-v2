@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Player } from '@/types/match';
-import { Check, Users } from 'lucide-react';
+import { Check, Users, ShieldOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface StarterSelectionProps {
@@ -18,14 +18,18 @@ export function StarterSelection({
   onConfirm,
 }: StarterSelectionProps) {
   const eligibleHomePlayers = homePlayers.filter(p => p.number !== null);
+  const eligibleAwayPlayers = awayPlayers.filter(p => !p.isExpelled);
+  const nonExpelledHome = eligibleHomePlayers.filter(p => !p.isExpelled);
   const [selectedHome, setSelectedHome] = useState<Set<string>>(
-    new Set(eligibleHomePlayers.filter(p => p.isStarter || p.isOnField).map(p => p.id))
+    new Set(nonExpelledHome.filter(p => p.isStarter || p.isOnField).map(p => p.id))
   );
   const [selectedAway, setSelectedAway] = useState<Set<string>>(
-    new Set(awayPlayers.filter(p => p.isStarter || p.isOnField).map(p => p.id))
+    new Set(eligibleAwayPlayers.filter(p => p.isStarter || p.isOnField).map(p => p.id))
   );
 
   const toggleHome = (playerId: string) => {
+    const player = eligibleHomePlayers.find(p => p.id === playerId);
+    if (player?.isExpelled) return;
     const newSet = new Set(selectedHome);
     if (newSet.has(playerId)) {
       newSet.delete(playerId);
@@ -36,6 +40,8 @@ export function StarterSelection({
   };
 
   const toggleAway = (playerId: string) => {
+    const player = awayPlayers.find(p => p.id === playerId);
+    if (player?.isExpelled) return;
     const newSet = new Set(selectedAway);
     if (newSet.has(playerId)) {
       newSet.delete(playerId);
@@ -73,31 +79,41 @@ export function StarterSelection({
             <span className="text-sm opacity-80">{selectedHome.size} selezionati</span>
           </div>
           <div className="p-3 space-y-2 max-h-[300px] overflow-y-auto">
-            {eligibleHomePlayers.map(player => (
-              <button
-                key={player.id}
-                onClick={() => toggleHome(player.id)}
-                className={cn(
-                  "w-full flex items-center gap-3 p-2 rounded-lg border transition-all",
-                  selectedHome.has(player.id)
-                    ? "bg-on-field/10 border-on-field/50"
-                    : "bg-muted/50 border-border hover:border-muted-foreground/30"
-                )}
-              >
-                <span className={cn(
-                  "w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold transition-colors",
-                  selectedHome.has(player.id)
-                    ? "bg-on-field text-on-field-foreground"
-                    : "bg-muted text-muted-foreground"
-                )}>
-                  {player.number}
-                </span>
-                <span className="flex-1 text-left text-sm font-medium">{player.name}</span>
-                {selectedHome.has(player.id) && (
-                  <Check className="h-5 w-5 text-on-field" />
-                )}
-              </button>
-            ))}
+            {eligibleHomePlayers.map(player => {
+              const expelled = !!player.isExpelled;
+              return (
+                <button
+                  key={player.id}
+                  onClick={() => toggleHome(player.id)}
+                  disabled={expelled}
+                  className={cn(
+                    "w-full flex items-center gap-3 p-2 rounded-lg border transition-all",
+                    expelled
+                      ? "bg-destructive/10 border-destructive/30 opacity-50 cursor-not-allowed"
+                      : selectedHome.has(player.id)
+                        ? "bg-on-field/10 border-on-field/50"
+                        : "bg-muted/50 border-border hover:border-muted-foreground/30"
+                  )}
+                >
+                  <span className={cn(
+                    "w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold transition-colors",
+                    expelled
+                      ? "bg-destructive text-destructive-foreground"
+                      : selectedHome.has(player.id)
+                        ? "bg-on-field text-on-field-foreground"
+                        : "bg-muted text-muted-foreground"
+                  )}>
+                    {player.number}
+                  </span>
+                  <span className={cn("flex-1 text-left text-sm font-medium", expelled && "line-through")}>{player.name}</span>
+                  {expelled ? (
+                    <ShieldOff className="h-5 w-5 text-destructive" />
+                  ) : selectedHome.has(player.id) ? (
+                    <Check className="h-5 w-5 text-on-field" />
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -108,31 +124,41 @@ export function StarterSelection({
             <span className="text-sm opacity-80">{selectedAway.size} selezionati</span>
           </div>
           <div className="p-3 space-y-2 max-h-[300px] overflow-y-auto">
-            {awayPlayers.map(player => (
-              <button
-                key={player.id}
-                onClick={() => toggleAway(player.id)}
-                className={cn(
-                  "w-full flex items-center gap-3 p-2 rounded-lg border transition-all",
-                  selectedAway.has(player.id)
-                    ? "bg-on-field/10 border-on-field/50"
-                    : "bg-muted/50 border-border hover:border-muted-foreground/30"
-                )}
-              >
-                <span className={cn(
-                  "w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold transition-colors",
-                  selectedAway.has(player.id)
-                    ? "bg-on-field text-on-field-foreground"
-                    : "bg-muted text-muted-foreground"
-                )}>
-                  {player.number}
-                </span>
-                 <span className="flex-1 text-left text-sm font-medium">{player.name || `#${player.number ?? ''}`}</span>
-                 {selectedAway.has(player.id) && (
-                  <Check className="h-5 w-5 text-on-field" />
-                )}
-              </button>
-            ))}
+            {awayPlayers.map(player => {
+              const expelled = !!player.isExpelled;
+              return (
+                <button
+                  key={player.id}
+                  onClick={() => toggleAway(player.id)}
+                  disabled={expelled}
+                  className={cn(
+                    "w-full flex items-center gap-3 p-2 rounded-lg border transition-all",
+                    expelled
+                      ? "bg-destructive/10 border-destructive/30 opacity-50 cursor-not-allowed"
+                      : selectedAway.has(player.id)
+                        ? "bg-on-field/10 border-on-field/50"
+                        : "bg-muted/50 border-border hover:border-muted-foreground/30"
+                  )}
+                >
+                  <span className={cn(
+                    "w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold transition-colors",
+                    expelled
+                      ? "bg-destructive text-destructive-foreground"
+                      : selectedAway.has(player.id)
+                        ? "bg-on-field text-on-field-foreground"
+                        : "bg-muted text-muted-foreground"
+                  )}>
+                    {player.number}
+                  </span>
+                  <span className={cn("flex-1 text-left text-sm font-medium", expelled && "line-through")}>{player.name || `#${player.number ?? ''}`}</span>
+                  {expelled ? (
+                    <ShieldOff className="h-5 w-5 text-destructive" />
+                  ) : selectedAway.has(player.id) ? (
+                    <Check className="h-5 w-5 text-on-field" />
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
