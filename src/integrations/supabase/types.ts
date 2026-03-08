@@ -24,6 +24,7 @@ export type Database = {
           id: string
           match_data: Json | null
           match_date: string
+          tournament_id: string | null
           user_id: string
         }
         Insert: {
@@ -35,6 +36,7 @@ export type Database = {
           id?: string
           match_data?: Json | null
           match_date?: string
+          tournament_id?: string | null
           user_id: string
         }
         Update: {
@@ -46,9 +48,18 @@ export type Database = {
           id?: string
           match_data?: Json | null
           match_date?: string
+          tournament_id?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "matches_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       players: {
         Row: {

@@ -142,7 +142,7 @@ export default function Tournaments() {
               <Card key={t.id} className="p-4 flex items-center gap-3">
                 <div
                   className="flex-1 cursor-pointer min-w-0"
-                  onClick={() => navigate(`/tournaments/${t.id}`)}
+                    onClick={() => navigate(`/tournament/${t.id}`)}
                 >
                   <h3 className="font-bold truncate">{t.name}</h3>
                 </div>
@@ -151,7 +151,7 @@ export default function Tournaments() {
                     size="sm"
                     variant="outline"
                     className="gap-1 h-8 text-xs"
-                    onClick={() => navigate(`/tournaments/${t.id}`)}
+                    onClick={() => navigate(`/tournament/${t.id}`)}
                   >
                     <ChevronRight className="h-3 w-3" /> Apri
                   </Button>
