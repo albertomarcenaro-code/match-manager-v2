@@ -98,6 +98,36 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_teams: {
+        Row: {
+          category: string | null
+          created_at: string
+          id: string
+          name: string
+          players: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          players?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          players?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       tournament_matches: {
         Row: {
           away_score: number
