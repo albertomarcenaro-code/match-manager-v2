@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Player } from '@/types/match';
-import { Plus, Trash2, Users, Shield, Check, Hash, Upload, Save, ArrowLeftRight, Trophy, ChevronUp, ChevronRight, Home } from 'lucide-react';
+import { Plus, Trash2, Users, Shield, Check, Hash, Upload, Save, ArrowLeftRight, Trophy, ChevronUp, ChevronRight, Home, FolderOpen, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { playerSchema, validateOrThrow } from '@/lib/validations';
 import { toast } from 'sonner';
