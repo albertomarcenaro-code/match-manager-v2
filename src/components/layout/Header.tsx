@@ -2,7 +2,7 @@ import { useState, forwardRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import logo from '@/assets/logo.png';
-import { User, LogOut, KeyRound, Wifi, WifiOff, Home, Plus } from 'lucide-react';
+import { User, LogOut, KeyRound, Wifi, WifiOff, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -35,8 +35,6 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(({
   syncStatus = 'checking', 
   isTournamentMode = false, 
   onTournamentModeChange,
-  onNewMatch,
-  showNavButtons = false,
 }, ref) => {
   const { user, isGuest, signOut, exitGuest } = useAuth();
   const navigate = useNavigate();
@@ -80,40 +78,19 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(({
     }
   };
 
-  const handleGoHome = () => {
-    navigate('/dashboard');
-  };
-
   const canToggleTournament = user && !isGuest;
 
   return (
     <header ref={ref} className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 max-w-6xl items-center justify-between gap-2 px-3 mx-auto">
         
-        {/* Left: Logo + Text + Nav Buttons */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 mr-1">
-            <img src={logo} alt="Match Manager Live Logo" className="h-8 w-8 object-contain" />
-            <span className="font-bold text-sm sm:text-base tracking-tight leading-none whitespace-nowrap">
-              <span className="text-slate-900">Match Manager</span>{' '}
-              <span className="text-green-500">Live</span>
-            </span>
-          </div>
-          
-          {showNavButtons && (
-            <div className="flex items-center gap-1 border-l pl-2 border-border/60">
-              <Button variant="ghost" size="sm" onClick={handleGoHome} className="gap-1 h-8 px-2">
-                <Home className="h-4 w-4" />
-                <span className="hidden md:inline text-xs">Home</span>
-              </Button>
-              {onNewMatch && (
-                <Button variant="ghost" size="sm" onClick={onNewMatch} className="gap-1 h-8 px-2">
-                  <Plus className="h-4 w-4" />
-                  <span className="hidden md:inline text-xs">Nuova</span>
-                </Button>
-              )}
-            </div>
-          )}
+        {/* Left: Logo + Text */}
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/dashboard')}>
+          <img src={logo} alt="Match Manager Live Logo" className="h-8 w-8 object-contain" />
+          <span className="font-bold text-sm sm:text-base tracking-tight leading-none whitespace-nowrap">
+            <span className="text-foreground">Match Manager</span>{' '}
+            <span className="text-secondary">Live</span>
+          </span>
         </div>
         
         {/* Center: Toggle Switch */}
@@ -207,6 +184,12 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
+                {/* My Teams link in profile menu */}
+                <DropdownMenuItem onClick={() => navigate('/my-teams')}>
+                  <Users className="h-4 w-4 mr-2" />
+                  Le Mie Squadre
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleResetPassword} disabled={isLoading}>
                   <KeyRound className="h-4 w-4 mr-2" />
                   Reset Password

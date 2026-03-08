@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Player } from '@/types/match';
-import { Plus, Trash2, Users, Shield, Check, Hash, Upload, Save, ArrowLeftRight, Trophy, ChevronUp, ChevronRight, Home } from 'lucide-react';
+import { Plus, Trash2, Users, Shield, Check, Hash, Upload, Save, ArrowLeftRight, Trophy, ChevronUp, ChevronRight, Home, FolderOpen, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { playerSchema, validateOrThrow } from '@/lib/validations';
 import { toast } from 'sonner';
@@ -101,6 +101,11 @@ export function RosterSetup({
   const [tournamentMode, setTournamentMode] = useState(tournament.isActive && !isSingleMatchMode);
   const [tournamentName, setTournamentName] = useState(tournament.name || '');
   const [showTournamentDialog, setShowTournamentDialog] = useState(false);
+  // Saved teams import
+  const [savedTeamsDialogOpen, setSavedTeamsDialogOpen] = useState(false);
+  const [savedTeamsTarget, setSavedTeamsTarget] = useState<'home' | 'away'>('home');
+  const [savedTeams, setSavedTeams] = useState<{ id: string; name: string; category: string; players: { name: string; number: number | null }[] }[]>([]);
+  const [loadingSavedTeams, setLoadingSavedTeams] = useState(false);
 
   // Priorità: se esiste una rosa già salvata localmente (es. chiusura app / reload), NON sovrascrivere con dati dal backend.
   const hasLocalRoster = useMemo(() => {
@@ -599,6 +604,70 @@ export function RosterSetup({
     setShowTournamentDialog(false);
   };
 
+  // --- Saved Teams Import Logic ---
+  const handleOpenSavedTeams = async (target: 'home' | 'away') => {
+    if (!user || isGuest) {
+      toast.error('Devi essere loggato per usare le squadre salvate');
+      return;
+    }
+    setSavedTeamsTarget(target);
+    setLoadingSavedTeams(true);
+    setSavedTeamsDialogOpen(true);
+    try {
+      const { data, error } = await supabase
+        .from('saved_teams')
+        .select('id, name, category, players')
+        .order('updated_at', { ascending: false });
+      if (error) throw error;
+      setSavedTeams((data || []).map(t => ({
+        ...t,
+        category: t.category || '',
+        players: (t.players as unknown as { name: string; number: number | null }[]) || [],
+      })));
+    } catch (e) {
+      console.error(e);
+      toast.error('Errore nel caricamento delle squadre');
+    } finally {
+      setLoadingSavedTeams(false);
+    }
+  };
+
+  const handleLoadSavedTeam = (team: { name: string; players: { name: string; number: number | null }[] }) => {
+    if (savedTeamsTarget === 'home') {
+      onHomeTeamNameChange(team.name);
+      // Clear existing home players
+      homePlayers.forEach(p => onRemovePlayer(p.id));
+      // Add saved team players one by one
+      team.players.forEach(tp => {
+        onAddPlayer(tp.name);
+      });
+      // Assign numbers after state settles
+      if (team.players.some(p => p.number !== null) && onCreatePlayersWithNumbers) {
+        const maxNumber = Math.max(...team.players.filter(p => p.number !== null).map(p => p.number!), 0);
+        setTimeout(() => {
+          team.players.forEach((tp, i) => {
+            if (tp.number !== null) {
+              // Will be handled by user or auto-numbering
+            }
+          });
+        }, 100);
+      }
+      toast.info('Squadra caricata. Usa Auto-numerazione (#) per assegnare i numeri.');
+    } else {
+      onAwayTeamNameChange(team.name);
+      // Clear existing away players
+      awayPlayers.forEach(p => onRemoveOpponentPlayer(p.id));
+      // Add saved team players with numbers
+      team.players.forEach(tp => {
+        if (onAddAwayPlayerFull) {
+          onAddAwayPlayerFull(tp.name, tp.number);
+        }
+      });
+    }
+    setSavedTeamsDialogOpen(false);
+    toast.success(`Squadra "${team.name}" caricata`);
+  };
+
   const eligiblePlayers = homePlayers.filter(p => p.number !== null);
   const canProceed = eligiblePlayers.length >= 1 && awayPlayers.length >= 1 && !hasDuplicates;
 
@@ -616,19 +685,10 @@ export function RosterSetup({
   const pageTitle = shouldShowTournamentName ? tournament.name : 'Configurazione Partita';
 
   return (
-    <div className="min-h-screen bg-background p-4 pb-24">
+    <div className="bg-background p-4 pb-24">
       <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header with Home button */}
-        <div className="relative text-center py-6">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute left-0 top-6"
-            onClick={() => navigate('/')}
-            title="Torna alla Home"
-          >
-            <Home className="h-5 w-5" />
-          </Button>
+        {/* Header - Home button removed (now in match nav bar) */}
+        <div className="text-center py-4">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/10 text-secondary mb-4">
             {isTournamentMode ? <Trophy className="h-5 w-5" /> : <Shield className="h-5 w-5" />}
             <span className="font-semibold">{pageTitle}</span>
@@ -756,6 +816,17 @@ export function RosterSetup({
                 >
                   <Hash className="h-5 w-5" />
                 </Button>
+                {user && !isGuest && (
+                  <Button 
+                    onClick={() => handleOpenSavedTeams('home')} 
+                    size="icon" 
+                    variant="outline"
+                    className="flex-shrink-0"
+                    title="Carica squadra salvata"
+                  >
+                    <FolderOpen className="h-5 w-5" />
+                  </Button>
+                )}
               </div>
 
               {/* Players List */}
@@ -876,6 +947,17 @@ export function RosterSetup({
                 >
                   <Hash className="h-5 w-5" />
                 </Button>
+                {user && !isGuest && (
+                  <Button 
+                    onClick={() => handleOpenSavedTeams('away')} 
+                    size="icon" 
+                    variant="outline"
+                    className="flex-shrink-0"
+                    title="Carica squadra salvata"
+                  >
+                    <FolderOpen className="h-5 w-5" />
+                  </Button>
+                )}
               </div>
 
               {/* Opponents List - Editable */}
@@ -1076,6 +1158,51 @@ export function RosterSetup({
               <Button onClick={handleStartTournament}>
                 Avvia Torneo
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Saved Teams Import Dialog */}
+        <Dialog open={savedTeamsDialogOpen} onOpenChange={setSavedTeamsDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>
+                Carica Squadra Salvata - {savedTeamsTarget === 'home' ? 'Casa' : 'Ospite'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-2 space-y-2 max-h-[400px] overflow-y-auto">
+              {loadingSavedTeams ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+                  Caricamento...
+                </div>
+              ) : savedTeams.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p className="text-sm">Nessuna squadra salvata.</p>
+                  <Button variant="link" size="sm" onClick={() => { setSavedTeamsDialogOpen(false); navigate('/my-teams'); }}>
+                    Vai a "Le Mie Squadre" per crearne una
+                  </Button>
+                </div>
+              ) : (
+                savedTeams.map(team => (
+                  <Button
+                    key={team.id}
+                    variant="outline"
+                    className="w-full justify-start text-left h-auto py-3 px-4"
+                    onClick={() => handleLoadSavedTeam(team)}
+                  >
+                    <div>
+                      <p className="font-semibold text-sm">{team.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {team.category ? `${team.category} · ` : ''}{team.players.length} giocatori
+                      </p>
+                    </div>
+                  </Button>
+                ))
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSavedTeamsDialogOpen(false)}>Chiudi</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
