@@ -205,10 +205,36 @@ const MatchApp = () => {
                       setActiveTab('starters');
                     }
                   }}
-                  onEndMatch={() => {
+                  onEndMatch={async () => {
                     if (state.isRunning) endPeriod();
                     endMatch();
                     setActiveTab('live');
+                    // Save to DB if logged in and tournament match
+                    if (user && !isGuest && tournamentId && !savedToDbRef.current) {
+                      savedToDbRef.current = true;
+                      try {
+                        const { error } = await supabase.from('matches').insert({
+                          user_id: user.id,
+                          home_team_name: state.homeTeam.name,
+                          away_team_name: state.awayTeam.name,
+                          home_score: state.homeTeam.score,
+                          away_score: state.awayTeam.score,
+                          tournament_id: tournamentId,
+                          match_data: {
+                            events: state.events,
+                            periodScores: state.periodScores,
+                            homeTeam: state.homeTeam,
+                            awayTeam: state.awayTeam,
+                          } as any,
+                        });
+                        if (error) throw error;
+                        toast.success('Partita salvata nel torneo!');
+                      } catch (err: any) {
+                        console.error('Save match error:', err);
+                        toast.error('Errore nel salvataggio della partita');
+                        savedToDbRef.current = false;
+                      }
+                    }
                   }}
                   onUndo={undoLastEvent}
                 />
