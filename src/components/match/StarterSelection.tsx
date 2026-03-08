@@ -79,31 +79,41 @@ export function StarterSelection({
             <span className="text-sm opacity-80">{selectedHome.size} selezionati</span>
           </div>
           <div className="p-3 space-y-2 max-h-[300px] overflow-y-auto">
-            {eligibleHomePlayers.map(player => (
-              <button
-                key={player.id}
-                onClick={() => toggleHome(player.id)}
-                className={cn(
-                  "w-full flex items-center gap-3 p-2 rounded-lg border transition-all",
-                  selectedHome.has(player.id)
-                    ? "bg-on-field/10 border-on-field/50"
-                    : "bg-muted/50 border-border hover:border-muted-foreground/30"
-                )}
-              >
-                <span className={cn(
-                  "w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold transition-colors",
-                  selectedHome.has(player.id)
-                    ? "bg-on-field text-on-field-foreground"
-                    : "bg-muted text-muted-foreground"
-                )}>
-                  {player.number}
-                </span>
-                <span className="flex-1 text-left text-sm font-medium">{player.name}</span>
-                {selectedHome.has(player.id) && (
-                  <Check className="h-5 w-5 text-on-field" />
-                )}
-              </button>
-            ))}
+            {eligibleHomePlayers.map(player => {
+              const expelled = !!player.isExpelled;
+              return (
+                <button
+                  key={player.id}
+                  onClick={() => toggleHome(player.id)}
+                  disabled={expelled}
+                  className={cn(
+                    "w-full flex items-center gap-3 p-2 rounded-lg border transition-all",
+                    expelled
+                      ? "bg-destructive/10 border-destructive/30 opacity-50 cursor-not-allowed"
+                      : selectedHome.has(player.id)
+                        ? "bg-on-field/10 border-on-field/50"
+                        : "bg-muted/50 border-border hover:border-muted-foreground/30"
+                  )}
+                >
+                  <span className={cn(
+                    "w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold transition-colors",
+                    expelled
+                      ? "bg-destructive text-destructive-foreground"
+                      : selectedHome.has(player.id)
+                        ? "bg-on-field text-on-field-foreground"
+                        : "bg-muted text-muted-foreground"
+                  )}>
+                    {player.number}
+                  </span>
+                  <span className={cn("flex-1 text-left text-sm font-medium", expelled && "line-through")}>{player.name}</span>
+                  {expelled ? (
+                    <ShieldOff className="h-5 w-5 text-destructive" />
+                  ) : selectedHome.has(player.id) ? (
+                    <Check className="h-5 w-5 text-on-field" />
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         </div>
 
