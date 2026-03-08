@@ -73,7 +73,7 @@ const formatDate = (ts: number) => {
 
 export default function SingleMatches() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const [matchName, setMatchName] = useState("");
   const [matchHistory, setMatchHistory] = useState<MatchSummary[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
