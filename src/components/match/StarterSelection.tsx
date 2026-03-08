@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Player } from '@/types/match';
-import { Check, Users } from 'lucide-react';
+import { Check, Users, ShieldOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface StarterSelectionProps {
