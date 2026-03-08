@@ -4,7 +4,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Play, Eye, Trash2, Home, Loader2 } from "lucide-react";
+import { Plus, Play, Eye, Trash2, Home, Loader2, LogIn } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -73,14 +73,16 @@ const formatDate = (ts: number) => {
 
 export default function SingleMatches() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const [matchName, setMatchName] = useState("");
   const [matchHistory, setMatchHistory] = useState<MatchSummary[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   useEffect(() => {
-    setMatchHistory(getMatchHistory());
-  }, []);
+    if (!isGuest && user) {
+      setMatchHistory(getMatchHistory());
+    }
+  }, [user, isGuest]);
 
   const handleCreate = () => {
     const id = "quick-" + Date.now();
@@ -124,7 +126,17 @@ export default function SingleMatches() {
 
         <h2 className="text-lg font-semibold mb-3">Storico Partite</h2>
 
-        {matchHistory.length === 0 ? (
+        {isGuest ? (
+          <Card className="p-8 text-center space-y-3">
+            <LogIn className="h-8 w-8 mx-auto text-muted-foreground" />
+            <p className="text-muted-foreground text-sm">
+              Esegui il login per salvare e rivedere le tue partite precedenti.
+            </p>
+            <Button variant="outline" size="sm" onClick={() => navigate("/auth")}>
+              Accedi
+            </Button>
+          </Card>
+        ) : matchHistory.length === 0 ? (
           <Card className="p-8 text-center">
             <p className="text-muted-foreground text-sm">
               Nessuna partita salvata. Crea una nuova partita per iniziare.
