@@ -178,7 +178,7 @@ export default function SingleMatches() {
                     size="sm"
                     variant={match.isEnded ? "outline" : "default"}
                     className="gap-1 h-8 text-xs"
-                    onClick={() => navigate(`/match/${match.id}`)}
+                    onClick={() => navigate(`/match-summary/${match.id}?source=local&backTo=/single-matches`)}
                   >
                     {match.isEnded ? (
                       <>

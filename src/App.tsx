@@ -51,6 +51,7 @@ const App = () => (
             <Route path="/single-matches" element={<ProtectedRoute><SingleMatches /></ProtectedRoute>} />
             <Route path="/match/:id" element={<ProtectedRoute><MatchApp /></ProtectedRoute>} />
             <Route path="/match-setup/:id" element={<ProtectedRoute><MatchApp /></ProtectedRoute>} />
+            <Route path="/match-summary/:id" element={<ProtectedRoute><MatchSummary /></ProtectedRoute>} />
             <Route path="/match" element={<Navigate to="/dashboard" replace />} />
             <Route path="/tournaments" element={<RegisteredRoute><Tournaments /></RegisteredRoute>} />
             <Route path="/tournament/:id" element={<RegisteredRoute><TournamentDetail /></RegisteredRoute>} />
