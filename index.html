@@ -3,12 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1a3a5c" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     
     <title>Match Manager Live</title>
     <meta name="description" content="Gestione professionale di partite di calcio e tornei in tempo reale." />
     <meta name="author" content="Match Manager Team" />
 
     <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/pwa-icon-192.png" />
 
     <meta property="og:title" content="Match Manager Live" />
     <meta property="og:description" content="Gestione partite e tornei con cronometro e statistiche live." />
@@ -21,7 +25,15 @@
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#f0f2f5;">
+        <div style="text-align:center;">
+          <div style="width:48px;height:48px;border:4px solid #e5e7eb;border-top-color:#2ea35f;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;"></div>
+          <p style="font-family:'DM Sans',sans-serif;color:#1a3a5c;font-size:14px;margin:0;">Caricamento...</p>
+        </div>
+      </div>
+    </div>
+    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
