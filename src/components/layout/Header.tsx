@@ -164,16 +164,27 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(({
         {/* Right: User Menu */}
         <div className="flex items-center">
           {isGuest ? (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleLogout}
-              disabled={isLoading}
-              className="gap-1 h-8 px-2 border-destructive/50 text-destructive hover:text-destructive hover:bg-destructive/10"
-            >
-              <LogOut className="h-3 w-3" />
-              <span className="text-[10px] font-bold">ESCI</span>
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/auth')}
+                className="gap-1 h-8 px-2 border-primary/50 text-primary hover:text-primary hover:bg-primary/10"
+              >
+                <User className="h-3 w-3" />
+                <span className="text-[10px] font-bold">ACCEDI</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleLogout}
+                disabled={isLoading}
+                className="gap-1 h-8 px-2 border-destructive/50 text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <LogOut className="h-3 w-3" />
+                <span className="text-[10px] font-bold">ESCI</span>
+              </Button>
+            </div>
           ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
