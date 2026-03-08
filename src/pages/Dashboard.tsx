@@ -12,18 +12,12 @@ export default function Dashboard() {
   const { isGuest } = useAuth();
 
   const handleSingleMatch = () => {
-    if (isGuest) {
-      navigate("/auth");
-      toast.info("Accedi per gestire le partite singole.");
-      return;
-    }
     navigate("/single-matches");
   };
 
   const handleTournament = () => {
     if (isGuest) {
-      navigate("/auth");
-      toast.info("Accedi per gestire i tornei.");
+      toast.info("La modalità Torneo richiede il login per gestire tabelle e classifiche. Accedi o Registrati.");
       return;
     }
     navigate("/tournaments");
