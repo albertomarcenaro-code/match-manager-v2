@@ -126,7 +126,17 @@ export default function SingleMatches() {
 
         <h2 className="text-lg font-semibold mb-3">Storico Partite</h2>
 
-        {matchHistory.length === 0 ? (
+        {isGuest ? (
+          <Card className="p-8 text-center space-y-3">
+            <LogIn className="h-8 w-8 mx-auto text-muted-foreground" />
+            <p className="text-muted-foreground text-sm">
+              Esegui il login per salvare e rivedere le tue partite precedenti.
+            </p>
+            <Button variant="outline" size="sm" onClick={() => navigate("/auth")}>
+              Accedi
+            </Button>
+          </Card>
+        ) : matchHistory.length === 0 ? (
           <Card className="p-8 text-center">
             <p className="text-muted-foreground text-sm">
               Nessuna partita salvata. Crea una nuova partita per iniziare.

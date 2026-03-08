@@ -46,7 +46,7 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/single-matches" element={<RegisteredRoute><SingleMatches /></RegisteredRoute>} />
+            <Route path="/single-matches" element={<ProtectedRoute><SingleMatches /></ProtectedRoute>} />
             <Route path="/match/:id" element={<ProtectedRoute><MatchApp /></ProtectedRoute>} />
             <Route path="/match-setup/:id" element={<ProtectedRoute><MatchApp /></ProtectedRoute>} />
             <Route path="/match" element={<Navigate to="/dashboard" replace />} />

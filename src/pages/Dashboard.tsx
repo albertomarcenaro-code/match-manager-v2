@@ -37,11 +37,6 @@ export default function Dashboard() {
             className="p-8 flex flex-col items-center text-center gap-4 cursor-pointer hover:shadow-lg transition-all border-2 border-transparent hover:border-primary/20"
             onClick={handleSingleMatch}
           >
-            {isGuest && (
-              <div className="absolute top-3 right-3 bg-background p-1 rounded-full shadow-sm border border-muted">
-                <Lock className="h-4 w-4 text-muted-foreground" />
-              </div>
-            )}
             <div className="p-4 bg-primary/10 rounded-full">
               <Zap className="h-10 w-10 text-primary" />
             </div>
