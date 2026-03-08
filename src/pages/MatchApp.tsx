@@ -13,6 +13,7 @@ import { RosterSetup } from '@/components/setup/RosterSetup';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Users, UserCheck, Play, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Header } from '@/components/layout/Header';
 
 const MatchApp = () => {
   const { id } = useParams();
