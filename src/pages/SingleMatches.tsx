@@ -4,7 +4,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Play, Eye, Trash2, Home, Loader2 } from "lucide-react";
+import { Plus, Play, Eye, Trash2, Home, Loader2, LogIn } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
