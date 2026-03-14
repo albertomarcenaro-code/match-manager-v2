@@ -269,7 +269,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      use_invitation_code: { Args: { p_code: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
