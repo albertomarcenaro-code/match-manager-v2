@@ -140,7 +140,7 @@ export default function Auth() {
 
       // 2. Create account
       const redirectUrl = `${window.location.origin}/`;
-      const { error: signUpError } = await supabase.auth.signUp({
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: regEmail,
         password: regPassword,
         options: { emailRedirectTo: redirectUrl },
@@ -152,22 +152,53 @@ export default function Auth() {
         return;
       }
 
-      // 3. Get the new user's ID and update profile
-      const { data: { user: newUser } } = await supabase.auth.getUser();
-      if (newUser) {
-        await supabase
+      const createdUser = signUpData.user;
+      if (!createdUser) {
+        toast.error('Utente non creato correttamente. Riprova.');
+        setIsLoading(false);
+        return;
+      }
+
+      const profilePayload = {
+        full_name: regFullName.trim(),
+        role: regRole,
+        sports_club: regSportsClub.trim(),
+        category: regCategory,
+      };
+
+      // 3. Save profile fields linked to the newly created user
+      const { data: updatedProfiles, error: updateProfileError } = await supabase
+        .from('profiles')
+        .update(profilePayload)
+        .eq('user_id', createdUser.id)
+        .select('id');
+
+      if (updateProfileError) {
+        toast.error('Errore nel salvataggio del profilo. Riprova.');
+        setIsLoading(false);
+        return;
+      }
+
+      if (!updatedProfiles || updatedProfiles.length === 0) {
+        const { error: insertProfileError } = await supabase
           .from('profiles')
-          .update({
-            full_name: regFullName.trim(),
-            role: regRole,
-            sports_club: regSportsClub.trim(),
-            category: regCategory,
-          })
-          .eq('user_id', newUser.id);
+          .insert({ user_id: createdUser.id, ...profilePayload });
+
+        if (insertProfileError) {
+          toast.error('Errore nel salvataggio del profilo. Riprova.');
+          setIsLoading(false);
+          return;
+        }
       }
 
       // 4. Increment invite code usage via secure function
-      await supabase.rpc('use_invitation_code', { p_code: regInviteCode.trim() });
+      const { data: codeUsed, error: useCodeError } = await supabase.rpc('use_invitation_code', { p_code: regInviteCode.trim() });
+
+      if (useCodeError || !codeUsed) {
+        toast.error('Codice invito non valido o limite utilizzi raggiunto');
+        setIsLoading(false);
+        return;
+      }
 
       toast.success('Registrazione completata! Controlla la tua email per confermare l\'account.');
       navigate('/dashboard');
