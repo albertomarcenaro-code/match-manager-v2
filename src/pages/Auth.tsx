@@ -47,7 +47,7 @@ const CATEGORIES = [
 export default function Auth() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { signUp, signIn, enterAsGuest } = useAuth();
+  const { signIn, enterAsGuest } = useAuth();
 
   // Login fields
   const [email, setEmail] = useState('');
