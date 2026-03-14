@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      invitation_codes: {
+        Row: {
+          code: string
+          created_at: string
+          current_uses: number
+          id: string
+          is_active: boolean
+          max_uses: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          current_uses?: number
+          id?: string
+          is_active?: boolean
+          max_uses?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          current_uses?: number
+          id?: string
+          is_active?: boolean
+          max_uses?: number
+        }
+        Relationships: []
+      }
       matches: {
         Row: {
           away_score: number
@@ -87,22 +114,34 @@ export type Database = {
       }
       profiles: {
         Row: {
+          category: string | null
           created_at: string
+          full_name: string | null
           id: string
+          role: string | null
+          sports_club: string | null
           team_name: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          category?: string | null
           created_at?: string
+          full_name?: string | null
           id?: string
+          role?: string | null
+          sports_club?: string | null
           team_name?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          category?: string | null
           created_at?: string
+          full_name?: string | null
           id?: string
+          role?: string | null
+          sports_club?: string | null
           team_name?: string | null
           updated_at?: string
           user_id?: string
@@ -230,7 +269,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      use_invitation_code: { Args: { p_code: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
