@@ -1,5 +1,4 @@
 import { Download } from 'lucide-react';
-import { Download } from 'lucide-react';
 import { MatchState } from '@/types/match';
 import ExcelJS from 'exceljs';
 

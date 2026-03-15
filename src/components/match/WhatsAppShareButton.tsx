@@ -1,5 +1,4 @@
 import { toast } from 'sonner';
-import { toast } from 'sonner';
 import { MatchState } from '@/types/match';
 
 interface WhatsAppShareButtonProps {
