@@ -1,8 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import { Helmet } from 'react-helmet';
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Trophy, Zap, Users, Share2, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Trophy, Zap, Users, Share2, CheckCircle2, Smartphone, Download } from "lucide-react";
 import { Header } from "@/components/layout/Header";
+import { useState, useEffect } from "react";
 
 const Landing = () => {
   const navigate = useNavigate();
