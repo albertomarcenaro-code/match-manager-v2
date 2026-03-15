@@ -1,12 +1,37 @@
 import { useNavigate } from "react-router-dom";
 import { Helmet } from 'react-helmet';
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Trophy, Zap, Users, Share2, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Trophy, Zap, Users, Share2, CheckCircle2, Smartphone, Download } from "lucide-react";
 import { Header } from "@/components/layout/Header";
+import { useState, useEffect } from "react";
 
 const Landing = () => {
   const navigate = useNavigate();
   const brandGreen = "#2ea35f";
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isIos, setIsIos] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    const ua = window.navigator.userAgent.toLowerCase();
+    setIsIos(/iphone|ipad|ipod/.test(ua));
+    setIsInstalled(window.matchMedia('(display-mode: standalone)').matches);
+
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      setDeferredPrompt(null);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col font-sans bg-background selection:bg-green-100">
@@ -80,6 +105,54 @@ const Landing = () => {
                 color={brandGreen}
               />
             </div>
+          </div>
+        </section>
+        {/* --- PWA INSTALL SECTION --- */}
+        <section className="py-20 bg-gradient-to-b from-background to-muted/40">
+          <div className="container mx-auto px-4 text-center max-w-2xl">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-secondary/10 mb-6">
+              <Smartphone className="w-8 h-8 text-secondary" />
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">
+              Porta Match Manager sempre con te
+            </h2>
+            <p className="text-lg text-muted-foreground mb-10 leading-relaxed">
+              Installa l'app sul tuo telefono per un accesso istantaneo, anche offline. Nessun app store necessario.
+            </p>
+
+            {isInstalled ? (
+              <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-secondary/10 text-secondary font-medium">
+                <CheckCircle2 className="w-5 h-5" />
+                App già installata!
+              </div>
+            ) : deferredPrompt ? (
+              <Button
+                onClick={handleInstall}
+                className="h-14 px-10 text-lg rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/90 shadow-lg"
+              >
+                <Download className="w-5 h-5 mr-2" />
+                Installa ora
+              </Button>
+            ) : (
+              <div className="grid sm:grid-cols-2 gap-6 text-left max-w-lg mx-auto">
+                <div className="p-6 rounded-2xl bg-card border border-border">
+                  <p className="font-bold mb-2">🍎 iPhone / iPad</p>
+                  <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>Apri in <strong>Safari</strong></li>
+                    <li>Tocca <strong>Condividi</strong> (⬆️)</li>
+                    <li>Seleziona <strong>"Aggiungi a Home"</strong></li>
+                  </ol>
+                </div>
+                <div className="p-6 rounded-2xl bg-card border border-border">
+                  <p className="font-bold mb-2">🤖 Android</p>
+                  <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>Apri in <strong>Chrome</strong></li>
+                    <li>Tocca il menu <strong>⋮</strong></li>
+                    <li>Seleziona <strong>"Installa app"</strong></li>
+                  </ol>
+                </div>
+              </div>
+            )}
           </div>
         </section>
       </main>
