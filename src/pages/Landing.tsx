@@ -8,6 +8,30 @@ import { useState, useEffect } from "react";
 const Landing = () => {
   const navigate = useNavigate();
   const brandGreen = "#2ea35f";
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isIos, setIsIos] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    const ua = window.navigator.userAgent.toLowerCase();
+    setIsIos(/iphone|ipad|ipod/.test(ua));
+    setIsInstalled(window.matchMedia('(display-mode: standalone)').matches);
+
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      setDeferredPrompt(null);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col font-sans bg-background selection:bg-green-100">
