@@ -475,9 +475,15 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
   };
 
   return (
-    <Button onClick={handleExport} variant="outline" className="gap-2">
-      <FileText className="h-4 w-4" />
-      Esporta PDF
-    </Button>
+    <button
+      onClick={handleExport}
+      className="flex flex-col items-center gap-1.5 group"
+      title="Esporta PDF"
+    >
+      <span className="flex items-center justify-center h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-md transition-transform group-hover:scale-110 group-active:scale-95">
+        <FileText className="h-6 w-6" />
+      </span>
+      <span className="text-xs font-medium text-muted-foreground">PDF</span>
+    </button>
   );
 }

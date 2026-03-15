@@ -287,10 +287,10 @@ const MatchApp = () => {
                         {state.homeTeam.name} {state.homeTeam.score} - {state.awayTeam.score} {state.awayTeam.name}
                       </p>
                     </div>
-                    <div className="grid grid-cols-3 gap-3 p-4 bg-card rounded-xl shadow-card">
-                      <div className="w-full"><ExportButton state={state} /></div>
-                      <div className="w-full"><PDFExportButton state={state} /></div>
-                      <div className="w-full"><WhatsAppShareButton state={state} /></div>
+                    <div className="flex flex-wrap justify-center gap-4 p-4 bg-card rounded-xl shadow-card">
+                      <ExportButton state={state} />
+                      <PDFExportButton state={state} />
+                      <WhatsAppShareButton state={state} />
                     </div>
                   </div>
                 )}
