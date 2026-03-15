@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import { toast } from 'sonner';
 import { MatchState } from '@/types/match';
 

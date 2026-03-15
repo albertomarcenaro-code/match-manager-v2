@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui/button';
+import { FileText } from 'lucide-react';
 import { FileText } from 'lucide-react';
 import { MatchState } from '@/types/match';
 import jsPDF from 'jspdf';
