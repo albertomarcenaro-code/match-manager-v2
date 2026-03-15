@@ -439,11 +439,35 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
       doc.text('Nessun evento registrato', centerX, y + 3, { align: 'center' });
     }
 
-    // Footer
+    // Footer with branding and QR code
     const pageHeight = doc.internal.pageSize.getHeight();
+    const footerY = pageHeight - 18;
+    
+    // Separator line
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, footerY, pageWidth - margin, footerY);
+    
+    // QR Code - generate as canvas and add to PDF
+    const landingUrl = 'https://matchmanager-live.lovable.app';
+    const qrCanvas = document.createElement('canvas');
+    const QRCodeLib = await import('qrcode');
+    await QRCodeLib.default.toCanvas(qrCanvas, landingUrl, { width: 100, margin: 0 });
+    const qrDataUrl = qrCanvas.toDataURL('image/png');
+    
+    // QR on the right
+    const qrSize = 14;
+    doc.addImage(qrDataUrl, 'PNG', pageWidth - margin - qrSize, footerY + 1, qrSize, qrSize);
+    
+    // Text on the left
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(39, 70, 63);
+    doc.text('Match Manager Live', margin, footerY + 5);
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(5);
-    doc.setTextColor(150);
-    doc.text('Match Manager Live', pageWidth / 2, pageHeight - 4, { align: 'center' });
+    doc.setTextColor(100, 100, 100);
+    doc.text(landingUrl, margin, footerY + 9);
+    doc.text('Gestisci le tue partite come un professionista', margin, footerY + 12);
 
     // Save
     const fileName = `${state.homeTeam.name}_vs_${state.awayTeam.name}_${new Date().toISOString().split('T')[0]}.pdf`;
