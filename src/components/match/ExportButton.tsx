@@ -1,4 +1,3 @@
-import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { MatchState } from '@/types/match';
 import ExcelJS from 'exceljs';
@@ -259,13 +258,15 @@ export function ExportButton({ state }: ExportButtonProps) {
   };
 
   return (
-    <Button
+    <button
       onClick={handleExport}
-      className="gap-2 bg-secondary hover:bg-secondary/90 text-secondary-foreground"
-      size="lg"
+      className="flex flex-col items-center gap-1.5 group"
+      title="Esporta Excel"
     >
-      <Download className="h-5 w-5" />
-      Esporta Excel
-    </Button>
+      <span className="flex items-center justify-center h-14 w-14 rounded-full bg-secondary text-secondary-foreground shadow-md transition-transform group-hover:scale-110 group-active:scale-95">
+        <Download className="h-6 w-6" />
+      </span>
+      <span className="text-xs font-medium text-muted-foreground">Excel</span>
+    </button>
   );
 }

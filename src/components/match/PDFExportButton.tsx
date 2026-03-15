@@ -1,4 +1,3 @@
-import { Button } from '@/components/ui/button';
 import { FileText } from 'lucide-react';
 import { MatchState } from '@/types/match';
 import jsPDF from 'jspdf';
@@ -86,7 +85,7 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
     return goals;
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const periodsPlayed = state.periodScores.length > 0 
       ? Math.max(...state.periodScores.map(ps => ps.period))
       : state.currentPeriod;
@@ -439,11 +438,35 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
       doc.text('Nessun evento registrato', centerX, y + 3, { align: 'center' });
     }
 
-    // Footer
+    // Footer with branding and QR code
     const pageHeight = doc.internal.pageSize.getHeight();
+    const footerY = pageHeight - 18;
+    
+    // Separator line
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, footerY, pageWidth - margin, footerY);
+    
+    // QR Code - generate as canvas and add to PDF
+    const landingUrl = 'https://matchmanager-live.lovable.app';
+    const qrCanvas = document.createElement('canvas');
+    const QRCodeLib = await import('qrcode');
+    await QRCodeLib.default.toCanvas(qrCanvas, landingUrl, { width: 100, margin: 0 });
+    const qrDataUrl = qrCanvas.toDataURL('image/png');
+    
+    // QR on the right
+    const qrSize = 14;
+    doc.addImage(qrDataUrl, 'PNG', pageWidth - margin - qrSize, footerY + 1, qrSize, qrSize);
+    
+    // Text on the left
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(39, 70, 63);
+    doc.text('Match Manager Live', margin, footerY + 5);
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(5);
-    doc.setTextColor(150);
-    doc.text('Match Manager Live', pageWidth / 2, pageHeight - 4, { align: 'center' });
+    doc.setTextColor(100, 100, 100);
+    doc.text(landingUrl, margin, footerY + 9);
+    doc.text('Gestisci le tue partite come un professionista', margin, footerY + 12);
 
     // Save
     const fileName = `${state.homeTeam.name}_vs_${state.awayTeam.name}_${new Date().toISOString().split('T')[0]}.pdf`;
@@ -451,9 +474,15 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
   };
 
   return (
-    <Button onClick={handleExport} variant="outline" className="gap-2">
-      <FileText className="h-4 w-4" />
-      Esporta PDF
-    </Button>
+    <button
+      onClick={handleExport}
+      className="flex flex-col items-center gap-1.5 group"
+      title="Esporta PDF"
+    >
+      <span className="flex items-center justify-center h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-md transition-transform group-hover:scale-110 group-active:scale-95">
+        <FileText className="h-6 w-6" />
+      </span>
+      <span className="text-xs font-medium text-muted-foreground">PDF</span>
+    </button>
   );
 }
