@@ -86,7 +86,7 @@ export function PDFExportButton({ state }: PDFExportButtonProps) {
     return goals;
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const periodsPlayed = state.periodScores.length > 0 
       ? Math.max(...state.periodScores.map(ps => ps.period))
       : state.currentPeriod;
