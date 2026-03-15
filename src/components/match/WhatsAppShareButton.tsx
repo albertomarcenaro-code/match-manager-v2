@@ -57,8 +57,8 @@ export const WhatsAppShareButton = ({ state }: WhatsAppShareButtonProps) => {
       message += `${i}°T:  ${scoreText}   | ${scorersText}\n`;
     }
 
-    // 3. Chiusura semplice
-    message += `\nMatch Manager Live`;
+    // 3. Chiusura con link
+    message += `\nhttps://matchmanager-live.lovable.app`;
 
     // Try Web Share API first (mobile)
     if (navigator.share) {
