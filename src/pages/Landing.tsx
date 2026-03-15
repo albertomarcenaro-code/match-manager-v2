@@ -107,6 +107,54 @@ const Landing = () => {
             </div>
           </div>
         </section>
+        {/* --- PWA INSTALL SECTION --- */}
+        <section className="py-20 bg-gradient-to-b from-background to-muted/40">
+          <div className="container mx-auto px-4 text-center max-w-2xl">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-secondary/10 mb-6">
+              <Smartphone className="w-8 h-8 text-secondary" />
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">
+              Porta Match Manager sempre con te
+            </h2>
+            <p className="text-lg text-muted-foreground mb-10 leading-relaxed">
+              Installa l'app sul tuo telefono per un accesso istantaneo, anche offline. Nessun app store necessario.
+            </p>
+
+            {isInstalled ? (
+              <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-secondary/10 text-secondary font-medium">
+                <CheckCircle2 className="w-5 h-5" />
+                App già installata!
+              </div>
+            ) : deferredPrompt ? (
+              <Button
+                onClick={handleInstall}
+                className="h-14 px-10 text-lg rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/90 shadow-lg"
+              >
+                <Download className="w-5 h-5 mr-2" />
+                Installa ora
+              </Button>
+            ) : (
+              <div className="grid sm:grid-cols-2 gap-6 text-left max-w-lg mx-auto">
+                <div className="p-6 rounded-2xl bg-card border border-border">
+                  <p className="font-bold mb-2">🍎 iPhone / iPad</p>
+                  <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>Apri in <strong>Safari</strong></li>
+                    <li>Tocca <strong>Condividi</strong> (⬆️)</li>
+                    <li>Seleziona <strong>"Aggiungi a Home"</strong></li>
+                  </ol>
+                </div>
+                <div className="p-6 rounded-2xl bg-card border border-border">
+                  <p className="font-bold mb-2">🤖 Android</p>
+                  <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>Apri in <strong>Chrome</strong></li>
+                    <li>Tocca il menu <strong>⋮</strong></li>
+                    <li>Seleziona <strong>"Installa app"</strong></li>
+                  </ol>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
       </main>
 
       {/* --- FOOTER SEMPLIFICATO --- */}
