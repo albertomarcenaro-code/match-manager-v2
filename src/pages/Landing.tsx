@@ -136,7 +136,7 @@ const Landing = () => {
             ) : (
               <div className="grid sm:grid-cols-2 gap-6 text-left max-w-lg mx-auto">
                 <div className="p-6 rounded-2xl bg-card border border-border">
-                  <p className="font-bold mb-2">🍎 iPhone / iPad</p>
+                  <p className="font-bold mb-2"> iPhone / iPad</p>
                   <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
                     <li>Apri in <strong>Safari</strong></li>
                     <li>Tocca <strong>Condividi</strong> (⬆️)</li>
@@ -144,7 +144,7 @@ const Landing = () => {
                   </ol>
                 </div>
                 <div className="p-6 rounded-2xl bg-card border border-border">
-                  <p className="font-bold mb-2">🤖 Android</p>
+                  <p className="font-bold mb-2"> Android</p>
                   <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
                     <li>Apri in <strong>Chrome</strong></li>
                     <li>Tocca il menu <strong>⋮</strong></li>
