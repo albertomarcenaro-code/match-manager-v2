@@ -17,6 +17,9 @@ import TournamentDetail from "./pages/TournamentDetail";
 import MatchSummary from "./pages/MatchSummary";
 import MyTeams from "./pages/MyTeams";
 import NotFound from "./pages/NotFound";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
+import About from "./pages/About";
 
 const queryClient = new QueryClient();
 
