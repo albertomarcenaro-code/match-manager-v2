@@ -174,9 +174,9 @@ const Landing = () => {
           <div className="border-t border-border pt-8 flex flex-col md:flex-row justify-between items-center text-sm text-muted-foreground">
             <p>© 2026 Match Manager Live. Tutti i diritti riservati.</p>
             <div className="flex gap-6 mt-4 md:mt-0">
-              <a href="#" className="hover:text-green-600 transition-colors">Privacy</a>
-              <a href="#" className="hover:text-green-600 transition-colors">Termini</a>
-              <a href="#" className="hover:text-green-600 transition-colors">Supporto</a>
+              <a href="/privacy" className="hover:text-green-600 transition-colors">Privacy</a>
+               <a href="/terms" className="hover:text-green-600 transition-colors">Terms</a>
+               <a href="/about" className="hover:text-green-600 transition-colors">About</a>
             </div>
           </div>
         </div>

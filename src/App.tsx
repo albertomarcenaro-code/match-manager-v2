@@ -17,6 +17,9 @@ import TournamentDetail from "./pages/TournamentDetail";
 import MatchSummary from "./pages/MatchSummary";
 import MyTeams from "./pages/MyTeams";
 import NotFound from "./pages/NotFound";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
+import About from "./pages/About";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +60,9 @@ const App = () => (
             <Route path="/tournament/:id" element={<RegisteredRoute><TournamentDetail /></RegisteredRoute>} />
             <Route path="/tournament-archive" element={<RegisteredRoute><TournamentArchive /></RegisteredRoute>} />
             <Route path="/my-teams" element={<RegisteredRoute><MyTeams /></RegisteredRoute>} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/about" element={<About />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
