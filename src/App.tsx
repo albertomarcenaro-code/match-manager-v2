@@ -60,6 +60,9 @@ const App = () => (
             <Route path="/tournament/:id" element={<RegisteredRoute><TournamentDetail /></RegisteredRoute>} />
             <Route path="/tournament-archive" element={<RegisteredRoute><TournamentArchive /></RegisteredRoute>} />
             <Route path="/my-teams" element={<RegisteredRoute><MyTeams /></RegisteredRoute>} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/about" element={<About />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
