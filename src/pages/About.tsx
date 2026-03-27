@@ -1,7 +1,8 @@
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Helmet } from "react-helmet";
-import { Mail } from "lucide-react";
+import { Mail, ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const About = () => (
   <div className="min-h-screen flex flex-col font-sans bg-background">

@@ -1,6 +1,8 @@
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Helmet } from "react-helmet";
+import { ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Privacy = () => (
   <div className="min-h-screen flex flex-col font-sans bg-background">
