@@ -1,6 +1,8 @@
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Helmet } from "react-helmet";
+import { ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Terms = () => (
   <div className="min-h-screen flex flex-col font-sans bg-background">
@@ -11,6 +13,10 @@ const Terms = () => (
     <Header />
     <main className="flex-1 py-12 md:py-16">
       <article className="container mx-auto px-4 max-w-3xl prose prose-neutral dark:prose-invert">
+        <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
+          <ArrowLeft className="w-4 h-4" />
+          Torna alla Home
+        </Link>
         <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-foreground mb-8">
           Termini e Condizioni Generali di Utilizzo
         </h1>
