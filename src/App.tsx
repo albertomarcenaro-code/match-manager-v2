@@ -20,6 +20,7 @@ import NotFound from "./pages/NotFound";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import About from "./pages/About";
+import Overview from "./pages/Overview";
 
 const queryClient = new QueryClient();
 

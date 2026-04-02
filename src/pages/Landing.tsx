@@ -66,10 +66,17 @@ const Landing = () => {
                   Inizia Gratuitamente
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
-                <span className="text-sm text-muted-foreground flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-green-600" /> Nessun setup complicato
-                </span>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate("/overview")}
+                  className="h-14 px-8 text-lg rounded-full border-secondary/40 text-secondary hover:bg-secondary/10 hover:text-secondary transition-all"
+                >
+                  Scopri come funziona
+                </Button>
               </div>
+              <span className="text-sm text-muted-foreground flex items-center gap-2 mt-2">
+                <CheckCircle2 className="w-4 h-4 text-green-600" /> Nessun setup complicato
+              </span>
             </div>
             
             <div className="hidden lg:block">
