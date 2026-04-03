@@ -1,6 +1,5 @@
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Play, Pause, Flag, StopCircle, RotateCcw } from 'lucide-react';
+import { useState, ReactNode } from 'react';
+import { Play, Pause, Flag, StopCircle, RotateCcw, Timer } from 'lucide-react';
 import { MatchState } from '@/types/match';
 import { PeriodDurationDialog } from './PeriodDurationDialog';
 import {
@@ -26,6 +25,54 @@ interface TimerControlsProps {
   onUndo: () => void;
 }
 
+interface CircleButtonProps {
+  onClick?: () => void;
+  icon: ReactNode;
+  label: string;
+  color: 'green' | 'gray' | 'red' | 'outline' | 'overtime';
+  disabled?: boolean;
+  className?: string;
+  asChild?: boolean;
+  children?: ReactNode;
+}
+
+const colorMap = {
+  green: 'bg-secondary text-secondary-foreground shadow-md',
+  gray: 'bg-muted-foreground text-white shadow-md',
+  red: 'bg-destructive text-destructive-foreground shadow-md',
+  outline: 'bg-card text-foreground border-2 border-border shadow-md',
+  overtime: 'bg-destructive text-destructive-foreground shadow-md animate-pulse',
+};
+
+function CircleButton({ onClick, icon, label, color, disabled, className, asChild, children }: CircleButtonProps) {
+  const Wrapper = asChild ? 'div' : 'button';
+  return (
+    <div className="flex flex-col items-center gap-1.5 min-w-[56px]">
+      {asChild ? (
+        <div className="flex flex-col items-center gap-1.5">
+          {children}
+          <span className="text-[10px] font-medium text-muted-foreground text-center leading-tight">{label}</span>
+        </div>
+      ) : (
+        <>
+          <button
+            onClick={onClick}
+            disabled={disabled}
+            className={cn(
+              'w-14 h-14 rounded-full flex items-center justify-center transition-all duration-150 active:scale-90 disabled:opacity-40 disabled:pointer-events-none',
+              colorMap[color],
+              className
+            )}
+          >
+            {icon}
+          </button>
+          <span className="text-[10px] font-medium text-muted-foreground text-center leading-tight">{label}</span>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function TimerControls({
   state,
   onStartPeriod,
@@ -36,13 +83,12 @@ export function TimerControls({
   onUndo,
 }: TimerControlsProps) {
   const [durationDialogOpen, setDurationDialogOpen] = useState(false);
-  
+
   const canStartPeriod = !state.isRunning && !state.isMatchEnded && !state.needsStarterSelection;
   const canEndPeriod = state.isRunning;
   const hasEvents = state.events.length > 0;
-  
-  // Check if we're in overtime (elapsed time >= period duration)
   const isOvertime = state.elapsedTime >= state.periodDuration * 60;
+  const showEndMatch = canEndPeriod || (!state.isRunning && state.isMatchStarted && !state.isMatchEnded);
 
   const handleStartClick = () => {
     setDurationDialogOpen(true);
@@ -53,163 +99,167 @@ export function TimerControls({
   };
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-2 p-4 bg-card rounded-xl shadow-card">
-      {/* Start/Resume Period */}
-      {!state.isRunning && canStartPeriod && (
-        <Button
-          onClick={handleStartClick}
-          className="gap-2 bg-secondary hover:bg-secondary/90 text-secondary-foreground"
-          size="lg"
-        >
-          <Play className="h-5 w-5" />
-          {state.currentPeriod === 0 ? 'Inizia partita' : `Inizia ${state.currentPeriod + 1}° tempo`}
-        </Button>
-      )}
+    <div className="p-3 bg-card rounded-xl shadow-card space-y-2">
+      <div className="flex flex-row justify-around items-start w-full">
+        {/* Start / Play / Pause */}
+        {!state.isRunning && canStartPeriod && (
+          <CircleButton
+            onClick={handleStartClick}
+            icon={<Play className="h-6 w-6 ml-0.5" />}
+            label={state.currentPeriod === 0 ? 'Inizia' : `${state.currentPeriod + 1}° tempo`}
+            color="green"
+          />
+        )}
 
-      {/* Pause/Resume */}
-      {state.isRunning && (
-        <>
-          {state.isPaused ? (
-            <Button
-              onClick={onResume}
-              className="gap-2 bg-secondary hover:bg-secondary/90 text-secondary-foreground"
-              size="lg"
-            >
-              <Play className="h-5 w-5" />
-              Riprendi
-            </Button>
-          ) : (
-            <Button
-              onClick={onPause}
-              variant="outline"
-              size="lg"
-              className="gap-2"
-            >
-              <Pause className="h-5 w-5" />
-              Pausa
-            </Button>
-          )}
-        </>
-      )}
+        {state.isRunning && !state.isPaused && (
+          <CircleButton
+            onClick={onPause}
+            icon={<Pause className="h-6 w-6" />}
+            label="Pausa"
+            color="green"
+          />
+        )}
 
-      {/* End Period - Text changes when in overtime */}
-      {canEndPeriod && (
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button 
-              variant={isOvertime ? "destructive" : "outline"} 
-              size="lg" 
-              className={cn(
-                "gap-2",
-                isOvertime && "animate-pulse"
-              )}
-            >
-              <Flag className="h-5 w-5" />
-              {isOvertime ? "Ferma tempo" : "Fine tempo"}
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Terminare il {state.currentPeriod}° tempo?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Il tempo verrà registrato con il punteggio attuale: {state.homeTeam.score} - {state.awayTeam.score}
-                {isOvertime && (
-                  <span className="block mt-2 text-destructive font-medium">
-                    Tempo regolamentare superato di {Math.floor((state.elapsedTime - state.periodDuration * 60) / 60)} minuti
+        {state.isRunning && state.isPaused && (
+          <CircleButton
+            onClick={onResume}
+            icon={<Play className="h-6 w-6 ml-0.5" />}
+            label="Riprendi"
+            color="green"
+          />
+        )}
+
+        {/* End Period */}
+        {canEndPeriod && (
+          <CircleButton asChild label="" color={isOvertime ? 'overtime' : 'gray'}>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <div className="flex flex-col items-center gap-1.5">
+                  <button
+                    className={cn(
+                      'w-14 h-14 rounded-full flex items-center justify-center transition-all duration-150 active:scale-90',
+                      isOvertime ? colorMap.overtime : colorMap.gray
+                    )}
+                  >
+                    <Timer className="h-6 w-6" />
+                  </button>
+                  <span className="text-[10px] font-medium text-muted-foreground text-center leading-tight">
+                    {isOvertime ? 'Ferma' : 'Fine tempo'}
                   </span>
-                )}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Annulla</AlertDialogCancel>
-              <AlertDialogAction onClick={onEndPeriod}>
-                Conferma
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+                </div>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Terminare il {state.currentPeriod}° tempo?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Il tempo verrà registrato con il punteggio attuale: {state.homeTeam.score} - {state.awayTeam.score}
+                    {isOvertime && (
+                      <span className="block mt-2 text-destructive font-medium">
+                        Tempo regolamentare superato di {Math.floor((state.elapsedTime - state.periodDuration * 60) / 60)} minuti
+                      </span>
+                    )}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                  <AlertDialogAction onClick={onEndPeriod}>Conferma</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </CircleButton>
+        )}
 
-      {/* End Match - separate button */}
-      {(canEndPeriod || (!state.isRunning && state.isMatchStarted && !state.isMatchEnded)) && (
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="destructive" size="lg" className="gap-2">
-              <StopCircle className="h-5 w-5" />
-              Fine partita
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Terminare la partita?</AlertDialogTitle>
-              <AlertDialogDescription>
-                La partita verrà conclusa con il punteggio finale: {state.homeTeam.score} - {state.awayTeam.score}
-                {state.isRunning && (
-                  <span className="block mt-2 text-muted-foreground">
-                    Il tempo corrente verrà automaticamente concluso.
-                  </span>
-                )}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Annulla</AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={() => {
-                  // If period is running, end it first, then end match
-                  if (state.isRunning) {
-                    onEndPeriod();
-                  }
-                  onEndMatch();
-                }} 
-                className="bg-destructive hover:bg-destructive/90"
-              >
-                Termina partita
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+        {/* End Match */}
+        {showEndMatch && (
+          <CircleButton asChild label="" color="red">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <div className="flex flex-col items-center gap-1.5">
+                  <button className={cn(
+                    'w-14 h-14 rounded-full flex items-center justify-center transition-all duration-150 active:scale-90',
+                    colorMap.red
+                  )}>
+                    <StopCircle className="h-6 w-6" />
+                  </button>
+                  <span className="text-[10px] font-medium text-muted-foreground text-center leading-tight">Fine partita</span>
+                </div>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Terminare la partita?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    La partita verrà conclusa con il punteggio finale: {state.homeTeam.score} - {state.awayTeam.score}
+                    {state.isRunning && (
+                      <span className="block mt-2 text-muted-foreground">
+                        Il tempo corrente verrà automaticamente concluso.
+                      </span>
+                    )}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      if (state.isRunning) {
+                        onEndPeriod();
+                      }
+                      onEndMatch();
+                    }}
+                    className="bg-destructive hover:bg-destructive/90"
+                  >
+                    Termina partita
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </CircleButton>
+        )}
 
-      {/* Undo */}
-      {hasEvents && !state.isMatchEnded && (
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="ghost" size="lg" className="gap-2">
-              <RotateCcw className="h-5 w-5" />
-              Annulla ultimo
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Annullare l'ultimo evento?</AlertDialogTitle>
-              <AlertDialogDescription>
-                L'ultimo evento registrato verrà rimosso dalla cronaca.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>No</AlertDialogCancel>
-              <AlertDialogAction onClick={onUndo}>
-                Sì, annulla
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+        {/* Undo */}
+        {hasEvents && !state.isMatchEnded && (
+          <CircleButton asChild label="" color="outline">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <div className="flex flex-col items-center gap-1.5">
+                  <button className={cn(
+                    'w-14 h-14 rounded-full flex items-center justify-center transition-all duration-150 active:scale-90',
+                    colorMap.outline
+                  )}>
+                    <RotateCcw className="h-5 w-5" />
+                  </button>
+                  <span className="text-[10px] font-medium text-muted-foreground text-center leading-tight">Annulla</span>
+                </div>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Annullare l'ultimo evento?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    L'ultimo evento registrato verrà rimosso dalla cronaca.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>No</AlertDialogCancel>
+                  <AlertDialogAction onClick={onUndo}>Sì, annulla</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </CircleButton>
+        )}
+      </div>
 
-      {/* Match Status Messages */}
+      {/* Status Messages */}
       {state.needsStarterSelection && !state.isMatchEnded && (
-        <p className="w-full text-center text-sm text-muted-foreground mt-2">
+        <p className="w-full text-center text-sm text-muted-foreground">
           Seleziona i titolari per {state.currentPeriod === 0 ? 'iniziare' : 'continuare'}
         </p>
       )}
-      
+
       {state.isMatchEnded && (
-        <p className="w-full text-center text-sm font-semibold text-secondary mt-2">
+        <p className="w-full text-center text-sm font-semibold text-secondary">
           Partita terminata
         </p>
       )}
 
-      {/* Period Duration Dialog */}
       <PeriodDurationDialog
         isOpen={durationDialogOpen}
         onClose={() => setDurationDialogOpen(false)}
