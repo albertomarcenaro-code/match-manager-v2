@@ -27,7 +27,7 @@ interface TimerControlsProps {
 
 interface CircleButtonProps {
   onClick?: () => void;
-  icon: ReactNode;
+  icon?: ReactNode;
   label: string;
   color: 'green' | 'gray' | 'red' | 'outline' | 'overtime';
   disabled?: boolean;
