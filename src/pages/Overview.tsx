@@ -18,6 +18,7 @@ function ScrollSection({
   title,
   body,
   detail,
+  mockup,
 }: {
   index: number;
   icon: React.ElementType;
@@ -25,6 +26,7 @@ function ScrollSection({
   title: string;
   body: string;
   detail?: string;
+  mockup?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
