@@ -69,21 +69,19 @@ function ScrollSection({
             style={{ opacity, y }}
             className={`flex justify-center ${isEven ? "md:order-2" : "md:order-1"}`}
           >
-            <div className="relative w-[280px] h-[380px] md:w-[320px] md:h-[440px] rounded-3xl bg-white/[0.04] border border-white/10 backdrop-blur-sm flex flex-col items-center justify-center gap-6 shadow-2xl">
-              <div className="w-20 h-20 rounded-2xl bg-secondary/20 flex items-center justify-center">
-                <Icon className="w-10 h-10 text-secondary" />
-              </div>
-              {AccentIcon && (
-                <div className="absolute -bottom-4 -right-4 w-14 h-14 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center border border-white/10">
-                  <AccentIcon className="w-7 h-7 text-white/60" />
+            {mockup ? (
+              <img
+                src={mockup}
+                alt={title}
+                className="w-[260px] sm:w-[280px] md:w-[320px] lg:w-[360px] rounded-3xl shadow-2xl border border-white/10 object-contain"
+              />
+            ) : (
+              <div className="relative w-[260px] h-[380px] md:w-[320px] md:h-[440px] rounded-3xl bg-white/[0.04] border border-white/10 backdrop-blur-sm flex flex-col items-center justify-center gap-6 shadow-2xl">
+                <div className="w-20 h-20 rounded-2xl bg-secondary/20 flex items-center justify-center">
+                  <Icon className="w-10 h-10 text-secondary" />
                 </div>
-              )}
-              <div className="w-3/4 space-y-2 px-4">
-                <div className="h-2.5 rounded-full bg-white/10 w-full" />
-                <div className="h-2.5 rounded-full bg-white/10 w-4/5" />
-                <div className="h-2.5 rounded-full bg-white/10 w-3/5" />
               </div>
-            </div>
+            )}
           </motion.div>
         </div>
       </div>
