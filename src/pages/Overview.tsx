@@ -6,6 +6,9 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, ClipboardList, Timer, FileText, Share2, Users, Shield } from "lucide-react";
+import mockup1 from "@/assets/mockup1.png";
+import mockup2 from "@/assets/mockup2.png";
+import mockup3 from "@/assets/mockup3.png";
 
 /* ── single sticky-scroll section ── */
 function ScrollSection({
@@ -15,6 +18,7 @@ function ScrollSection({
   title,
   body,
   detail,
+  mockup,
 }: {
   index: number;
   icon: React.ElementType;
@@ -22,6 +26,7 @@ function ScrollSection({
   title: string;
   body: string;
   detail?: string;
+  mockup?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
@@ -64,21 +69,19 @@ function ScrollSection({
             style={{ opacity, y }}
             className={`flex justify-center ${isEven ? "md:order-2" : "md:order-1"}`}
           >
-            <div className="relative w-[280px] h-[380px] md:w-[320px] md:h-[440px] rounded-3xl bg-white/[0.04] border border-white/10 backdrop-blur-sm flex flex-col items-center justify-center gap-6 shadow-2xl">
-              <div className="w-20 h-20 rounded-2xl bg-secondary/20 flex items-center justify-center">
-                <Icon className="w-10 h-10 text-secondary" />
-              </div>
-              {AccentIcon && (
-                <div className="absolute -bottom-4 -right-4 w-14 h-14 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center border border-white/10">
-                  <AccentIcon className="w-7 h-7 text-white/60" />
+            {mockup ? (
+              <img
+                src={mockup}
+                alt={title}
+                className="w-[260px] sm:w-[280px] md:w-[320px] lg:w-[360px] rounded-3xl shadow-2xl border border-white/10 object-contain"
+              />
+            ) : (
+              <div className="relative w-[260px] h-[380px] md:w-[320px] md:h-[440px] rounded-3xl bg-white/[0.04] border border-white/10 backdrop-blur-sm flex flex-col items-center justify-center gap-6 shadow-2xl">
+                <div className="w-20 h-20 rounded-2xl bg-secondary/20 flex items-center justify-center">
+                  <Icon className="w-10 h-10 text-secondary" />
                 </div>
-              )}
-              <div className="w-3/4 space-y-2 px-4">
-                <div className="h-2.5 rounded-full bg-white/10 w-full" />
-                <div className="h-2.5 rounded-full bg-white/10 w-4/5" />
-                <div className="h-2.5 rounded-full bg-white/10 w-3/5" />
               </div>
-            </div>
+            )}
           </motion.div>
         </div>
       </div>
@@ -96,20 +99,22 @@ export default function Overview() {
       accentIcon: Users,
       title: "Prepara la partita",
       body: "Inserisci le squadre, seleziona i titolari e fai partire il cronometro.",
-      detail:
-        "Crea una o più squadre personalizzate salvando in anticipo la lista dei tuoi giocatori per averli sempre pronti.",
+      detail: "Crea una o più squadre personalizzate salvando in anticipo la lista dei tuoi giocatori per averli sempre pronti.",
+      mockup: mockup1,
     },
     {
       icon: Timer,
       accentIcon: Shield,
       title: "Tutto sotto controllo",
       body: "Segna gol, cartellini e sostituzioni con un solo tocco direttamente dal campo.",
+      mockup: mockup2,
     },
     {
       icon: FileText,
       accentIcon: Share2,
       title: "Condividi il successo",
       body: "A fine gara, genera automaticamente il report in PDF e invialo istantaneamente in chat.",
+      mockup: mockup3,
     },
   ];
 
