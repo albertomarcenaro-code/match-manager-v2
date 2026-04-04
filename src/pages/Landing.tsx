@@ -81,7 +81,9 @@ const Landing = () => {
             
             <div className="hidden lg:block">
               <img 
-                src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&q=80&w=1200" 
+                src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&q=60&w=860" 
+                loading="eager"
+                fetchPriority="high"
                 alt="Campo da calcio" 
                 className="rounded-3xl shadow-2xl object-cover h-[500px] w-full"
               />
