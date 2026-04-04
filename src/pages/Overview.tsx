@@ -6,9 +6,9 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, ClipboardList, Timer, FileText, Share2, Users, Shield } from "lucide-react";
-import mockup1 from "@/assets/mockup1.png";
-import mockup2 from "@/assets/mockup2.png";
-import mockup3 from "@/assets/mockup3.png";
+import mockup1 from "@/assets/mockup1.webp";
+import mockup2 from "@/assets/mockup2.webp";
+import mockup3 from "@/assets/mockup3.webp";
 
 /* ── single sticky-scroll section ── */
 function ScrollSection({
