@@ -1,7 +1,7 @@
 import { useState, forwardRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import logo from '@/assets/logo.png';
+import logo from '@/assets/logo.webp';
 import { User, LogOut, KeyRound, Wifi, WifiOff, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
