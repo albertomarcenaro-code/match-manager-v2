@@ -99,20 +99,22 @@ export default function Overview() {
       accentIcon: Users,
       title: "Prepara la partita",
       body: "Inserisci le squadre, seleziona i titolari e fai partire il cronometro.",
-      detail:
-        "Crea una o più squadre personalizzate salvando in anticipo la lista dei tuoi giocatori per averli sempre pronti.",
+      detail: "Crea una o più squadre personalizzate salvando in anticipo la lista dei tuoi giocatori per averli sempre pronti.",
+      mockup: mockup1,
     },
     {
       icon: Timer,
       accentIcon: Shield,
       title: "Tutto sotto controllo",
       body: "Segna gol, cartellini e sostituzioni con un solo tocco direttamente dal campo.",
+      mockup: mockup2,
     },
     {
       icon: FileText,
       accentIcon: Share2,
       title: "Condividi il successo",
       body: "A fine gara, genera automaticamente il report in PDF e invialo istantaneamente in chat.",
+      mockup: mockup3,
     },
   ];
 

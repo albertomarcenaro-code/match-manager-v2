@@ -184,7 +184,8 @@ const Landing = () => {
               <a href="/privacy" className="hover:text-green-600 transition-colors">Privacy</a>
                <a href="/terms" className="hover:text-green-600 transition-colors">Terms</a>
                <a href="/about" className="hover:text-green-600 transition-colors">About</a>
-            </div>
+               <a href="/overview" className="hover:text-green-600 transition-colors">Overview</a>
+             </div>
           </div>
         </div>
       </footer>
