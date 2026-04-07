@@ -39,6 +39,19 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(({
   const { user, isGuest, signOut, exitGuest } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [displayName, setDisplayName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) { setDisplayName(null); return; }
+    supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('user_id', user.id)
+      .single()
+      .then(({ data }) => {
+        setDisplayName(data?.full_name || null);
+      });
+  }, [user]);
 
   const handleLogout = async () => {
     setIsLoading(true);
@@ -194,8 +207,17 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(({
                   </div>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                {/* My Teams link in profile menu */}
+              <DropdownMenuContent align="end" className="w-52">
+                {/* User identity */}
+                <div className="px-2 py-2 border-b border-border/50">
+                  <p className="text-sm font-bold truncate">{displayName || user?.email}</p>
+                  {displayName && <p className="text-xs text-muted-foreground truncate">{user?.email}</p>}
+                </div>
+                <DropdownMenuItem onClick={() => navigate('/profile')}>
+                  <UserCircle className="h-4 w-4 mr-2" />
+                  Il mio Profilo
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate('/my-teams')}>
                   <Users className="h-4 w-4 mr-2" />
                   Le Mie Squadre
