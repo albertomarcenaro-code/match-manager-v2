@@ -1,8 +1,9 @@
-import { useState, forwardRef } from 'react';
+import { useState, useEffect, forwardRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import logo from '@/assets/logo.webp';
-import { User, LogOut, KeyRound, Wifi, WifiOff, Users } from 'lucide-react';
+import { User, LogOut, KeyRound, Wifi, WifiOff, Users, UserCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
