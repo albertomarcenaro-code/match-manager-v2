@@ -145,59 +145,65 @@ export default function SingleMatches() {
         ) : (
           <div className="space-y-3">
             {matchHistory.map((match) => (
-              <Card key={match.id} className="p-4 flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 text-sm font-semibold">
-                    <span className="truncate">{match.homeTeam}</span>
-                    <span className="text-lg font-bold text-primary whitespace-nowrap">
-                      {match.homeScore} - {match.awayScore}
-                    </span>
-                    <span className="truncate">{match.awayTeam}</span>
+              <Card key={match.id} className="p-4 space-y-2">
+                <div className="space-y-1">
+                  {/* Home team row */}
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold truncate">{match.homeTeam}</span>
+                    <span className="text-lg font-bold text-primary tabular-nums shrink-0">{match.homeScore}</span>
                   </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        match.isEnded
-                          ? "bg-muted text-muted-foreground"
-                          : match.isStarted
-                          ? "bg-primary/10 text-primary"
-                          : "bg-accent text-accent-foreground"
-                      }`}
-                    >
-                      {match.isEnded ? "Terminata" : match.isStarted ? "In corso" : "Da iniziare"}
-                    </span>
-                    {match.timestamp > 0 && (
-                      <span className="text-xs text-muted-foreground">
-                        {formatDate(match.timestamp)}
+                  {/* Away team row */}
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold truncate">{match.awayTeam}</span>
+                    <span className="text-lg font-bold text-primary tabular-nums shrink-0">{match.awayScore}</span>
+                  </div>
+                  {/* Info row */}
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center gap-2">
+                      {match.timestamp > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          {formatDate(match.timestamp)}
+                        </span>
+                      )}
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          match.isEnded
+                            ? "bg-muted text-muted-foreground"
+                            : match.isStarted
+                            ? "bg-primary/10 text-primary"
+                            : "bg-accent text-accent-foreground"
+                        }`}
+                      >
+                        {match.isEnded ? "Terminata" : match.isStarted ? "In corso" : "Da iniziare"}
                       </span>
-                    )}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        size="sm"
+                        variant={match.isEnded ? "outline" : "default"}
+                        className="gap-1 h-8 text-xs"
+                        onClick={() => navigate(`/match-summary/${match.id}?source=local&backTo=/single-matches`)}
+                      >
+                        {match.isEnded ? (
+                          <>
+                            <Eye className="h-3 w-3" /> Vedi
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-3 w-3" /> Riprendi
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => setDeleteTarget(match.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <Button
-                    size="sm"
-                    variant={match.isEnded ? "outline" : "default"}
-                    className="gap-1 h-8 text-xs"
-                    onClick={() => navigate(`/match-summary/${match.id}?source=local&backTo=/single-matches`)}
-                  >
-                    {match.isEnded ? (
-                      <>
-                        <Eye className="h-3 w-3" /> Vedi
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-3 w-3" /> Riprendi
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => setDeleteTarget(match.id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
                 </div>
               </Card>
             ))}
