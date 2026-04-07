@@ -278,27 +278,33 @@ export default function TournamentDetail() {
         ) : (
           <div className="space-y-3">
             {matches.map((m) => (
-              <Card key={m.id} className="p-4 flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 text-sm font-semibold">
-                    <span className="truncate">{m.home_team_name}</span>
-                    <span className="text-lg font-bold text-primary whitespace-nowrap">
-                      {m.home_score} - {m.away_score}
-                    </span>
-                    <span className="truncate">{m.away_team_name}</span>
+              <Card key={m.id} className="p-4 space-y-2">
+                <div className="space-y-1">
+                  {/* Home team row */}
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold truncate">{m.home_team_name}</span>
+                    <span className="text-lg font-bold text-primary tabular-nums shrink-0">{m.home_score}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">{formatDate(m.match_date)}</p>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <Button size="sm" variant="outline" className="h-8 w-8 p-0"
-                    onClick={() => navigate(`/match-summary/${m.id}?source=db&backTo=/tournament/${tournamentId}`)}>
-                    <Eye className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button size="sm" variant="ghost"
-                    className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => setDeleteTarget(m.id)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                  {/* Away team row */}
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold truncate">{m.away_team_name}</span>
+                    <span className="text-lg font-bold text-primary tabular-nums shrink-0">{m.away_score}</span>
+                  </div>
+                  {/* Info row */}
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-xs text-muted-foreground">{formatDate(m.match_date)}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button size="sm" variant="outline" className="h-8 w-8 p-0"
+                        onClick={() => navigate(`/match-summary/${m.id}?source=db&backTo=/tournament/${tournamentId}`)}>
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="sm" variant="ghost"
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => setDeleteTarget(m.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </Card>
             ))}
