@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { User, Pencil, Check, X, ArrowLeft, Mail, Shield, Building2, Tag } from "lucide-react";
+import { User, Pencil, ArrowLeft, Mail, Shield, Building2, Tag, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -25,15 +25,13 @@ const CATEGORY_OPTIONS = [
   "Juniores (U18-U19)", "Prima Squadra"
 ];
 
-type EditableField = "full_name" | "role" | "sports_club" | "category";
-
 export default function Profile() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfileData>({ full_name: null, role: null, sports_club: null, category: null });
+  const [draft, setDraft] = useState<ProfileData>({ full_name: null, role: null, sports_club: null, category: null });
   const [isLoading, setIsLoading] = useState(true);
-  const [editingField, setEditingField] = useState<EditableField | null>(null);
-  const [editValue, setEditValue] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -44,99 +42,83 @@ export default function Profile() {
         .select("full_name, role, sports_club, category")
         .eq("user_id", user.id)
         .single();
-      if (data) setProfile(data);
+      if (data) {
+        setProfile(data);
+        setDraft(data);
+      }
       setIsLoading(false);
     };
     fetchProfile();
   }, [user]);
 
-  const startEdit = (field: EditableField) => {
-    setEditingField(field);
-    setEditValue(profile[field] || "");
+  const startEdit = () => {
+    setDraft({ ...profile });
+    setIsEditing(true);
   };
 
   const cancelEdit = () => {
-    setEditingField(null);
-    setEditValue("");
+    setDraft({ ...profile });
+    setIsEditing(false);
   };
 
-  const saveField = async () => {
-    if (!user || !editingField) return;
+  const saveAll = async () => {
+    if (!user) return;
     setIsSaving(true);
     const { error } = await supabase
       .from("profiles")
-      .update({ [editingField]: editValue || null })
+      .update({
+        full_name: draft.full_name || null,
+        role: draft.role || null,
+        sports_club: draft.sports_club || null,
+        category: draft.category || null,
+      })
       .eq("user_id", user.id);
-    
+
     if (error) {
       toast.error("Errore nel salvataggio");
     } else {
-      setProfile(prev => ({ ...prev, [editingField!]: editValue || null }));
+      setProfile({ ...draft });
       toast.success("Profilo aggiornato");
+      setIsEditing(false);
     }
-    setEditingField(null);
-    setEditValue("");
     setIsSaving(false);
   };
 
-  const renderField = (label: string, field: EditableField, icon: React.ReactNode, type: "text" | "select" = "text", options?: string[]) => {
-    const isEditing = editingField === field;
-    const value = profile[field];
-
-    return (
-      <div className="flex items-center justify-between py-3 border-b border-border/50 last:border-0">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="text-muted-foreground">{icon}</div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-muted-foreground">{label}</p>
-            {isEditing ? (
-              <div className="flex items-center gap-2 mt-1">
-                {type === "select" && options ? (
-                  <Select value={editValue} onValueChange={setEditValue}>
-                    <SelectTrigger className="h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {options.map(opt => (
-                        <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input
-                    value={editValue}
-                    onChange={e => setEditValue(e.target.value)}
-                    className="h-8 text-sm"
-                    autoFocus
-                  />
-                )}
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" onClick={saveField} disabled={isSaving}>
-                  <Check className="h-4 w-4" />
-                </Button>
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={cancelEdit}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <p className="text-sm font-medium truncate">{value || <span className="text-muted-foreground italic">Non impostato</span>}</p>
-            )}
-          </div>
-        </div>
-        {!isEditing && (
-          <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => startEdit(field)}>
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
+  const renderField = (label: string, field: keyof ProfileData, icon: React.ReactNode, type: "text" | "select" = "text", options?: string[]) => (
+    <div className="flex items-center gap-3 py-3 border-b border-border/50 last:border-0">
+      <div className="text-muted-foreground">{icon}</div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-muted-foreground mb-1">{label}</p>
+        {isEditing ? (
+          type === "select" && options ? (
+            <Select value={draft[field] || ""} onValueChange={v => setDraft(prev => ({ ...prev, [field]: v }))}>
+              <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Seleziona..." /></SelectTrigger>
+              <SelectContent>
+                {options.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              value={draft[field] || ""}
+              onChange={e => setDraft(prev => ({ ...prev, [field]: e.target.value }))}
+              className="h-9 text-sm"
+            />
+          )
+        ) : (
+          <p className="text-sm font-medium truncate">
+            {profile[field] || <span className="text-muted-foreground italic">Non impostato</span>}
+          </p>
         )}
       </div>
-    );
-  };
+    </div>
+  );
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <Header />
         <main className="flex-1 flex items-center justify-center">
-          <p className="text-muted-foreground">Caricamento...</p>
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </main>
         <Footer />
       </div>
@@ -153,25 +135,34 @@ export default function Profile() {
 
         <Card>
           <CardHeader className="pb-3">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
-                <User className="h-6 w-6 text-primary" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+                  <User className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Il mio Profilo</CardTitle>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
+                </div>
               </div>
-              <div>
-                <CardTitle className="text-lg">Il mio Profilo</CardTitle>
-                <p className="text-xs text-muted-foreground">{user?.email}</p>
-              </div>
+              {!isEditing && (
+                <Button size="icon" variant="ghost" onClick={startEdit} className="text-muted-foreground hover:text-primary">
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent className="space-y-0">
-            {/* Email - non editable */}
-            <div className="flex items-center justify-between py-3 border-b border-border/50">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div className="text-muted-foreground"><Mail className="h-4 w-4" /></div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-muted-foreground">Email</p>
+            {/* Email - always read-only */}
+            <div className="flex items-center gap-3 py-3 border-b border-border/50">
+              <div className="text-muted-foreground"><Mail className="h-4 w-4" /></div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground mb-1">Email</p>
+                {isEditing ? (
+                  <Input value={user?.email || ""} disabled className="h-9 text-sm opacity-60" />
+                ) : (
                   <p className="text-sm font-medium truncate">{user?.email}</p>
-                </div>
+                )}
               </div>
             </div>
 
@@ -179,6 +170,18 @@ export default function Profile() {
             {renderField("Ruolo", "role", <Shield className="h-4 w-4" />, "select", ROLE_OPTIONS)}
             {renderField("Società Sportiva", "sports_club", <Building2 className="h-4 w-4" />)}
             {renderField("Categoria", "category", <Tag className="h-4 w-4" />, "select", CATEGORY_OPTIONS)}
+
+            {isEditing && (
+              <div className="flex gap-3 pt-5">
+                <Button onClick={saveAll} disabled={isSaving} className="flex-1 gap-2">
+                  {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Salva Modifiche
+                </Button>
+                <Button variant="outline" onClick={cancelEdit} disabled={isSaving} className="flex-1">
+                  Annulla
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>
