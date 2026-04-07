@@ -1,8 +1,9 @@
-import { useState, forwardRef } from 'react';
+import { useState, useEffect, forwardRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import logo from '@/assets/logo.webp';
-import { User, LogOut, KeyRound, Wifi, WifiOff, Users } from 'lucide-react';
+import { User, LogOut, KeyRound, Wifi, WifiOff, Users, UserCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -20,7 +21,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
 interface HeaderProps {
@@ -39,6 +39,19 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(({
   const { user, isGuest, signOut, exitGuest } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [displayName, setDisplayName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) { setDisplayName(null); return; }
+    supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('user_id', user.id)
+      .single()
+      .then(({ data }) => {
+        setDisplayName(data?.full_name || null);
+      });
+  }, [user]);
 
   const handleLogout = async () => {
     setIsLoading(true);
@@ -194,8 +207,17 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(({
                   </div>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                {/* My Teams link in profile menu */}
+              <DropdownMenuContent align="end" className="w-52">
+                {/* User identity */}
+                <div className="px-2 py-2 border-b border-border/50">
+                  <p className="text-sm font-bold truncate">{displayName || user?.email}</p>
+                  {displayName && <p className="text-xs text-muted-foreground truncate">{user?.email}</p>}
+                </div>
+                <DropdownMenuItem onClick={() => navigate('/profile')}>
+                  <UserCircle className="h-4 w-4 mr-2" />
+                  Il mio Profilo
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate('/my-teams')}>
                   <Users className="h-4 w-4 mr-2" />
                   Le Mie Squadre

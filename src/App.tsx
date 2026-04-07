@@ -16,6 +16,7 @@ import Tournaments from "./pages/Tournaments";
 import TournamentDetail from "./pages/TournamentDetail";
 import MatchSummary from "./pages/MatchSummary";
 import MyTeams from "./pages/MyTeams";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
@@ -61,6 +62,7 @@ const App = () => (
             <Route path="/tournament/:id" element={<RegisteredRoute><TournamentDetail /></RegisteredRoute>} />
             <Route path="/tournament-archive" element={<RegisteredRoute><TournamentArchive /></RegisteredRoute>} />
             <Route path="/my-teams" element={<RegisteredRoute><MyTeams /></RegisteredRoute>} />
+            <Route path="/profile" element={<RegisteredRoute><Profile /></RegisteredRoute>} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/about" element={<About />} />
