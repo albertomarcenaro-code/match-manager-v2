@@ -43,6 +43,15 @@ const RegisteredRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const LazyFallback = () => (
+  <div className="h-screen flex items-center justify-center font-sans">
+    <div className="text-center">
+      <div className="w-12 h-12 border-4 border-muted border-t-primary rounded-full animate-spin mx-auto mb-4" />
+      <p className="text-sm text-muted-foreground">Caricamento...</p>
+    </div>
+  </div>
+);
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -50,26 +59,28 @@ const App = () => (
       <Sonner position="top-center" />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/single-matches" element={<ProtectedRoute><SingleMatches /></ProtectedRoute>} />
-            <Route path="/match/:id" element={<ProtectedRoute><MatchApp /></ProtectedRoute>} />
-            <Route path="/match-setup/:id" element={<ProtectedRoute><MatchApp /></ProtectedRoute>} />
-            <Route path="/match-summary/:id" element={<ProtectedRoute><MatchSummary /></ProtectedRoute>} />
-            <Route path="/match" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/tournaments" element={<RegisteredRoute><Tournaments /></RegisteredRoute>} />
-            <Route path="/tournament/:id" element={<RegisteredRoute><TournamentDetail /></RegisteredRoute>} />
-            <Route path="/tournament-archive" element={<RegisteredRoute><TournamentArchive /></RegisteredRoute>} />
-            <Route path="/my-teams" element={<RegisteredRoute><MyTeams /></RegisteredRoute>} />
-            <Route path="/profile" element={<RegisteredRoute><Profile /></RegisteredRoute>} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/overview" element={<Overview />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <Suspense fallback={<LazyFallback />}>
+            <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/single-matches" element={<ProtectedRoute><SingleMatches /></ProtectedRoute>} />
+              <Route path="/match/:id" element={<ProtectedRoute><MatchApp /></ProtectedRoute>} />
+              <Route path="/match-setup/:id" element={<ProtectedRoute><MatchApp /></ProtectedRoute>} />
+              <Route path="/match-summary/:id" element={<ProtectedRoute><MatchSummary /></ProtectedRoute>} />
+              <Route path="/match" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/tournaments" element={<RegisteredRoute><Tournaments /></RegisteredRoute>} />
+              <Route path="/tournament/:id" element={<RegisteredRoute><TournamentDetail /></RegisteredRoute>} />
+              <Route path="/tournament-archive" element={<RegisteredRoute><TournamentArchive /></RegisteredRoute>} />
+              <Route path="/my-teams" element={<RegisteredRoute><MyTeams /></RegisteredRoute>} />
+              <Route path="/profile" element={<RegisteredRoute><Profile /></RegisteredRoute>} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/overview" element={<Overview />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
