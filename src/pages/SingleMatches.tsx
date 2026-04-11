@@ -4,9 +4,10 @@ import { Footer } from "@/components/layout/Footer";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Play, Eye, Trash2, Home, Loader2, LogIn } from "lucide-react";
+import { Plus, Play, Eye, Trash2, Home, Loader2, LogIn, WifiOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -28,32 +29,7 @@ interface MatchSummary {
   isEnded: boolean;
   isStarted: boolean;
   timestamp: number;
-}
-
-function getMatchHistory(): MatchSummary[] {
-  const history: MatchSummary[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key?.startsWith("match_state_")) {
-      try {
-        const data = JSON.parse(localStorage.getItem(key) || "");
-        const matchId = key.replace("match_state_", "");
-        const tsMatch = matchId.match(/\d+$/);
-        const timestamp = tsMatch ? parseInt(tsMatch[0]) : 0;
-        history.push({
-          id: matchId,
-          homeTeam: data.homeTeam?.name || "Casa",
-          awayTeam: data.awayTeam?.name || "Ospiti",
-          homeScore: data.homeTeam?.score || 0,
-          awayScore: data.awayTeam?.score || 0,
-          isEnded: data.isMatchEnded || false,
-          isStarted: data.isMatchStarted || false,
-          timestamp,
-        });
-      } catch {}
-    }
-  }
-  return history.sort((a, b) => b.timestamp - a.timestamp);
+  source: "db";
 }
 
 const formatDate = (ts: number) => {
@@ -77,28 +53,79 @@ export default function SingleMatches() {
   const [matchName, setMatchName] = useState("");
   const [matchHistory, setMatchHistory] = useState<MatchSummary[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [dbError, setDbError] = useState(false);
 
+  // Always load from cloud database for logged-in users
   useEffect(() => {
     if (!isGuest && user) {
-      setMatchHistory(getMatchHistory());
+      loadFromDatabase();
     }
   }, [user, isGuest]);
+
+  const loadFromDatabase = async () => {
+    if (!user) return;
+    setLoading(true);
+    setDbError(false);
+    try {
+      const { data, error } = await supabase
+        .from("matches")
+        .select("*")
+        .eq("user_id", user.id)
+        .is("tournament_id", null) // Only single matches, not tournament ones
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      const matches: MatchSummary[] = (data || []).map((m) => ({
+        id: m.id,
+        homeTeam: m.home_team_name,
+        awayTeam: m.away_team_name,
+        homeScore: m.home_score,
+        awayScore: m.away_score,
+        isEnded: (m as any).status === "completed",
+        isStarted: true,
+        timestamp: new Date(m.created_at).getTime(),
+        source: "db" as const,
+      }));
+
+      setMatchHistory(matches);
+    } catch (err) {
+      console.error("Failed to load matches from database:", err);
+      setDbError(true);
+      toast.error("Errore nel caricamento delle partite dal database");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCreate = () => {
     const id = "quick-" + Date.now();
     navigate(`/match/${id}`);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteTarget) return;
-    localStorage.removeItem(`match_state_${deleteTarget}`);
+    
     try {
-      const list: string[] = JSON.parse(localStorage.getItem("match_list") || "[]");
-      localStorage.setItem("match_list", JSON.stringify(list.filter((id) => id !== deleteTarget)));
-    } catch {}
-    setMatchHistory((prev) => prev.filter((m) => m.id !== deleteTarget));
-    setDeleteTarget(null);
-    toast.success("Partita eliminata");
+      const { error } = await supabase
+        .from("matches")
+        .delete()
+        .eq("id", deleteTarget);
+      
+      if (error) throw error;
+      
+      // Also clean up any localStorage remnant
+      localStorage.removeItem(`match_state_${deleteTarget}`);
+      
+      setMatchHistory((prev) => prev.filter((m) => m.id !== deleteTarget));
+      toast.success("Partita eliminata");
+    } catch (err) {
+      console.error("Failed to delete match:", err);
+      toast.error("Errore nell'eliminazione della partita");
+    } finally {
+      setDeleteTarget(null);
+    }
   };
 
   return (
@@ -136,6 +163,20 @@ export default function SingleMatches() {
               Accedi
             </Button>
           </Card>
+        ) : dbError ? (
+          <Card className="p-8 text-center space-y-3">
+            <WifiOff className="h-8 w-8 mx-auto text-destructive" />
+            <p className="text-muted-foreground text-sm">
+              Impossibile connettersi al database. Controlla la connessione e riprova.
+            </p>
+            <Button variant="outline" size="sm" onClick={loadFromDatabase}>
+              Riprova
+            </Button>
+          </Card>
+        ) : loading ? (
+          <div className="flex justify-center p-8">
+            <Loader2 className="animate-spin h-8 w-8 text-muted-foreground" />
+          </div>
         ) : matchHistory.length === 0 ? (
           <Card className="p-8 text-center">
             <p className="text-muted-foreground text-sm">
@@ -147,17 +188,14 @@ export default function SingleMatches() {
             {matchHistory.map((match) => (
               <Card key={match.id} className="p-4 space-y-2">
                 <div className="space-y-1">
-                  {/* Home team row */}
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-sm font-semibold truncate">{match.homeTeam}</span>
                     <span className="text-lg font-bold text-primary tabular-nums shrink-0">{match.homeScore}</span>
                   </div>
-                  {/* Away team row */}
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-sm font-semibold truncate">{match.awayTeam}</span>
                     <span className="text-lg font-bold text-primary tabular-nums shrink-0">{match.awayScore}</span>
                   </div>
-                  {/* Info row */}
                   <div className="flex items-center justify-between pt-1">
                     <div className="flex items-center gap-2">
                       {match.timestamp > 0 && (
@@ -169,12 +207,10 @@ export default function SingleMatches() {
                         className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                           match.isEnded
                             ? "bg-muted text-muted-foreground"
-                            : match.isStarted
-                            ? "bg-primary/10 text-primary"
-                            : "bg-accent text-accent-foreground"
+                            : "bg-primary/10 text-primary"
                         }`}
                       >
-                        {match.isEnded ? "Terminata" : match.isStarted ? "In corso" : "Da iniziare"}
+                        {match.isEnded ? "Terminata" : "In corso"}
                       </span>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
@@ -182,7 +218,13 @@ export default function SingleMatches() {
                         size="sm"
                         variant={match.isEnded ? "outline" : "default"}
                         className="gap-1 h-8 text-xs"
-                        onClick={() => navigate(`/match-summary/${match.id}?source=local&backTo=/single-matches`)}
+                        onClick={() => {
+                          if (match.isEnded) {
+                            navigate(`/match-summary/${match.id}?source=db&backTo=/single-matches`);
+                          } else {
+                            navigate(`/match/${match.id}`);
+                          }
+                        }}
                       >
                         {match.isEnded ? (
                           <>
