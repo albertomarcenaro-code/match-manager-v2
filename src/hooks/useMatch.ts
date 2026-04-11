@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { MatchState, Player, TeamType, CardType, MatchEvent } from '../types/match';
 import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
-// Per-match storage key for persistence across reloads
+// Per-match storage key for persistence across reloads (local cache only)
 const STORAGE_KEY_PREFIX = 'match_state_';
-const MATCH_LIST_KEY = 'match_list';
 
 const getStorageKey = (matchId: string | undefined) =>
   matchId ? `${STORAGE_KEY_PREFIX}${matchId}` : 'match_manager_state';
@@ -48,8 +49,11 @@ const generateId = () => Math.random().toString(36).substr(2, 9);
 export const useMatch = () => {
   const { id } = useParams();
   const storageKey = getStorageKey(id);
+  const { user, isGuest } = useAuth();
+  const dbMatchIdRef = useRef<string | null>(null);
+  const savingRef = useRef(false);
 
-  // FIX #1: Always try to restore from per-match storage. No more reset on "quick-"/"new-" prefixes.
+  // Try to restore from localStorage (used as local cache for in-progress matches)
   const [state, setState] = useState<MatchState>(() => {
     const saved = localStorage.getItem(storageKey);
     if (saved) {
@@ -62,21 +66,142 @@ export const useMatch = () => {
     return initialState;
   });
 
-  // Auto-save on every state change (per-match key)
+  // Local cache: save to localStorage on every state change (for crash recovery / tab reload)
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify(state));
-    // Track match in global list for history/dashboard
-    if (id) {
-      try {
-        const list: string[] = JSON.parse(localStorage.getItem(MATCH_LIST_KEY) || '[]');
-        if (!list.includes(id)) {
-          list.push(id);
-          localStorage.setItem(MATCH_LIST_KEY, JSON.stringify(list));
-        }
-      } catch {}
-    }
-  }, [state, storageKey, id]);
+  }, [state, storageKey]);
 
+  // On mount: if logged in, try to load match from DB (for resume across devices)
+  useEffect(() => {
+    if (!user || isGuest || !id) return;
+    
+    const loadFromDb = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('matches')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('id', id)
+          .maybeSingle();
+
+        if (error) throw error;
+        
+        if (data) {
+          dbMatchIdRef.current = data.id;
+          const md = (data.match_data as any) || {};
+          // If we have DB data and no local cache, restore from DB
+          const localSaved = localStorage.getItem(storageKey);
+          if (!localSaved && md.fullState) {
+            setState({ ...initialState, ...md.fullState });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load match from DB:', err);
+      }
+    };
+    
+    loadFromDb();
+  }, [user, isGuest, id]);
+
+  // Save match state to cloud DB (debounced, for logged-in users)
+  const saveToDb = useCallback(async (currentState: MatchState) => {
+    if (!user || isGuest || !id || savingRef.current) return;
+    
+    savingRef.current = true;
+    try {
+      const matchData = {
+        events: currentState.events,
+        periodScores: currentState.periodScores,
+        homeTeam: currentState.homeTeam,
+        awayTeam: currentState.awayTeam,
+        fullState: currentState,
+      };
+      
+      const status = currentState.isMatchEnded ? 'completed' : 'in_progress';
+      
+      if (dbMatchIdRef.current) {
+        // Update existing match
+        const { error } = await supabase
+          .from('matches')
+          .update({
+            home_team_name: currentState.homeTeam.name,
+            away_team_name: currentState.awayTeam.name,
+            home_score: currentState.homeTeam.score,
+            away_score: currentState.awayTeam.score,
+            match_data: matchData as any,
+            status,
+          })
+          .eq('id', dbMatchIdRef.current);
+        
+        if (error) throw error;
+      } else {
+        // Insert new match
+        const { data, error } = await supabase
+          .from('matches')
+          .insert({
+            id, // use the same ID as the route param
+            user_id: user.id,
+            home_team_name: currentState.homeTeam.name,
+            away_team_name: currentState.awayTeam.name,
+            home_score: currentState.homeTeam.score,
+            away_score: currentState.awayTeam.score,
+            match_data: matchData as any,
+            status,
+          })
+          .select('id')
+          .single();
+        
+        if (error) throw error;
+        if (data) {
+          dbMatchIdRef.current = data.id;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to save match to DB:', err);
+      // Don't show toast on every auto-save failure to avoid spamming
+    } finally {
+      savingRef.current = false;
+    }
+  }, [user, isGuest, id]);
+
+  // Auto-save to DB when match state changes significantly (started, score change, ended)
+  const prevScoreRef = useRef({ home: 0, away: 0 });
+  const prevEndedRef = useRef(false);
+  const prevStartedRef = useRef(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!user || isGuest || !id) return;
+    
+    const scoreChanged = state.homeTeam.score !== prevScoreRef.current.home || 
+                         state.awayTeam.score !== prevScoreRef.current.away;
+    const justEnded = state.isMatchEnded && !prevEndedRef.current;
+    const justStarted = state.isMatchStarted && !prevStartedRef.current;
+    
+    prevScoreRef.current = { home: state.homeTeam.score, away: state.awayTeam.score };
+    prevEndedRef.current = state.isMatchEnded;
+    prevStartedRef.current = state.isMatchStarted;
+    
+    // Immediate save on significant events
+    if (justEnded || justStarted || scoreChanged) {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveToDb(state);
+      return;
+    }
+    
+    // Debounced save for other changes (roster edits, etc.)
+    if (state.isMatchStarted) {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => saveToDb(state), 5000);
+    }
+    
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [state, user, isGuest, id, saveToDb]);
+
+  // ... keep existing code for all the match action callbacks ...
+  
   const setHomeTeamName = useCallback((name: string) => setState(prev => ({
     ...prev, homeTeam: { ...prev.homeTeam, name }
   })), []);
@@ -144,6 +269,7 @@ export const useMatch = () => {
     }));
   }, []);
 
+  // NEW: Add away player with full name and number
   const addOpponentPlayer = useCallback((number: number) => {
     const newPlayer: Player = {
       id: generateId(),
@@ -164,7 +290,6 @@ export const useMatch = () => {
     }));
   }, []);
 
-  // NEW: Add away player with full name and number
   const addAwayPlayerFull = useCallback((name: string, number: number | null) => {
     const newPlayer: Player = {
       id: generateId(),
@@ -633,7 +758,6 @@ export const useMatch = () => {
             const newCards = { ...p.cards, [cardType]: p.cards[cardType] + 1 };
             const expelled = cardType === 'red' || newCards.yellow >= 2;
             if (expelled) {
-              // Expelled: remove from field immediately and finalize playtime
               const now = Date.now();
               const addedSeconds = p.currentEntryTime !== null ? Math.floor((now - p.currentEntryTime) / 1000) : 0;
               const updatedPerPeriod = { ...p.secondsPlayedPerPeriod };
@@ -762,6 +886,8 @@ export const useMatch = () => {
         localStorage.removeItem(getStorageKey(id));
       }
     }
+    // Reset DB reference so a new match record is created
+    dbMatchIdRef.current = null;
   }, [id]);
 
   const addPlayerToMatch = useCallback((team: TeamType, name: string, number: number) => {

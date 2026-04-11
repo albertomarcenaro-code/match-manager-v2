@@ -51,6 +51,7 @@ export type Database = {
           id: string
           match_data: Json | null
           match_date: string
+          status: string
           tournament_id: string | null
           user_id: string
         }
@@ -63,6 +64,7 @@ export type Database = {
           id?: string
           match_data?: Json | null
           match_date?: string
+          status?: string
           tournament_id?: string | null
           user_id: string
         }
@@ -75,6 +77,7 @@ export type Database = {
           id?: string
           match_data?: Json | null
           match_date?: string
+          status?: string
           tournament_id?: string | null
           user_id?: string
         }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMatch } from '@/hooks/useMatch';
 import { MatchHeader } from '@/components/match/MatchHeader';
@@ -14,9 +14,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Users, UserCheck, Play, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/layout/Header';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
 
 const MatchApp = () => {
   const { id } = useParams();
@@ -24,7 +22,6 @@ const MatchApp = () => {
   const [searchParams] = useSearchParams();
   const { user, isGuest } = useAuth();
   const tournamentId = searchParams.get('tournamentId');
-  const savedToDbRef = useRef(false);
 
   const {
     state,
@@ -205,36 +202,11 @@ const MatchApp = () => {
                       setActiveTab('starters');
                     }
                   }}
-                  onEndMatch={async () => {
+                  onEndMatch={() => {
                     if (state.isRunning) endPeriod();
                     endMatch();
                     setActiveTab('live');
-                    // Save to DB if logged in and tournament match
-                    if (user && !isGuest && tournamentId && !savedToDbRef.current) {
-                      savedToDbRef.current = true;
-                      try {
-                        const { error } = await supabase.from('matches').insert({
-                          user_id: user.id,
-                          home_team_name: state.homeTeam.name,
-                          away_team_name: state.awayTeam.name,
-                          home_score: state.homeTeam.score,
-                          away_score: state.awayTeam.score,
-                          tournament_id: tournamentId,
-                          match_data: {
-                            events: state.events,
-                            periodScores: state.periodScores,
-                            homeTeam: state.homeTeam,
-                            awayTeam: state.awayTeam,
-                          } as any,
-                        });
-                        if (error) throw error;
-                        toast.success('Partita salvata nel torneo!');
-                      } catch (err: any) {
-                        console.error('Save match error:', err);
-                        toast.error('Errore nel salvataggio della partita');
-                        savedToDbRef.current = false;
-                      }
-                    }
+                    // DB save is now handled automatically by useMatch hook
                   }}
                   onUndo={undoLastEvent}
                 />

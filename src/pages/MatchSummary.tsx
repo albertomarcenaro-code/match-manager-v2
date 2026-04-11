@@ -39,7 +39,7 @@ export default function MatchSummary() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const source = searchParams.get("source") || "local"; // "db" or "local"
+  const source = searchParams.get("source") || (user ? "db" : "local");
   const backTo = searchParams.get("backTo") || "/dashboard";
 
   const [data, setData] = useState<MatchSummaryData | null>(null);
@@ -47,12 +47,12 @@ export default function MatchSummary() {
 
   useEffect(() => {
     if (!id) return;
-    if (source === "db") {
+    if (source === "db" || user) {
       loadFromDb();
     } else {
       loadFromLocal();
     }
-  }, [id, source]);
+  }, [id, source, user]);
 
   const loadFromDb = async () => {
     setLoading(true);
