@@ -1,73 +1,45 @@
-# Welcome to your Lovable project
+# ⚽ Match Manager Pro
 
-## Project info
+**Match Manager Pro** è una PWA (Progressive Web App) avanzata progettata per allenatori e dirigenti sportivi. L'applicazione permette di gestire l'intera vita di una squadra di calcio, dalla preparazione della partita alla generazione di report professionali, con un'interfaccia ottimizzata per l'uso sul campo.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## 🚀 Funzionalità Principali
 
-## How can I edit this code?
+* **Onboarding Dinamico (`/overview`):** Tour immersivo in stile "Apple Scroll" che guida i nuovi utenti attraverso le funzionalità core dell'app.
+* **Gestione Partita Live:** Cronometro integrato con interfaccia "one-touch" per segnare gol, cartellini e sostituzioni senza perdere di vista il campo.
+* **Modulo Tornei:** Gestione completa di gironi e fasi eliminatorie con calcolo automatico di classifiche e statistiche.
+* **Reportistica PDF:** Generazione istantanea di riepiloghi gara in formato PDF, ottimizzati per la condivisione rapida su WhatsApp o via Email.
+* **Area Personale & Privacy:** Gestione sicura del profilo utente con isolamento totale dei dati tra account diversi.
 
-There are several ways of editing your application.
+## 🛠️ Tech Stack
 
-**Use Lovable**
+Questo progetto è costruito con tecnologie moderne per garantire velocità e affidabilità:
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+- **Frontend:** React + Vite + TypeScript
+- **Styling:** Tailwind CSS + shadcn-ui
+- **Animazioni:** Framer Motion (per lo scroll dinamico e transizioni UI)
+- **Icone:** Lucide-React
+- **Database & Auth:** Supabase (PostgreSQL)
 
-Changes made via Lovable will be committed automatically to this repo.
+## ⚠️ Filosofia di Sviluppo: RISCHIO ZERO REGRESSIONI
 
-**Use your preferred IDE**
+Il progetto segue una rigorosa politica di sviluppo volta a preservare la stabilità delle funzioni core:
+1.  **Isolamento:** Le nuove feature grafiche o di presentazione (come il carosello di onboarding) vengono sviluppate in rotte isolate prima dell'integrazione.
+2.  **Integrità Dati:** Ogni modifica alla UI non deve mai interferire con la logica del cronometro o con i filtri di sicurezza `user_id` del database.
+3.  **Ottimizzazione Mobile:** Ogni componente è testato per garantire un caricamento rapido (LCP ottimizzato) anche in condizioni di rete instabile (4G/5G sui campi da gioco).
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## 💻 Sviluppo Locale
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+Se desideri lavorare localmente sul codice:
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
+# 1. Clona il repository
 git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
+# 2. Entra nella cartella
 cd <YOUR_PROJECT_NAME>
 
-# Step 3: Install the necessary dependencies.
-npm i
+# 3. Installa le dipendenze
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# 4. Avvia il server di sviluppo
 npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
