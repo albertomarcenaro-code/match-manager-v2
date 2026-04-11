@@ -290,6 +290,26 @@ export const useMatch = () => {
     }));
   }, []);
 
+  const addAwayPlayerFull = useCallback((name: string, number: number | null) => {
+    const newPlayer: Player = {
+      id: generateId(),
+      name: name.toUpperCase(),
+      number,
+      isOnField: false,
+      isStarter: false,
+      isExpelled: false,
+      goals: 0,
+      cards: { yellow: 0, red: 0 },
+      currentEntryTime: null,
+      totalSecondsPlayed: 0,
+      secondsPlayedPerPeriod: {}
+    };
+    setState(prev => ({
+      ...prev,
+      awayTeam: { ...prev.awayTeam, players: [...prev.awayTeam.players, newPlayer] }
+    }));
+  }, []);
+
   // NEW: Update away player name
   const updateAwayPlayerName = useCallback((playerId: string, name: string) => {
     setState(prev => ({
