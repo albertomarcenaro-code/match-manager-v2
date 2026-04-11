@@ -22,7 +22,6 @@ const MatchApp = () => {
   const [searchParams] = useSearchParams();
   const { user, isGuest } = useAuth();
   const tournamentId = searchParams.get('tournamentId');
-  const savedToDbRef = useRef(false);
 
   const {
     state,
