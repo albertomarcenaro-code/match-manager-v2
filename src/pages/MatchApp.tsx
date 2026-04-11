@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMatch } from '@/hooks/useMatch';
 import { MatchHeader } from '@/components/match/MatchHeader';
