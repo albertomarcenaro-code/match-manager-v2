@@ -100,7 +100,7 @@ export default function SingleMatches() {
   };
 
   const handleCreate = () => {
-    const id = "quick-" + Date.now();
+    const id = crypto.randomUUID();
     navigate(`/match/${id}`);
   };
 
