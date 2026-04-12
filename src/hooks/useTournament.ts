@@ -9,7 +9,7 @@ import { tournamentSchema, tournamentMatchSchema, tournamentPlayersArraySchema, 
 
 const TOURNAMENT_STORAGE_KEY = 'tournament-state';
 
-const generateId = () => Math.random().toString(36).substring(2, 9);
+const generateId = () => crypto.randomUUID();
 
 const createEmptyTournament = (): TournamentState => ({
   id: generateId(),
