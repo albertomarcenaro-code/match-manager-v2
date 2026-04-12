@@ -156,9 +156,16 @@ export const useMatch = () => {
           dbMatchIdRef.current = data.id;
         }
       }
-    } catch (err) {
-      console.error('Failed to save match to DB:', err);
-      // Don't show toast on every auto-save failure to avoid spamming
+    } catch (err: any) {
+      console.error('Failed to save match to DB:', {
+        message: err?.message,
+        details: err?.details,
+        hint: err?.hint,
+        code: err?.code,
+        matchId: id,
+        dbMatchId: dbMatchIdRef.current,
+        userId: user?.id,
+      });
     } finally {
       savingRef.current = false;
     }
