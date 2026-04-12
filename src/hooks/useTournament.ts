@@ -258,9 +258,15 @@ export function useTournament() {
           setDbTournamentId(data.id);
           setTournament(prev => ({ ...prev, id: data.id }));
         }
-      } catch (error) {
-        console.error('Failed to save tournament to database:', error);
-        toast.error('Errore nella validazione dei dati del torneo');
+      } catch (error: any) {
+        console.error('Failed to save tournament to database:', {
+          message: error?.message,
+          details: error?.details,
+          hint: error?.hint,
+          code: error?.code,
+          userId: user.id,
+        });
+        toast.error(`Errore salvataggio torneo: ${error?.message || 'errore sconosciuto'}`);
       }
     }
 
@@ -381,9 +387,16 @@ export function useTournament() {
             ),
           }));
         }
-      } catch (error) {
-        console.error('Failed to save match to database:', error);
-        toast.error('Errore nella validazione dei dati della partita');
+      } catch (error: any) {
+        console.error('Failed to save tournament match to database:', {
+          message: error?.message,
+          details: error?.details,
+          hint: error?.hint,
+          code: error?.code,
+          tournamentId: dbTournamentId,
+          userId: user.id,
+        });
+        toast.error(`Errore salvataggio partita torneo: ${error?.message || 'errore sconosciuto'}`);
       }
     }
 
