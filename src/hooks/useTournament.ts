@@ -427,10 +427,6 @@ export function useTournament() {
       toast.success('Partita aggiunta al torneo');
     }
   }, [user, isGuest, dbTournamentId, tournament.players]);
-    }
-
-    toast.success('Partita aggiunta al torneo');
-  }, [user, isGuest, dbTournamentId]);
 
   const getTournamentPlayers = useCallback(() => {
     return tournament.players;
