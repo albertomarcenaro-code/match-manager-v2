@@ -55,6 +55,7 @@ const MatchApp = () => {
     updateAwayPlayerName,
     updateAwayPlayerNumber,
     bulkAddAwayPlayers,
+    fixStarterError,
   } = useMatch();
 
   // Tab navigation: 'roster' | 'starters' | 'live'
@@ -226,6 +227,7 @@ const MatchApp = () => {
                     onYellowCard={(pid) => recordCard('home', pid, 'yellow')}
                     onRedCard={(pid) => recordCard('home', pid, 'red')}
                     onAddPlayer={(name, num) => addPlayerToMatch('home', name, num)}
+                    onFixStarterError={(pid) => fixStarterError('home', pid)}
                   />
                   <TeamPanel
                     teamName={state.awayTeam.name}
@@ -240,6 +242,7 @@ const MatchApp = () => {
                     onYellowCard={(pid) => recordCard('away', pid, 'yellow')}
                     onRedCard={(pid) => recordCard('away', pid, 'red')}
                     onAddPlayer={(name, num) => addPlayerToMatch('away', name, num)}
+                    onFixStarterError={(pid) => fixStarterError('away', pid)}
                   />
                 </div>
 

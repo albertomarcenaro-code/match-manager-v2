@@ -1,4 +1,4 @@
-import { useState, memo, useCallback } from 'react';
+import { useState, memo, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Player, MatchEvent } from '@/types/match';
@@ -10,6 +10,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Popover,
   PopoverContent,
@@ -38,6 +48,7 @@ interface TeamPanelProps {
   onYellowCard: (playerId: string) => void;
   onRedCard: (playerId: string) => void;
   onAddPlayer?: (name: string, number: number) => void;
+  onFixStarterError?: (playerId: string) => void;
 }
 
 type ActionType = 'goal' | 'ownGoal' | 'substitution' | 'yellowCard' | 'redCard';
@@ -55,12 +66,42 @@ export function TeamPanel({
   onYellowCard,
   onRedCard,
   onAddPlayer,
+  onFixStarterError,
 }: TeamPanelProps) {
   const [actionType, setActionType] = useState<ActionType | null>(null);
   const [selectedPlayerOut, setSelectedPlayerOut] = useState<string>('');
   const [showAddPlayerDialog, setShowAddPlayerDialog] = useState(false);
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newPlayerNumber, setNewPlayerNumber] = useState('');
+  const [fixCandidate, setFixCandidate] = useState<Player | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFiredRef = useRef(false);
+
+  const startLongPress = useCallback((player: Player) => {
+    if (!onFixStarterError) return;
+    longPressFiredRef.current = false;
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      longPressFiredRef.current = true;
+      triggerHaptic();
+      setFixCandidate(player);
+    }, 600);
+  }, [onFixStarterError]);
+
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const longPressHandlers = (player: Player) => ({
+    onPointerDown: () => startLongPress(player),
+    onPointerUp: cancelLongPress,
+    onPointerLeave: cancelLongPress,
+    onPointerCancel: cancelLongPress,
+    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+  });
 
   const onFieldPlayers = players.filter(p => p.isOnField && !p.isExpelled);
   const benchPlayers = players.filter(p => !p.isOnField && !p.isExpelled);
@@ -269,7 +310,8 @@ export function TeamPanel({
           {onFieldPlayers.map(player => (
             <div
               key={player.id}
-              className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-on-field/10 border border-on-field/20"
+              {...longPressHandlers(player)}
+              className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-on-field/10 border border-on-field/20 select-none touch-none cursor-pointer"
             >
               <span className="w-6 h-6 flex items-center justify-center rounded-full bg-on-field text-on-field-foreground text-[10px] font-bold flex-shrink-0">
                 {player.number}
@@ -331,7 +373,8 @@ export function TeamPanel({
             {benchPlayers.map(player => (
               <div
                 key={player.id}
-                className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-on-bench/10 border border-on-bench/20"
+                {...longPressHandlers(player)}
+                className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-on-bench/10 border border-on-bench/20 select-none touch-none cursor-pointer"
               >
                 <span className="w-6 h-6 flex items-center justify-center rounded-full bg-on-bench text-on-bench-foreground text-[10px] font-bold flex-shrink-0">
                   {player.number}
@@ -475,6 +518,33 @@ export function TeamPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Quick fix starter error confirmation */}
+      <AlertDialog open={fixCandidate !== null} onOpenChange={(open) => !open && setFixCandidate(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Correzione titolari</AlertDialogTitle>
+            <AlertDialogDescription>
+              {fixCandidate?.isOnField
+                ? `Sposta ${fixCandidate?.name} in panchina (Correzione errore iniziale)?`
+                : `Sposta ${fixCandidate?.name} tra i titolari (Correzione errore iniziale)?`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (fixCandidate && onFixStarterError) {
+                  onFixStarterError(fixCandidate.id);
+                }
+                setFixCandidate(null);
+              }}
+            >
+              Conferma
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
