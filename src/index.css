@@ -142,6 +142,12 @@
     @apply border-border;
   }
 
+  html {
+    /* Smooth keyboard-aware scrolling for all focused fields */
+    scroll-padding-top: 5rem;
+    scroll-padding-bottom: calc(6rem + var(--kb-inset, 0px));
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'DM Sans', system-ui, sans-serif;
