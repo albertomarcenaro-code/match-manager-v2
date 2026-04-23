@@ -897,6 +897,81 @@ export const useMatch = () => {
     dbMatchIdRef.current = null;
   }, [id]);
 
+  // Quick correction of initial starter error - moves player on/off field WITHOUT counting as a tactical substitution.
+  // The player entering is treated as if they entered at the start of the current period (timestamp 0),
+  // and the player leaving has their playtime for this period zeroed (since they shouldn't have been there).
+  const fixStarterError = useCallback((team: TeamType, playerId: string) => {
+    setState(prev => {
+      if (!prev.isMatchStarted || prev.isMatchEnded) return prev;
+      const teamKey = team === 'home' ? 'homeTeam' : 'awayTeam';
+      const player = prev[teamKey].players.find(p => p.id === playerId);
+      if (!player || player.isExpelled) return prev;
+
+      const currentPeriod = prev.currentPeriod;
+      const periodStartTs = prev.periodStartTimestamp ?? Date.now();
+      const wasOnField = player.isOnField;
+
+      const updatedPlayers = prev[teamKey].players.map(p => {
+        if (p.id !== playerId) return p;
+        if (wasOnField) {
+          // Move OFF field: remove any playtime accrued in this period (was an error)
+          const accruedThisPeriod = p.currentEntryTime !== null
+            ? Math.floor((Date.now() - p.currentEntryTime) / 1000)
+            : 0;
+          const updatedPerPeriod = { ...p.secondsPlayedPerPeriod };
+          // Subtract any accidentally tracked seconds for this period
+          const existingPeriodSecs = updatedPerPeriod[currentPeriod] || 0;
+          updatedPerPeriod[currentPeriod] = Math.max(0, existingPeriodSecs - accruedThisPeriod);
+          return {
+            ...p,
+            isOnField: false,
+            isStarter: false,
+            currentEntryTime: null,
+            totalSecondsPlayed: Math.max(0, p.totalSecondsPlayed - accruedThisPeriod),
+            secondsPlayedPerPeriod: updatedPerPeriod,
+          };
+        } else {
+          // Move ON field as if entered at period start (00:00)
+          return {
+            ...p,
+            isOnField: true,
+            isStarter: true,
+            currentEntryTime: periodStartTs,
+          };
+        }
+      });
+
+      // Replace any prior player_in/player_out events for this player in current period to keep timeline clean
+      const filteredEvents = prev.events.filter(e => !(
+        e.period === currentPeriod &&
+        e.playerId === playerId &&
+        (e.type === 'player_in' || e.type === 'player_out') &&
+        (e.timestamp === 0)
+      ));
+
+      const correctionEvent: MatchEvent = {
+        id: generateId(),
+        type: wasOnField ? 'player_out' : 'player_in',
+        team,
+        playerId,
+        playerName: `${player.name}${player.number !== null ? ` (#${player.number})` : ''}`,
+        playerNumber: player.number ?? undefined,
+        timestamp: 0,
+        period: currentPeriod,
+        description: wasOnField
+          ? `✏️ Correzione titolari: ${player.name} spostato in panchina`
+          : `✏️ Correzione titolari: ${player.name} inserito tra i titolari`,
+      };
+
+      return {
+        ...prev,
+        [teamKey]: { ...prev[teamKey], players: updatedPlayers },
+        events: [correctionEvent, ...filteredEvents],
+      };
+    });
+    toast.success("Formazione titolari corretta");
+  }, []);
+
   const addPlayerToMatch = useCallback((team: TeamType, name: string, number: number) => {
     const newPlayer: Player = {
       id: generateId(),
@@ -950,6 +1025,7 @@ export const useMatch = () => {
     swapTeams,
     undoLastEvent,
     addPlayerToMatch,
+    fixStarterError,
     updateElapsedTime,
     addAwayPlayerFull,
     updateAwayPlayerName,
