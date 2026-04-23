@@ -685,7 +685,7 @@ export function RosterSetup({
   const pageTitle = shouldShowTournamentName ? tournament.name : 'Configurazione Partita';
 
   return (
-    <div className="bg-background p-4 pb-24">
+    <div className="bg-background p-4 pb-keyboard scroll-keyboard-safe overflow-y-auto">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header - Home button removed (now in match nav bar) */}
         <div className="text-center py-4">
