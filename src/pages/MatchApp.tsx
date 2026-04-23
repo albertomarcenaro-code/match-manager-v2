@@ -55,6 +55,7 @@ const MatchApp = () => {
     updateAwayPlayerName,
     updateAwayPlayerNumber,
     bulkAddAwayPlayers,
+    fixStarterError,
   } = useMatch();
 
   // Tab navigation: 'roster' | 'starters' | 'live'
