@@ -518,6 +518,33 @@ export function TeamPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Quick fix starter error confirmation */}
+      <AlertDialog open={fixCandidate !== null} onOpenChange={(open) => !open && setFixCandidate(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Correzione titolari</AlertDialogTitle>
+            <AlertDialogDescription>
+              {fixCandidate?.isOnField
+                ? `Sposta ${fixCandidate?.name} in panchina (Correzione errore iniziale)?`
+                : `Sposta ${fixCandidate?.name} tra i titolari (Correzione errore iniziale)?`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (fixCandidate && onFixStarterError) {
+                  onFixStarterError(fixCandidate.id);
+                }
+                setFixCandidate(null);
+              }}
+            >
+              Conferma
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
