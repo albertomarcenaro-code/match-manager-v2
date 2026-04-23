@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { useKeyboardAware } from "@/hooks/useKeyboardAware";
 
 import Landing from "./pages/Landing";
 
@@ -52,7 +53,9 @@ const LazyFallback = () => (
   </div>
 );
 
-const App = () => (
+const App = () => {
+  useKeyboardAware();
+  return (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
@@ -85,6 +88,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;

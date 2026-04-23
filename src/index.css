@@ -142,6 +142,12 @@
     @apply border-border;
   }
 
+  html {
+    /* Smooth keyboard-aware scrolling for all focused fields */
+    scroll-padding-top: 5rem;
+    scroll-padding-bottom: calc(6rem + var(--kb-inset, 0px));
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'DM Sans', system-ui, sans-serif;
@@ -187,6 +193,29 @@
     line-height: 1.2;
     word-wrap: break-word;
     overflow-wrap: break-word;
+  }
+
+  /* --- KEYBOARD AWARE / VISUAL VIEWPORT UTILITIES --- */
+  /* Min-height that follows the visual viewport (shrinks with virtual keyboard).
+     Falls back to 100vh if the JS hook hasn't initialised the var yet. */
+  .min-h-app {
+    min-height: 100vh;
+    min-height: var(--app-vh, 100vh);
+  }
+  .h-app {
+    height: 100vh;
+    height: var(--app-vh, 100vh);
+  }
+  /* Adaptive bottom padding that accounts for the on-screen keyboard
+     plus iOS safe-area inset. Use on scroll containers and forms. */
+  .pb-keyboard {
+    padding-bottom: calc(2.5rem + var(--kb-inset, 0px) + env(safe-area-inset-bottom, 0px));
+  }
+  /* Give focused fields breathing room when scrolled into view */
+  .scroll-keyboard-safe {
+    scroll-padding-top: 5rem;
+    scroll-padding-bottom: calc(6rem + var(--kb-inset, 0px));
+    scroll-behavior: smooth;
   }
 
   /* --- NUOVE ANIMAZIONI LANDING --- */
