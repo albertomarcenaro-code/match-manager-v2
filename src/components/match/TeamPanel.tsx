@@ -48,6 +48,7 @@ interface TeamPanelProps {
   onYellowCard: (playerId: string) => void;
   onRedCard: (playerId: string) => void;
   onAddPlayer?: (name: string, number: number) => void;
+  onFixStarterError?: (playerId: string) => void;
 }
 
 type ActionType = 'goal' | 'ownGoal' | 'substitution' | 'yellowCard' | 'redCard';
