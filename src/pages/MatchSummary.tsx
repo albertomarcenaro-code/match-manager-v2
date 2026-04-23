@@ -197,10 +197,36 @@ export default function MatchSummary() {
   const homePlayerSummaries = playerSummaries.filter(p => p.isHome).sort((a, b) => b.minutes - a.minutes);
   const awayPlayerSummaries = playerSummaries.filter(p => !p.isHome).sort((a, b) => b.minutes - a.minutes);
 
-  // Build chronicle from events
-  const chronicleEvents = data.events.filter(
-    (ev: any) => ev.description && ev.description.trim() !== ""
-  );
+  // Build chronicle from events: group period_start with starters in single lines per team,
+  // and skip individual player_in/player_out events (they are summarized in the period_start block).
+  const chronicleEvents = (() => {
+    const events = data.events as any[];
+    const result: any[] = [];
+    events.forEach((ev, index) => {
+      if (ev.type === "player_in" || ev.type === "player_out") return;
+      if (ev.type === "period_start") {
+        const periodInEvents = events.filter(
+          (e, i) => i > index && e.period === ev.period && e.type === "player_in" && (e.timestamp ?? 0) === 0
+        );
+        const homeStarters = periodInEvents
+          .filter(e => e.team === "home")
+          .map(e => e.playerName?.split("(")[0].trim())
+          .filter(Boolean);
+        const awayStarters = periodInEvents
+          .filter(e => e.team === "away")
+          .map(e => e.playerName?.split("(")[0].trim())
+          .filter(Boolean);
+        result.push({
+          ...ev,
+          description: ev.description || `Inizio ${ev.period}° tempo`,
+          _starters: { home: homeStarters, away: awayStarters },
+        });
+        return;
+      }
+      if (ev.description && ev.description.trim() !== "") result.push(ev);
+    });
+    return result;
+  })();
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -331,10 +357,22 @@ export default function MatchSummary() {
             <div className="space-y-1">
               {chronicleEvents.map((ev: any, i: number) => (
                 <div key={ev.id || i} className="text-xs py-1.5 border-b border-border/50 last:border-0">
-                  <span className="text-muted-foreground font-mono mr-2">
-                    {ev.period ? `${ev.period}°T` : ""} {formatTime(ev.timestamp || 0)}
-                  </span>
-                  <span>{ev.description}</span>
+                  <div>
+                    <span className="text-muted-foreground font-mono mr-2">
+                      {ev.period ? `${ev.period}°T` : ""} {ev.type === "period_start" ? "" : formatTime(ev.timestamp || 0)}
+                    </span>
+                    <span>{ev.description}</span>
+                  </div>
+                  {ev.type === "period_start" && ev._starters && (
+                    <div className="mt-1 ml-1 space-y-0.5 text-muted-foreground">
+                      {ev._starters.home.length > 0 && (
+                        <p><span className="font-medium">Titolari {data.homeTeamName}:</span> {ev._starters.home.join(", ")}</p>
+                      )}
+                      {ev._starters.away.length > 0 && (
+                        <p><span className="font-medium">Titolari {data.awayTeamName}:</span> {ev._starters.away.join(", ")}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
