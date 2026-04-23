@@ -66,12 +66,42 @@ export function TeamPanel({
   onYellowCard,
   onRedCard,
   onAddPlayer,
+  onFixStarterError,
 }: TeamPanelProps) {
   const [actionType, setActionType] = useState<ActionType | null>(null);
   const [selectedPlayerOut, setSelectedPlayerOut] = useState<string>('');
   const [showAddPlayerDialog, setShowAddPlayerDialog] = useState(false);
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newPlayerNumber, setNewPlayerNumber] = useState('');
+  const [fixCandidate, setFixCandidate] = useState<Player | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFiredRef = useRef(false);
+
+  const startLongPress = useCallback((player: Player) => {
+    if (!onFixStarterError) return;
+    longPressFiredRef.current = false;
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      longPressFiredRef.current = true;
+      triggerHaptic();
+      setFixCandidate(player);
+    }, 600);
+  }, [onFixStarterError]);
+
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const longPressHandlers = (player: Player) => ({
+    onPointerDown: () => startLongPress(player),
+    onPointerUp: cancelLongPress,
+    onPointerLeave: cancelLongPress,
+    onPointerCancel: cancelLongPress,
+    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+  });
 
   const onFieldPlayers = players.filter(p => p.isOnField && !p.isExpelled);
   const benchPlayers = players.filter(p => !p.isOnField && !p.isExpelled);
