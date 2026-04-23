@@ -310,7 +310,8 @@ export function TeamPanel({
           {onFieldPlayers.map(player => (
             <div
               key={player.id}
-              className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-on-field/10 border border-on-field/20"
+              {...longPressHandlers(player)}
+              className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-on-field/10 border border-on-field/20 select-none touch-none cursor-pointer"
             >
               <span className="w-6 h-6 flex items-center justify-center rounded-full bg-on-field text-on-field-foreground text-[10px] font-bold flex-shrink-0">
                 {player.number}
@@ -372,7 +373,8 @@ export function TeamPanel({
             {benchPlayers.map(player => (
               <div
                 key={player.id}
-                className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-on-bench/10 border border-on-bench/20"
+                {...longPressHandlers(player)}
+                className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-on-bench/10 border border-on-bench/20 select-none touch-none cursor-pointer"
               >
                 <span className="w-6 h-6 flex items-center justify-center rounded-full bg-on-bench text-on-bench-foreground text-[10px] font-bold flex-shrink-0">
                   {player.number}
