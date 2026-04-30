@@ -343,8 +343,8 @@ export default function TournamentDetail() {
       </AlertDialog>
 
       {/* Global Stats Dialog */}
-      <Dialog open={showStats} onOpenChange={setShowStats}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+      <Dialog open={showStats} onOpenChange={(o) => { setShowStats(o); if (!o) setShowMatchDetail(false); }}>
+        <DialogContent className={`${showMatchDetail ? "max-w-3xl" : "max-w-lg"} max-h-[85vh] overflow-y-auto`}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5" /> Statistiche Globali
@@ -370,30 +370,70 @@ export default function TournamentDetail() {
             {/* Player stats table */}
             {stats.players.length > 0 ? (
               <>
-                <h3 className="font-semibold text-sm">Rendimento Giocatori</h3>
-                <div className="rounded-md border overflow-x-auto">
-                  <Table>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <h3 className="font-semibold text-sm">Rendimento Giocatori</h3>
+                  {orderedMatches.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1 h-8 text-xs"
+                      onClick={() => setShowMatchDetail((v) => !v)}
+                    >
+                      {showMatchDetail ? (
+                        <><ChevronsLeft className="h-3.5 w-3.5" /> Nascondi Dettaglio</>
+                      ) : (
+                        <><ChevronsRight className="h-3.5 w-3.5" /> Mostra Dettaglio Partite</>
+                      )}
+                    </Button>
+                  )}
+                </div>
+                <div className="rounded-md border overflow-x-auto relative">
+                  <Table className="text-xs">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-xs">Giocatore</TableHead>
-                        <TableHead className="text-xs text-center">Pres.</TableHead>
-                        <TableHead className="text-xs text-center">Min</TableHead>
-                        <TableHead className="text-xs text-center">⚽</TableHead>
-                        <TableHead className="text-xs text-center">🟨</TableHead>
-                        <TableHead className="text-xs text-center">🟥</TableHead>
+                        <TableHead className="text-xs sticky left-0 bg-card z-10 min-w-[120px] shadow-[1px_0_0_0_hsl(var(--border))]">Giocatore</TableHead>
+                        <TableHead className="text-xs text-center px-2">Pres.</TableHead>
+                        <TableHead className="text-xs text-center px-2">Min</TableHead>
+                        <TableHead className="text-xs text-center px-2">Media</TableHead>
+                        <TableHead className="text-xs text-center px-2">⚽</TableHead>
+                        <TableHead className="text-xs text-center px-2">🟨</TableHead>
+                        <TableHead className="text-xs text-center px-2">🟥</TableHead>
+                        {showMatchDetail && orderedMatches.map((m, i) => (
+                          <TableHead
+                            key={m.id}
+                            className="text-[10px] text-center px-1.5 whitespace-nowrap text-muted-foreground"
+                            title={`${m.home_team_name} vs ${m.away_team_name}`}
+                          >
+                            P{i + 1}
+                          </TableHead>
+                        ))}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {stats.players.map((p) => (
-                        <TableRow key={p.name}>
-                          <TableCell className="text-xs font-medium py-2">{p.name}</TableCell>
-                          <TableCell className="text-xs text-center py-2">{p.matchesPlayed}</TableCell>
-                          <TableCell className="text-xs text-center py-2">{p.minutes}'</TableCell>
-                          <TableCell className="text-xs text-center py-2">{p.goals || "-"}</TableCell>
-                          <TableCell className="text-xs text-center py-2">{p.yellowCards || "-"}</TableCell>
-                          <TableCell className="text-xs text-center py-2">{p.redCards || "-"}</TableCell>
-                        </TableRow>
-                      ))}
+                      {stats.players.map((p) => {
+                        const avg = p.matchesPlayed > 0 ? Math.round(p.minutes / p.matchesPlayed) : 0;
+                        return (
+                          <TableRow key={p.name}>
+                            <TableCell className="text-xs font-medium py-2 sticky left-0 bg-card z-10 min-w-[120px] shadow-[1px_0_0_0_hsl(var(--border))]">
+                              {p.name}
+                            </TableCell>
+                            <TableCell className="text-xs text-center py-2 px-2 tabular-nums">{p.matchesPlayed}</TableCell>
+                            <TableCell className="text-xs text-center py-2 px-2 tabular-nums">{p.minutes}'</TableCell>
+                            <TableCell className="text-xs text-center py-2 px-2 tabular-nums">{avg ? `${avg}'` : "-"}</TableCell>
+                            <TableCell className="text-xs text-center py-2 px-2 tabular-nums">{p.goals || "-"}</TableCell>
+                            <TableCell className="text-xs text-center py-2 px-2 tabular-nums">{p.yellowCards || "-"}</TableCell>
+                            <TableCell className="text-xs text-center py-2 px-2 tabular-nums">{p.redCards || "-"}</TableCell>
+                            {showMatchDetail && orderedMatches.map((m) => {
+                              const v = p.perMatchMinutes[m.id];
+                              return (
+                                <TableCell key={m.id} className="text-[11px] text-center py-2 px-1.5 tabular-nums text-muted-foreground">
+                                  {v == null ? "-" : `${v}'`}
+                                </TableCell>
+                              );
+                            })}
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
