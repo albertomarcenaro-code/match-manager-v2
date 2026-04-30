@@ -47,6 +47,7 @@ interface PlayerAggStats {
   redCards: number;
   minutes: number;
   matchesPlayed: number;
+  perMatchMinutes: Record<string, number | null>; // match.id -> minutes (null if not in that match)
 }
 
 export default function TournamentDetail() {
