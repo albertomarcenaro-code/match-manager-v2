@@ -238,7 +238,7 @@ export default function MatchSummary() {
         </Button>
 
         {/* Score Card */}
-        <Card className="p-6 text-center space-y-2">
+        <Card className="p-6 space-y-3">
           {data.matchDate && (
             <p className="text-xs text-muted-foreground">
               {new Date(data.matchDate).toLocaleDateString("it-IT", {
