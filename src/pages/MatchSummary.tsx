@@ -238,7 +238,7 @@ export default function MatchSummary() {
         </Button>
 
         {/* Score Card */}
-        <Card className="p-6 text-center space-y-2">
+        <Card className="p-6 space-y-3">
           {data.matchDate && (
             <p className="text-xs text-muted-foreground">
               {new Date(data.matchDate).toLocaleDateString("it-IT", {
@@ -247,15 +247,15 @@ export default function MatchSummary() {
               })}
             </p>
           )}
-          <div className="flex items-center justify-center gap-4">
-            <div className="flex-1 text-right">
-              <p className="text-lg font-bold truncate">{data.homeTeamName}</p>
+          <div className="space-y-2 text-left">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-base sm:text-lg font-bold truncate">{data.homeTeamName}</span>
+              <span className="text-2xl sm:text-3xl font-black text-primary tabular-nums shrink-0">{data.homeScore}</span>
             </div>
-            <div className="text-3xl font-black text-primary tabular-nums">
-              {data.homeScore} - {data.awayScore}
-            </div>
-            <div className="flex-1 text-left">
-              <p className="text-lg font-bold truncate">{data.awayTeamName}</p>
+            <Separator />
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-base sm:text-lg font-bold truncate">{data.awayTeamName}</span>
+              <span className="text-2xl sm:text-3xl font-black text-primary tabular-nums shrink-0">{data.awayScore}</span>
             </div>
           </div>
 
