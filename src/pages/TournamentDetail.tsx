@@ -130,11 +130,26 @@ export default function TournamentDetail() {
     } catch { return ""; }
   };
 
+  // Matches in chronological order (oldest first) for P1, P2, P3...
+  const orderedMatches = [...matches].sort(
+    (a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime()
+  );
+
   const computeGlobalStats = () => {
     let wins = 0, draws = 0, losses = 0;
     const playerMap: Record<string, PlayerAggStats> = {};
 
-    for (const m of matches) {
+    const ensure = (name: string): PlayerAggStats => {
+      if (!playerMap[name]) {
+        playerMap[name] = {
+          name, goals: 0, yellowCards: 0, redCards: 0, minutes: 0, matchesPlayed: 0,
+          perMatchMinutes: {},
+        };
+      }
+      return playerMap[name];
+    };
+
+    for (const m of orderedMatches) {
       if (m.home_score > m.away_score) wins++;
       else if (m.home_score === m.away_score) draws++;
       else losses++;
@@ -144,35 +159,31 @@ export default function TournamentDetail() {
         const events = md.events || [];
         const homePlayers = md.homePlayers || [];
 
-        // Aggregate player minutes from homePlayers roster data
         for (const p of homePlayers) {
           const name = p.name || "Sconosciuto";
-          if (!playerMap[name]) {
-            playerMap[name] = { name, goals: 0, yellowCards: 0, redCards: 0, minutes: 0, matchesPlayed: 0 };
-          }
+          const player = ensure(name);
           const totalSec = p.totalSecondsPlayed || 0;
+          const mins = Math.round(totalSec / 60);
           if (totalSec > 0 || p.isOnField) {
-            playerMap[name].minutes += Math.round(totalSec / 60);
-            playerMap[name].matchesPlayed += 1;
+            player.minutes += mins;
+            player.matchesPlayed += 1;
+            player.perMatchMinutes[m.id] = mins;
+          } else {
+            // Player in roster but didn't play this match
+            if (player.perMatchMinutes[m.id] === undefined) {
+              player.perMatchMinutes[m.id] = null;
+            }
           }
         }
 
-        // Aggregate events
         for (const ev of events) {
           if (ev.type === "goal" && ev.team === "home") {
-            const name = ev.playerName || "Sconosciuto";
-            if (!playerMap[name]) {
-              playerMap[name] = { name, goals: 0, yellowCards: 0, redCards: 0, minutes: 0, matchesPlayed: 0 };
-            }
-            playerMap[name].goals += 1;
+            ensure(ev.playerName || "Sconosciuto").goals += 1;
           }
           if (ev.type === "card" && ev.team === "home") {
-            const name = ev.playerName || "Sconosciuto";
-            if (!playerMap[name]) {
-              playerMap[name] = { name, goals: 0, yellowCards: 0, redCards: 0, minutes: 0, matchesPlayed: 0 };
-            }
-            if (ev.cardType === "yellow") playerMap[name].yellowCards += 1;
-            if (ev.cardType === "red") playerMap[name].redCards += 1;
+            const player = ensure(ev.playerName || "Sconosciuto");
+            if (ev.cardType === "yellow") player.yellowCards += 1;
+            if (ev.cardType === "red") player.redCards += 1;
           }
         }
       }
