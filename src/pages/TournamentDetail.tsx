@@ -60,6 +60,7 @@ export default function TournamentDetail() {
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [showStats, setShowStats] = useState(false);
+  const [showMatchDetail, setShowMatchDetail] = useState(false);
 
   useEffect(() => {
     if (user && tournamentId) loadTournament();
