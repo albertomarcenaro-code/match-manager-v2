@@ -187,8 +187,9 @@ export const useMatch = () => {
         const { data, error } = await supabase
           .from('matches')
           .insert({
-            id, // use the same ID as the route param
+            id, // use the same ID as the route param (must be a valid UUID)
             user_id: user.id,
+            tournament_id: tournamentId || null,
             home_team_name: currentState.homeTeam.name,
             away_team_name: currentState.awayTeam.name,
             home_score: currentState.homeTeam.score,
