@@ -45,6 +45,7 @@ const MatchApp = () => {
     addOpponentPlayer,
     removeOpponentPlayer,
     undoLastEvent,
+    deleteEvent,
     addPlayerToMatch,
     updateElapsedTime,
     bulkAddPlayers,
