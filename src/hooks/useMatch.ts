@@ -48,6 +48,8 @@ const generateId = () => Math.random().toString(36).substr(2, 9);
 
 export const useMatch = () => {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const tournamentId = searchParams.get('tournamentId');
   const storageKey = getStorageKey(id);
   const { user, isGuest } = useAuth();
   const dbMatchIdRef = useRef<string | null>(null);
