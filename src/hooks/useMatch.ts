@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { MatchState, Player, TeamType, CardType, MatchEvent } from '../types/match';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -48,6 +48,8 @@ const generateId = () => Math.random().toString(36).substr(2, 9);
 
 export const useMatch = () => {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const tournamentId = searchParams.get('tournamentId');
   const storageKey = getStorageKey(id);
   const { user, isGuest } = useAuth();
   const dbMatchIdRef = useRef<string | null>(null);
@@ -89,10 +91,56 @@ export const useMatch = () => {
         if (data) {
           dbMatchIdRef.current = data.id;
           const md = (data.match_data as any) || {};
-          // If we have DB data and no local cache, restore from DB
           const localSaved = localStorage.getItem(storageKey);
           if (!localSaved && md.fullState) {
             setState({ ...initialState, ...md.fullState });
+          }
+          return;
+        }
+
+        // No DB match yet. If this is a tournament match and we have no local cache,
+        // try to pre-populate roster + jersey numbers from the latest match in same tournament.
+        const localSaved = localStorage.getItem(storageKey);
+        if (!localSaved && tournamentId) {
+          const { data: prev } = await supabase
+            .from('matches')
+            .select('match_data, home_team_name, away_team_name')
+            .eq('user_id', user.id)
+            .eq('tournament_id', tournamentId)
+            .order('match_date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (prev?.match_data) {
+            const md = prev.match_data as any;
+            const fs = md.fullState;
+            if (fs?.homeTeam && fs?.awayTeam) {
+              // Reset per-match stats but keep roster + numbers + starters
+              const resetPlayer = (p: Player): Player => ({
+                ...p,
+                isOnField: !!p.isStarter,
+                isExpelled: false,
+                goals: 0,
+                cards: { yellow: 0, red: 0 },
+                currentEntryTime: null,
+                totalSecondsPlayed: 0,
+                secondsPlayedPerPeriod: {},
+              });
+              setState({
+                ...initialState,
+                homeTeam: {
+                  name: fs.homeTeam.name,
+                  score: 0,
+                  players: (fs.homeTeam.players || []).map(resetPlayer),
+                },
+                awayTeam: {
+                  name: fs.awayTeam.name,
+                  score: 0,
+                  players: (fs.awayTeam.players || []).map(resetPlayer),
+                },
+              });
+              toast.success('Formazione precedente ripristinata');
+            }
           }
         }
       } catch (err) {
@@ -101,7 +149,7 @@ export const useMatch = () => {
     };
     
     loadFromDb();
-  }, [user, isGuest, id]);
+  }, [user, isGuest, id, tournamentId, storageKey]);
 
   // Save match state to cloud DB (debounced, for logged-in users)
   const saveToDb = useCallback(async (currentState: MatchState) => {
@@ -139,8 +187,9 @@ export const useMatch = () => {
         const { data, error } = await supabase
           .from('matches')
           .insert({
-            id, // use the same ID as the route param
+            id, // use the same ID as the route param (must be a valid UUID)
             user_id: user.id,
+            tournament_id: tournamentId || null,
             home_team_name: currentState.homeTeam.name,
             away_team_name: currentState.awayTeam.name,
             home_score: currentState.homeTeam.score,
@@ -169,7 +218,7 @@ export const useMatch = () => {
     } finally {
       savingRef.current = false;
     }
-  }, [user, isGuest, id]);
+  }, [user, isGuest, id, tournamentId]);
 
   // Auto-save to DB when match state changes significantly (started, score change, ended)
   const prevScoreRef = useRef({ home: 0, away: 0 });
