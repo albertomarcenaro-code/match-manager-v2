@@ -99,7 +99,8 @@ export default function TournamentDetail() {
 
   const handleNewMatch = () => {
     if (!tournamentId) return;
-    const matchId = `tournament-${tournamentId}-${Date.now()}`;
+    // Must be a valid UUID — DB column matches.id is uuid
+    const matchId = crypto.randomUUID();
     navigate(`/match/${matchId}?tournamentId=${tournamentId}`);
   };
 
