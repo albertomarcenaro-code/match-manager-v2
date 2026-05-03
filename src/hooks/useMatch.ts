@@ -1144,6 +1144,7 @@ export const useMatch = () => {
     createPlayersWithNumbers,
     swapTeams,
     undoLastEvent,
+    deleteEvent,
     addPlayerToMatch,
     fixStarterError,
     updateElapsedTime,
