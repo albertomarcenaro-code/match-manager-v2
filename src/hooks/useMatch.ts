@@ -218,7 +218,7 @@ export const useMatch = () => {
     } finally {
       savingRef.current = false;
     }
-  }, [user, isGuest, id]);
+  }, [user, isGuest, id, tournamentId]);
 
   // Auto-save to DB when match state changes significantly (started, score change, ended)
   const prevScoreRef = useRef({ home: 0, away: 0 });
