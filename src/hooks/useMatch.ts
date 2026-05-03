@@ -929,6 +929,77 @@ export const useMatch = () => {
     toast.success("Ultimo evento annullato");
   }, []);
 
+  // Delete a single event from the timeline and reverse its side-effects on score/stats/roster
+  const deleteEvent = useCallback((eventId: string) => {
+    setState(prev => {
+      const ev = prev.events.find(e => e.id === eventId);
+      if (!ev) return prev;
+      const remaining = prev.events.filter(e => e.id !== eventId);
+      let next: MatchState = { ...prev, events: remaining };
+
+      if (ev.type === 'goal' && ev.playerId) {
+        const teamKey = ev.team === 'home' ? 'homeTeam' : 'awayTeam';
+        next = {
+          ...next,
+          [teamKey]: {
+            ...next[teamKey],
+            score: Math.max(0, next[teamKey].score - 1),
+            players: next[teamKey].players.map(p =>
+              p.id === ev.playerId ? { ...p, goals: Math.max(0, p.goals - 1) } : p
+            ),
+          },
+        };
+      } else if (ev.type === 'own_goal') {
+        // Goal counted for the OPPOSITE team
+        const scoringTeamKey = ev.team === 'home' ? 'awayTeam' : 'homeTeam';
+        next = {
+          ...next,
+          [scoringTeamKey]: {
+            ...next[scoringTeamKey],
+            score: Math.max(0, next[scoringTeamKey].score - 1),
+          },
+        };
+      } else if ((ev.type === 'yellow_card' || ev.type === 'red_card') && ev.playerId) {
+        const teamKey = ev.team === 'home' ? 'homeTeam' : 'awayTeam';
+        const cardKey: 'yellow' | 'red' = ev.type === 'yellow_card' ? 'yellow' : 'red';
+        next = {
+          ...next,
+          [teamKey]: {
+            ...next[teamKey],
+            players: next[teamKey].players.map(p => {
+              if (p.id !== ev.playerId) return p;
+              const newCards = { ...p.cards, [cardKey]: Math.max(0, p.cards[cardKey] - 1) };
+              const stillExpelled = newCards.red > 0 || newCards.yellow >= 2;
+              return { ...p, cards: newCards, isExpelled: stillExpelled ? p.isExpelled : false };
+            }),
+          },
+        };
+      } else if (ev.type === 'substitution' && ev.playerOutId && ev.playerInId) {
+        const teamKey = ev.team === 'home' ? 'homeTeam' : 'awayTeam';
+        next = {
+          ...next,
+          [teamKey]: {
+            ...next[teamKey],
+            players: next[teamKey].players.map(p => {
+              if (p.id === ev.playerOutId) {
+                // Was sent off → put back on field
+                return { ...p, isOnField: true, currentEntryTime: p.currentEntryTime ?? Date.now() };
+              }
+              if (p.id === ev.playerInId) {
+                // Was brought on → put back on bench
+                return { ...p, isOnField: false, currentEntryTime: null };
+              }
+              return p;
+            }),
+          },
+        };
+      }
+
+      return next;
+    });
+    toast.success('Evento eliminato');
+  }, []);
+
   const resetMatch = useCallback((keepTeams = false) => {
     if (keepTeams) {
       setState(prev => ({
@@ -1073,6 +1144,7 @@ export const useMatch = () => {
     createPlayersWithNumbers,
     swapTeams,
     undoLastEvent,
+    deleteEvent,
     addPlayerToMatch,
     fixStarterError,
     updateElapsedTime,

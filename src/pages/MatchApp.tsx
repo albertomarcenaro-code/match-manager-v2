@@ -45,6 +45,7 @@ const MatchApp = () => {
     addOpponentPlayer,
     removeOpponentPlayer,
     undoLastEvent,
+    deleteEvent,
     addPlayerToMatch,
     updateElapsedTime,
     bulkAddPlayers,
@@ -251,6 +252,7 @@ const MatchApp = () => {
                   events={state.events}
                   homeTeamName={state.homeTeam.name}
                   awayTeamName={state.awayTeam.name}
+                  onDeleteEvent={deleteEvent}
                 />
 
                 {/* Final Report section when match ended */}
