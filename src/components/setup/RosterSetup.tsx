@@ -414,33 +414,79 @@ export function RosterSetup({
     setIsSaving(true);
 
     try {
+      // Flush eventuali autosave in coda per evitare race condition
+      if (saveTimerRef.current) {
+        window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      await flushRosterNumberSaves();
+
       await supabase
         .from('profiles')
         .update({ team_name: homeTeamName })
         .eq('user_id', user.id);
 
-      await supabase
+      // Sync intelligente: UPDATE per esistenti, INSERT solo per nuovi, DELETE per rimossi.
+      // NIENTE delete+insert globale (faceva perdere gli ID e generava duplicati al successivo autosave).
+      const { data: existingRows, error: fetchErr } = await supabase
         .from('players')
-        .delete()
+        .select('id, name, number')
         .eq('user_id', user.id);
+      if (fetchErr) throw fetchErr;
 
-      // Save names only (numbers are match-specific for single matches)
-      const playersToInsert = homePlayers.map(p => ({
-        user_id: user.id,
-        name: p.name,
-        number: null, // Don't save numbers as defaults
-      }));
+      const existingByName = new Map<string, { id: string; number: number | null }>();
+      (existingRows || []).forEach(r => {
+        if (r.name) existingByName.set(r.name, { id: r.id, number: r.number });
+      });
 
-      if (playersToInsert.length > 0) {
-        await supabase
+      const localNames = new Set(homePlayers.map(p => p.name));
+
+      // 1) DELETE giocatori non più presenti localmente
+      const idsToDelete = (existingRows || [])
+        .filter(r => !localNames.has(r.name))
+        .map(r => r.id);
+      if (idsToDelete.length > 0) {
+        const { error } = await supabase
           .from('players')
-          .insert(playersToInsert);
+          .delete()
+          .in('id', idsToDelete);
+        if (error) throw error;
       }
 
-      toast.success('Rosa salvata (solo nomi)!');
-    } catch (error) {
+      // 2) UPDATE per esistenti (se il numero è cambiato) e INSERT per nuovi
+      const newIdMap: Record<string, string> = {};
+      for (const p of homePlayers) {
+        // Validazione: nome obbligatorio, numero opzionale (null se vuoto)
+        const validated = validateOrThrow(playerSchema, { name: p.name, number: p.number ?? null });
+        const existing = existingByName.get(validated.name);
+
+        if (existing) {
+          newIdMap[validated.name] = existing.id;
+          if (existing.number !== validated.number) {
+            const { error } = await supabase
+              .from('players')
+              .update({ number: validated.number })
+              .eq('id', existing.id);
+            if (error) throw error;
+          }
+        } else {
+          const { data, error } = await supabase
+            .from('players')
+            .insert({ user_id: user.id, name: validated.name, number: validated.number })
+            .select('id, name')
+            .single();
+          if (error) throw error;
+          if (data?.id && data?.name) newIdMap[data.name] = data.id;
+        }
+      }
+
+      // Aggiorna la mappa locale degli ID DB così i futuri autosave fanno UPDATE (non INSERT)
+      setDbPlayerIdsByName(newIdMap);
+
+      toast.success('Rosa salvata!');
+    } catch (error: any) {
       console.error('Error saving roster:', error);
-      toast.error('Errore nel salvataggio');
+      toast.error(`Errore nel salvataggio: ${error?.message ?? ''}`);
     } finally {
       setIsSaving(false);
     }
