@@ -24,6 +24,8 @@ const Terms = lazy(() => import("./pages/Terms"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const About = lazy(() => import("./pages/About"));
 const Overview = lazy(() => import("./pages/Overview"));
+const LiveMatch = lazy(() => import("./pages/LiveMatch"));
+const LiveTournament = lazy(() => import("./pages/LiveTournament"));
 
 const queryClient = new QueryClient();
 
@@ -81,6 +83,8 @@ const App = () => {
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/about" element={<About />} />
               <Route path="/overview" element={<Overview />} />
+              <Route path="/live/match/:id" element={<LiveMatch />} />
+              <Route path="/live/tournament/:id" element={<LiveTournament />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

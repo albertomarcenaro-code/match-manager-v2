@@ -21,6 +21,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import ExcelJS from "exceljs";
+import { ShareLiveButton } from "@/components/live/ShareLiveButton";
 
 interface TournamentData {
   id: string;
@@ -275,10 +276,15 @@ export default function TournamentDetail() {
           </Button>
         </div>
 
-        {/* New match button */}
-        <Button onClick={handleNewMatch} className="w-full gap-2 mb-6">
-          <Plus className="h-4 w-4" /> Nuova Partita nel Torneo
-        </Button>
+        {/* Action buttons */}
+        <div className="flex flex-col sm:flex-row gap-2 mb-6">
+          <Button onClick={handleNewMatch} className="flex-1 gap-2">
+            <Plus className="h-4 w-4" /> Nuova Partita nel Torneo
+          </Button>
+          {tournamentId && (
+            <ShareLiveButton type="tournament" id={tournamentId} variant="outline" size="default" />
+          )}
+        </div>
 
         {/* Match list */}
         <h2 className="text-lg font-semibold mb-3">Partite Disputate ({matches.length})</h2>

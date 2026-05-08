@@ -9,6 +9,7 @@ import { StarterSelection } from '@/components/match/StarterSelection';
 import { ExportButton } from '@/components/match/ExportButton';
 import { PDFExportButton } from '@/components/match/PDFExportButton';
 import { WhatsAppShareButton } from '@/components/match/WhatsAppShareButton';
+import { ShareLiveButton } from '@/components/live/ShareLiveButton';
 import { RosterSetup } from '@/components/setup/RosterSetup';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Users, UserCheck, Play, Home } from 'lucide-react';
@@ -191,6 +192,12 @@ const MatchApp = () => {
               </div>
             ) : (
               <>
+                {/* Share Live link */}
+                {id && (
+                  <div className="flex justify-end">
+                    <ShareLiveButton type="match" id={id} />
+                  </div>
+                )}
                  {/* Timer Controls */}
                 <TimerControls
                   state={state}
