@@ -192,6 +192,12 @@ const MatchApp = () => {
               </div>
             ) : (
               <>
+                {/* Share Live link */}
+                {id && (
+                  <div className="flex justify-end">
+                    <ShareLiveButton type="match" id={id} />
+                  </div>
+                )}
                  {/* Timer Controls */}
                 <TimerControls
                   state={state}
