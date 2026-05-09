@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { LiveBadge } from '@/components/live/LiveBadge';
 import { LiveFooter } from '@/components/live/LiveFooter';
 import { Card } from '@/components/ui/card';
-import { Loader2, Target, Square, RefreshCw, Flag, AlertTriangle } from 'lucide-react';
+import { Loader2, Target, Square, RefreshCw, Flag, AlertTriangle, Trophy } from 'lucide-react';
 import logo from '@/assets/logo.webp';
 import { cn } from '@/lib/utils';
 
@@ -17,30 +17,38 @@ interface MatchRow {
   status: string;
   match_date: string;
   match_data: any;
+  tournament_id: string | null;
 }
 
 const formatTime = (seconds: number) => {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
-  return `${mins}'${secs.toString().padStart(2, '0')}"`;
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
+
+const formatMin = (seconds: number) => `${Math.floor(seconds / 60)}'`;
 
 const periodLabel = (md: any): string => {
-  if (!md) return 'In attesa';
+  if (!md) return '-';
   if (md.isMatchEnded) return 'Finale';
-  if (!md.isMatchStarted) return 'Pre-partita';
-  if (md.isPaused && !md.isRunning) return 'Intervallo';
+  if (!md.isMatchStarted) return 'Pre';
   const p = md.currentPeriod || 1;
-  const total = md.totalPeriods || 2;
-  if (total === 2) return p === 1 ? '1° Tempo' : '2° Tempo';
-  return `${p}° Periodo`;
+  return `${p}° tempo`;
 };
 
-const ordinal = (n: number) => `${n}°`;
+const statusLabel = (md: any): string => {
+  if (!md) return 'In attesa';
+  if (md.isMatchEnded) return 'Terminata';
+  if (md.isPaused) return 'In pausa';
+  if (md.isRunning) return 'In corso';
+  if (md.isMatchStarted) return 'Intervallo';
+  return 'Da iniziare';
+};
 
 export default function LiveMatch() {
   const { id } = useParams<{ id: string }>();
   const [match, setMatch] = useState<MatchRow | null>(null);
+  const [tournamentName, setTournamentName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [tick, setTick] = useState(0);
@@ -60,6 +68,14 @@ export default function LiveMatch() {
         setNotFound(true);
       } else {
         setMatch(data as MatchRow);
+        if ((data as MatchRow).tournament_id) {
+          const { data: t } = await supabase
+            .from('tournaments')
+            .select('name')
+            .eq('id', (data as MatchRow).tournament_id!)
+            .maybeSingle();
+          if (mounted && t) setTournamentName((t as any).name);
+        }
       }
       setLoading(false);
     };
@@ -82,7 +98,6 @@ export default function LiveMatch() {
     };
   }, [id]);
 
-  // Local timer tick for smooth elapsed seconds while running
   const md = match?.match_data;
   useEffect(() => {
     if (!md?.isRunning || md?.isPaused) return;
@@ -95,15 +110,14 @@ export default function LiveMatch() {
     const base = md.elapsedTime || 0;
     if (!md.isRunning || md.isPaused || !md.periodStartTimestamp) return base;
     const accPause = md.accumulatedPauseTime || 0;
-    const extra = Math.max(0, Math.floor((Date.now() - md.periodStartTimestamp - accPause) / 1000));
-    return extra;
-    // tick is read implicitly via re-render
+    return Math.max(0, Math.floor((Date.now() - md.periodStartTimestamp - accPause) / 1000));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [md, tick]);
 
   const events: any[] = md?.events || [];
   const periodScores: any[] = md?.periodScores || [];
   const isLive = !!md?.isMatchStarted && !md?.isMatchEnded;
+  const isOvertime = isLive && md?.isRunning && elapsed >= (md?.periodDuration || 999) * 60;
 
   if (loading) {
     return (
@@ -117,7 +131,6 @@ export default function LiveMatch() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center">
         <h1 className="text-2xl font-bold text-foreground mb-2">Partita non trovata</h1>
-        <p className="text-muted-foreground mb-4">Il link potrebbe essere errato o la partita rimossa.</p>
         <Link to="/" className="text-primary font-semibold hover:underline">Torna alla home</Link>
       </div>
     );
@@ -127,30 +140,52 @@ export default function LiveMatch() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
+      {/* Top brand bar */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border/40">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <img src={logo} alt="Match Manager" className="h-7 w-7" />
             <span className="font-bold text-sm text-foreground">Match Manager</span>
           </Link>
           <LiveBadge isLive={isLive} />
         </div>
+
+        {/* Sub-header: period | timer+status | tournament */}
+        <div className="max-w-2xl mx-auto px-4 pb-2 grid grid-cols-3 items-center gap-2">
+          <div className="text-left">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Tempo</p>
+            <p className="text-sm font-bold text-foreground">{periodLabel(md)}</p>
+          </div>
+
+          <div className={cn(
+            'text-center rounded-lg px-2 py-1 transition-colors',
+            isOvertime ? 'bg-destructive text-destructive-foreground' : 'bg-muted/60'
+          )}>
+            <p className={cn('text-lg font-bold tabular-nums leading-tight', isOvertime ? 'text-destructive-foreground' : 'text-foreground')}>
+              {md?.isMatchStarted ? formatTime(elapsed) : '00:00'}
+            </p>
+            <p className={cn('text-[10px] font-semibold uppercase tracking-wider leading-tight', isOvertime ? 'text-destructive-foreground/80' : 'text-muted-foreground')}>
+              {isOvertime ? 'Recupero' : statusLabel(md)}
+            </p>
+          </div>
+
+          <div className="text-right">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Torneo</p>
+            {match.tournament_id && tournamentName ? (
+              <Link
+                to={`/public-tournament/${match.tournament_id}`}
+                className="text-sm font-bold text-primary hover:underline truncate block"
+              >
+                {tournamentName}
+              </Link>
+            ) : (
+              <p className="text-sm font-semibold text-muted-foreground truncate">Amichevole</p>
+            )}
+          </div>
+        </div>
       </header>
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-4 space-y-4">
-        {/* Status + Timer */}
-        <div className="text-center">
-          <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            {periodLabel(md)}
-          </p>
-          {md?.isMatchStarted && !md?.isMatchEnded && (
-            <p className="text-2xl font-bold tabular-nums text-foreground mt-1">
-              {formatTime(elapsed)}
-            </p>
-          )}
-        </div>
-
         {/* Scoreboard */}
         <Card className="p-4 sm:p-6">
           <div className="space-y-3">
@@ -179,19 +214,17 @@ export default function LiveMatch() {
             </div>
           </div>
 
-          {/* Period scores */}
           {periodScores.length > 0 && (
             <div className="mt-4 pt-3 border-t border-border/40 flex flex-wrap gap-2 justify-center">
               {periodScores.map((ps: any) => (
                 <span key={ps.period} className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground tabular-nums">
-                  {ordinal(ps.period)}: {ps.homeScore}-{ps.awayScore}
+                  {ps.period}°: {ps.homeScore}-{ps.awayScore}
                 </span>
               ))}
             </div>
           )}
         </Card>
 
-        {/* Marcatori */}
         {goalEvents.length > 0 && (
           <Card className="p-4">
             <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
@@ -202,13 +235,13 @@ export default function LiveMatch() {
                 <li key={e.id} className="flex items-center gap-2 text-sm">
                   <span className={cn('h-2 w-2 rounded-full flex-shrink-0', e.team === 'home' ? 'bg-green-600' : 'bg-gray-500')} />
                   <span className="tabular-nums text-muted-foreground text-xs w-12 flex-shrink-0">
-                    {formatTime(e.timestamp || 0)}
+                    {formatMin(e.timestamp || 0)}
                   </span>
                   <span className="font-medium text-foreground truncate">
                     {e.type === 'own_goal' ? 'AG ' : ''}{e.playerName || 'N/D'}
                   </span>
                   <span className="text-xs text-muted-foreground ml-auto flex-shrink-0">
-                    {ordinal(e.period)}
+                    {e.period}°
                   </span>
                 </li>
               ))}
@@ -216,7 +249,6 @@ export default function LiveMatch() {
           </Card>
         )}
 
-        {/* Cronologia eventi (compatta) */}
         {events.length > 0 && (
           <Card className="p-4">
             <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">
@@ -227,13 +259,23 @@ export default function LiveMatch() {
                 <li key={e.id} className="flex items-center gap-2 text-xs">
                   <EventIcon type={e.type} />
                   <span className="tabular-nums text-muted-foreground w-12 flex-shrink-0">
-                    {formatTime(e.timestamp || 0)}
+                    {formatMin(e.timestamp || 0)}
                   </span>
                   <span className="text-foreground truncate flex-1">{e.description}</span>
                 </li>
               ))}
             </ul>
           </Card>
+        )}
+
+        {match.tournament_id && tournamentName && (
+          <Link
+            to={`/public-tournament/${match.tournament_id}`}
+            className="flex items-center justify-center gap-2 text-sm font-semibold text-primary hover:underline py-2"
+          >
+            <Trophy className="h-4 w-4" />
+            Vai al torneo: {tournamentName}
+          </Link>
         )}
       </main>
 
