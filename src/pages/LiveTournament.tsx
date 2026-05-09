@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { LiveBadge } from '@/components/live/LiveBadge';
 import { LiveFooter } from '@/components/live/LiveFooter';
 import { Card } from '@/components/ui/card';
-import { Loader2, Trophy } from 'lucide-react';
+import { Loader2, Trophy, Target, Square } from 'lucide-react';
 import logo from '@/assets/logo.webp';
+import { cn } from '@/lib/utils';
 
 interface Tournament {
   id: string;
@@ -22,6 +23,8 @@ interface MatchRow {
   match_date: string;
   match_data: any;
 }
+
+const formatMin = (s: number) => `${Math.floor((s || 0) / 60)}'`;
 
 export default function LiveTournament() {
   const { id } = useParams<{ id: string }>();
@@ -77,6 +80,39 @@ export default function LiveTournament() {
     };
   }, [id]);
 
+  // Aggregate stats from match_data.events across all matches
+  const stats = useMemo(() => {
+    const scorers = new Map<string, { name: string; goals: number }>();
+    const yellows = new Map<string, { name: string; count: number }>();
+    const reds = new Map<string, { name: string; count: number }>();
+
+    for (const m of matches) {
+      const evts: any[] = m.match_data?.events || [];
+      for (const e of evts) {
+        const name = e.playerName || 'N/D';
+        const key = (e.playerId || name).toString();
+        if (e.type === 'goal') {
+          const cur = scorers.get(key) || { name, goals: 0 };
+          cur.goals += 1;
+          scorers.set(key, cur);
+        } else if (e.type === 'yellow_card') {
+          const cur = yellows.get(key) || { name, count: 0 };
+          cur.count += 1;
+          yellows.set(key, cur);
+        } else if (e.type === 'red_card') {
+          const cur = reds.get(key) || { name, count: 0 };
+          cur.count += 1;
+          reds.set(key, cur);
+        }
+      }
+    }
+    return {
+      scorers: [...scorers.values()].sort((a, b) => b.goals - a.goals),
+      yellows: [...yellows.values()].sort((a, b) => b.count - a.count),
+      reds: [...reds.values()].sort((a, b) => b.count - a.count),
+    };
+  }, [matches]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -117,49 +153,110 @@ export default function LiveTournament() {
           <p className="text-sm text-muted-foreground">{tournament.team_name}</p>
         </div>
 
-        {matches.length === 0 ? (
-          <Card className="p-6 text-center text-sm text-muted-foreground">
-            Nessuna partita ancora disponibile.
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            {matches.map((m) => {
-              const md = m.match_data || {};
-              const isLiveNow = md.isMatchStarted && !md.isMatchEnded;
-              const isFinal = md.isMatchEnded;
-              return (
-                <Link
-                  key={m.id}
-                  to={`/live/match/${m.id}`}
-                  className="block"
-                >
-                  <Card className="p-3 hover:bg-accent/50 transition-colors">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium text-foreground truncate">{m.home_team_name}</span>
-                          <span className="text-sm font-bold tabular-nums">{m.home_score}</span>
+        {/* Calendario */}
+        <section>
+          <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+            Calendario
+          </h2>
+          {matches.length === 0 ? (
+            <Card className="p-6 text-center text-sm text-muted-foreground">
+              Nessuna partita ancora disponibile.
+            </Card>
+          ) : (
+            <div className="space-y-2">
+              {matches.map((m) => {
+                const md = m.match_data || {};
+                const isLiveNow = md.isMatchStarted && !md.isMatchEnded;
+                const isFinal = md.isMatchEnded;
+                return (
+                  <Link key={m.id} to={`/live/match/${m.id}`} className="block">
+                    <Card className="p-3 hover:bg-accent/50 transition-colors">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium text-foreground truncate">{m.home_team_name}</span>
+                            <span className="text-sm font-bold tabular-nums">{m.home_score}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium text-foreground truncate">{m.away_team_name}</span>
+                            <span className="text-sm font-bold tabular-nums">{m.away_score}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium text-foreground truncate">{m.away_team_name}</span>
-                          <span className="text-sm font-bold tabular-nums">{m.away_score}</span>
+                        <div className="flex-shrink-0">
+                          {isLiveNow ? (
+                            <LiveBadge isLive />
+                          ) : isFinal ? (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-bold uppercase">Finale</span>
+                          ) : (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted/50 text-muted-foreground font-bold uppercase">Programmata</span>
+                          )}
                         </div>
                       </div>
-                      <div className="flex-shrink-0">
-                        {isLiveNow ? (
-                          <LiveBadge isLive />
-                        ) : isFinal ? (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-bold uppercase">Finale</span>
-                        ) : (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted/50 text-muted-foreground font-bold uppercase">Programmata</span>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-                </Link>
-              );
-            })}
-          </div>
+                    </Card>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* Statistiche */}
+        {(stats.scorers.length > 0 || stats.yellows.length > 0 || stats.reds.length > 0) && (
+          <section className="space-y-3">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+              Statistiche torneo
+            </h2>
+
+            {stats.scorers.length > 0 && (
+              <Card className="p-4">
+                <h3 className="text-xs font-bold uppercase text-muted-foreground mb-2 flex items-center gap-2">
+                  <Target className="h-3.5 w-3.5" /> Marcatori
+                </h3>
+                <ul className="space-y-1">
+                  {stats.scorers.slice(0, 10).map((s, i) => (
+                    <li key={i} className="flex items-center justify-between text-sm">
+                      <span className="text-foreground truncate">{s.name}</span>
+                      <span className="font-bold tabular-nums text-foreground">{s.goals}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
+
+            {(stats.yellows.length > 0 || stats.reds.length > 0) && (
+              <Card className="p-4">
+                <h3 className="text-xs font-bold uppercase text-muted-foreground mb-2 flex items-center gap-2">
+                  <Square className="h-3.5 w-3.5" /> Disciplinare
+                </h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-[11px] font-semibold text-yellow-600 uppercase mb-1">Gialli</p>
+                    <ul className="space-y-0.5">
+                      {stats.yellows.slice(0, 8).map((s, i) => (
+                        <li key={i} className="flex items-center justify-between">
+                          <span className="text-foreground truncate">{s.name}</span>
+                          <span className="font-bold tabular-nums">{s.count}</span>
+                        </li>
+                      ))}
+                      {stats.yellows.length === 0 && <li className="text-muted-foreground text-xs">—</li>}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold text-red-600 uppercase mb-1">Rossi</p>
+                    <ul className="space-y-0.5">
+                      {stats.reds.slice(0, 8).map((s, i) => (
+                        <li key={i} className="flex items-center justify-between">
+                          <span className="text-foreground truncate">{s.name}</span>
+                          <span className="font-bold tabular-nums">{s.count}</span>
+                        </li>
+                      ))}
+                      {stats.reds.length === 0 && <li className="text-muted-foreground text-xs">—</li>}
+                    </ul>
+                  </div>
+                </div>
+              </Card>
+            )}
+          </section>
         )}
       </main>
 

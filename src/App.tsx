@@ -85,6 +85,7 @@ const App = () => {
               <Route path="/overview" element={<Overview />} />
               <Route path="/live/match/:id" element={<LiveMatch />} />
               <Route path="/live/tournament/:id" element={<LiveTournament />} />
+              <Route path="/public-tournament/:id" element={<LiveTournament />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
