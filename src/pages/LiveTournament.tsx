@@ -4,9 +4,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { LiveBadge } from '@/components/live/LiveBadge';
 import { LiveFooter } from '@/components/live/LiveFooter';
 import { Card } from '@/components/ui/card';
-import { Loader2, Trophy, Target, Square } from 'lucide-react';
+import { Loader2, Trophy, Target, Square, Clock } from 'lucide-react';
 import logo from '@/assets/logo.webp';
 import { cn } from '@/lib/utils';
+import { aggregateTournamentStats } from '@/lib/tournamentStats';
 
 interface Tournament {
   id: string;
