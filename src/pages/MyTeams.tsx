@@ -111,31 +111,48 @@ export default function MyTeams() {
     const players = parsePlayersFromText(playersText);
     
     try {
+      const trimmedName = teamName.trim();
+      const payload = {
+        name: trimmedName,
+        category: teamCategory.trim(),
+        players: JSON.parse(JSON.stringify(players)) as Json,
+      };
+
       if (editingTeam) {
         const { error } = await supabase
           .from('saved_teams')
-          .update({ 
-            name: teamName.trim(), 
-            category: teamCategory.trim(),
-            players: JSON.parse(JSON.stringify(players)) as Json,
-          })
+          .update(payload)
           .eq('id', editingTeam.id);
         if (error) throw error;
         toast.success('Squadra aggiornata');
       } else {
-        const { error } = await supabase
+        // UPSERT logic: if a team with the same name already exists for this
+        // user, update it instead of creating a duplicate row.
+        const { data: existing, error: findErr } = await supabase
           .from('saved_teams')
-          .insert({
-            user_id: user.id,
-            name: teamName.trim(),
-            category: teamCategory.trim(),
-            players: JSON.parse(JSON.stringify(players)) as Json,
-          });
-        if (error) throw error;
-        toast.success('Squadra salvata');
+          .select('id')
+          .eq('user_id', user.id)
+          .ilike('name', trimmedName)
+          .maybeSingle();
+        if (findErr) throw findErr;
+
+        if (existing?.id) {
+          const { error } = await supabase
+            .from('saved_teams')
+            .update(payload)
+            .eq('id', existing.id);
+          if (error) throw error;
+          toast.success('Squadra esistente aggiornata');
+        } else {
+          const { error } = await supabase
+            .from('saved_teams')
+            .insert({ user_id: user.id, ...payload });
+          if (error) throw error;
+          toast.success('Squadra salvata');
+        }
       }
       setDialogOpen(false);
-      loadTeams();
+      await loadTeams();
     } catch (e: any) {
       toast.error(`Errore: ${e.message}`);
     } finally {
