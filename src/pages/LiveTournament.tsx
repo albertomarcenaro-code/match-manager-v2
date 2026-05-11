@@ -81,38 +81,13 @@ export default function LiveTournament() {
     };
   }, [id]);
 
-  // Aggregate stats from match_data.events across all matches
-  const stats = useMemo(() => {
-    const scorers = new Map<string, { name: string; goals: number }>();
-    const yellows = new Map<string, { name: string; count: number }>();
-    const reds = new Map<string, { name: string; count: number }>();
-
-    for (const m of matches) {
-      const evts: any[] = m.match_data?.events || [];
-      for (const e of evts) {
-        const name = e.playerName || 'N/D';
-        const key = (e.playerId || name).toString();
-        if (e.type === 'goal') {
-          const cur = scorers.get(key) || { name, goals: 0 };
-          cur.goals += 1;
-          scorers.set(key, cur);
-        } else if (e.type === 'yellow_card') {
-          const cur = yellows.get(key) || { name, count: 0 };
-          cur.count += 1;
-          yellows.set(key, cur);
-        } else if (e.type === 'red_card') {
-          const cur = reds.get(key) || { name, count: 0 };
-          cur.count += 1;
-          reds.set(key, cur);
-        }
-      }
-    }
-    return {
-      scorers: [...scorers.values()].sort((a, b) => b.goals - a.goals),
-      yellows: [...yellows.values()].sort((a, b) => b.count - a.count),
-      reds: [...reds.values()].sort((a, b) => b.count - a.count),
-    };
-  }, [matches]);
+  // Aggregate stats from match_data across all matches (Mia Squadra only),
+  // keyed strictly by player.id with name fallback for safety.
+  const stats = useMemo(() => aggregateTournamentStats(matches), [matches]);
+  const scorers = useMemo(() => stats.players.filter(p => p.goals > 0).sort((a, b) => b.goals - a.goals), [stats]);
+  const minutesRanking = useMemo(() => stats.players.filter(p => p.minutes > 0).sort((a, b) => b.minutes - a.minutes), [stats]);
+  const yellows = useMemo(() => stats.players.filter(p => p.yellowCards > 0).sort((a, b) => b.yellowCards - a.yellowCards), [stats]);
+  const reds = useMemo(() => stats.players.filter(p => p.redCards > 0).sort((a, b) => b.redCards - a.redCards), [stats]);
 
   if (loading) {
     return (
