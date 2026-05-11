@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import ExcelJS from "exceljs";
 import { ShareLiveButton } from "@/components/live/ShareLiveButton";
+import { aggregateTournamentStats } from "@/lib/tournamentStats";
 
 interface TournamentData {
   id: string;
@@ -39,16 +40,6 @@ interface TournamentMatchRow {
   match_date: string;
   match_data: any;
   tournament_id: string;
-}
-
-interface PlayerAggStats {
-  name: string;
-  goals: number;
-  yellowCards: number;
-  redCards: number;
-  minutes: number;
-  matchesPlayed: number;
-  perMatchMinutes: Record<string, number | null>; // match.id -> minutes (null if not in that match)
 }
 
 export default function TournamentDetail() {
