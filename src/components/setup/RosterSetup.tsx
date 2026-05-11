@@ -528,17 +528,23 @@ export function RosterSetup({
           const uniqueNames = [...new Set(players.map(p => p.name))];
           onBulkAddPlayers(uniqueNames);
 
-          // For tournament mode with existing matches: load numbers from first match
-          if (isTournamentMode && tournament.isActive && tournament.matches.length > 0) {
-            const firstMatch = tournament.matches[0];
+          // For tournament mode: persist numbers from tournament + latest match
+          if (isTournamentMode && tournament.isActive) {
             const numbersByName: Record<string, number | null> = {};
-             
-            if (firstMatch.playerStats) {
-              firstMatch.playerStats.forEach((stat: any) => {
-                if (stat.playerName && stat.playerNumber !== null) {
-                  numbersByName[stat.playerName] = stat.playerNumber;
-                }
-              });
+            tournament.players.forEach((p: any) => {
+              if (p?.name && typeof p.number === 'number') {
+                numbersByName[p.name] = p.number;
+              }
+            });
+            if (tournament.matches.length > 0) {
+              const latestMatch = tournament.matches[tournament.matches.length - 1];
+              if (latestMatch?.playerStats) {
+                latestMatch.playerStats.forEach((stat: any) => {
+                  if (stat.playerName && typeof stat.playerNumber === 'number') {
+                    numbersByName[stat.playerName] = stat.playerNumber;
+                  }
+                });
+              }
             }
             setPendingDbNumbersByName(numbersByName);
           }
