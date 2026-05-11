@@ -177,20 +177,20 @@ export default function LiveTournament() {
         </section>
 
         {/* Statistiche */}
-        {(stats.scorers.length > 0 || stats.yellows.length > 0 || stats.reds.length > 0) && (
+        {(scorers.length > 0 || minutesRanking.length > 0 || yellows.length > 0 || reds.length > 0) && (
           <section className="space-y-3">
             <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
               Statistiche torneo
             </h2>
 
-            {stats.scorers.length > 0 && (
+            {scorers.length > 0 && (
               <Card className="p-4">
                 <h3 className="text-xs font-bold uppercase text-muted-foreground mb-2 flex items-center gap-2">
                   <Target className="h-3.5 w-3.5" /> Marcatori
                 </h3>
                 <ul className="space-y-1">
-                  {stats.scorers.slice(0, 10).map((s, i) => (
-                    <li key={i} className="flex items-center justify-between text-sm">
+                  {scorers.slice(0, 10).map((s) => (
+                    <li key={s.key} className="flex items-center justify-between text-sm">
                       <span className="text-foreground truncate">{s.name}</span>
                       <span className="font-bold tabular-nums text-foreground">{s.goals}</span>
                     </li>
@@ -199,7 +199,26 @@ export default function LiveTournament() {
               </Card>
             )}
 
-            {(stats.yellows.length > 0 || stats.reds.length > 0) && (
+            {minutesRanking.length > 0 && (
+              <Card className="p-4">
+                <h3 className="text-xs font-bold uppercase text-muted-foreground mb-2 flex items-center gap-2">
+                  <Clock className="h-3.5 w-3.5" /> Minuti giocati
+                </h3>
+                <ul className="space-y-1">
+                  {minutesRanking.slice(0, 15).map((s) => (
+                    <li key={s.key} className="flex items-center justify-between text-sm">
+                      <span className="text-foreground truncate">
+                        {s.name}
+                        <span className="text-muted-foreground text-xs ml-1">({s.matchesPlayed})</span>
+                      </span>
+                      <span className="font-bold tabular-nums text-foreground">{s.minutes}'</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
+
+            {(yellows.length > 0 || reds.length > 0) && (
               <Card className="p-4">
                 <h3 className="text-xs font-bold uppercase text-muted-foreground mb-2 flex items-center gap-2">
                   <Square className="h-3.5 w-3.5" /> Disciplinare
@@ -208,25 +227,25 @@ export default function LiveTournament() {
                   <div>
                     <p className="text-[11px] font-semibold text-yellow-600 uppercase mb-1">Gialli</p>
                     <ul className="space-y-0.5">
-                      {stats.yellows.slice(0, 8).map((s, i) => (
-                        <li key={i} className="flex items-center justify-between">
+                      {yellows.slice(0, 8).map((s) => (
+                        <li key={s.key} className="flex items-center justify-between">
                           <span className="text-foreground truncate">{s.name}</span>
-                          <span className="font-bold tabular-nums">{s.count}</span>
+                          <span className="font-bold tabular-nums">{s.yellowCards}</span>
                         </li>
                       ))}
-                      {stats.yellows.length === 0 && <li className="text-muted-foreground text-xs">—</li>}
+                      {yellows.length === 0 && <li className="text-muted-foreground text-xs">—</li>}
                     </ul>
                   </div>
                   <div>
                     <p className="text-[11px] font-semibold text-red-600 uppercase mb-1">Rossi</p>
                     <ul className="space-y-0.5">
-                      {stats.reds.slice(0, 8).map((s, i) => (
-                        <li key={i} className="flex items-center justify-between">
+                      {reds.slice(0, 8).map((s) => (
+                        <li key={s.key} className="flex items-center justify-between">
                           <span className="text-foreground truncate">{s.name}</span>
-                          <span className="font-bold tabular-nums">{s.count}</span>
+                          <span className="font-bold tabular-nums">{s.redCards}</span>
                         </li>
                       ))}
-                      {stats.reds.length === 0 && <li className="text-muted-foreground text-xs">—</li>}
+                      {reds.length === 0 && <li className="text-muted-foreground text-xs">—</li>}
                     </ul>
                   </div>
                 </div>
