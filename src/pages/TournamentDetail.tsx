@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import ExcelJS from "exceljs";
 import { ShareLiveButton } from "@/components/live/ShareLiveButton";
+import { aggregateTournamentStats } from "@/lib/tournamentStats";
 
 interface TournamentData {
   id: string;
@@ -39,16 +40,6 @@ interface TournamentMatchRow {
   match_date: string;
   match_data: any;
   tournament_id: string;
-}
-
-interface PlayerAggStats {
-  name: string;
-  goals: number;
-  yellowCards: number;
-  redCards: number;
-  minutes: number;
-  matchesPlayed: number;
-  perMatchMinutes: Record<string, number | null>; // match.id -> minutes (null if not in that match)
 }
 
 export default function TournamentDetail() {
@@ -137,63 +128,7 @@ export default function TournamentDetail() {
     (a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime()
   );
 
-  const computeGlobalStats = () => {
-    let wins = 0, draws = 0, losses = 0;
-    const playerMap: Record<string, PlayerAggStats> = {};
-
-    const ensure = (name: string): PlayerAggStats => {
-      if (!playerMap[name]) {
-        playerMap[name] = {
-          name, goals: 0, yellowCards: 0, redCards: 0, minutes: 0, matchesPlayed: 0,
-          perMatchMinutes: {},
-        };
-      }
-      return playerMap[name];
-    };
-
-    for (const m of orderedMatches) {
-      if (m.home_score > m.away_score) wins++;
-      else if (m.home_score === m.away_score) draws++;
-      else losses++;
-
-      if (m.match_data && typeof m.match_data === "object") {
-        const md = m.match_data as any;
-        const events = md.events || [];
-        const homePlayers = md.homePlayers || [];
-
-        for (const p of homePlayers) {
-          const name = p.name || "Sconosciuto";
-          const player = ensure(name);
-          const totalSec = p.totalSecondsPlayed || 0;
-          const mins = Math.round(totalSec / 60);
-          if (totalSec > 0 || p.isOnField) {
-            player.minutes += mins;
-            player.matchesPlayed += 1;
-            player.perMatchMinutes[m.id] = mins;
-          } else {
-            // Player in roster but didn't play this match
-            if (player.perMatchMinutes[m.id] === undefined) {
-              player.perMatchMinutes[m.id] = null;
-            }
-          }
-        }
-
-        for (const ev of events) {
-          if (ev.type === "goal" && ev.team === "home") {
-            ensure(ev.playerName || "Sconosciuto").goals += 1;
-          }
-          if (ev.type === "card" && ev.team === "home") {
-            const player = ensure(ev.playerName || "Sconosciuto");
-            if (ev.cardType === "yellow") player.yellowCards += 1;
-            if (ev.cardType === "red") player.redCards += 1;
-          }
-        }
-      }
-    }
-
-    const players = Object.values(playerMap).sort((a, b) => b.minutes - a.minutes);
-    return { wins, draws, losses, players };
-  };
+  const computeGlobalStats = () => aggregateTournamentStats(orderedMatches);
 
   const exportExcel = async () => {
     const stats = computeGlobalStats();
@@ -420,7 +355,7 @@ export default function TournamentDetail() {
                       {stats.players.map((p) => {
                         const avg = p.matchesPlayed > 0 ? Math.round(p.minutes / p.matchesPlayed) : 0;
                         return (
-                          <TableRow key={p.name}>
+                          <TableRow key={p.key}>
                             <TableCell className="text-xs font-medium py-2 sticky left-0 bg-card z-10 min-w-[120px] shadow-[1px_0_0_0_hsl(var(--border))]">
                               {p.name}
                             </TableCell>

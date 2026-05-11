@@ -4,9 +4,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { LiveBadge } from '@/components/live/LiveBadge';
 import { LiveFooter } from '@/components/live/LiveFooter';
 import { Card } from '@/components/ui/card';
-import { Loader2, Trophy, Target, Square } from 'lucide-react';
+import { Loader2, Trophy, Target, Square, Clock } from 'lucide-react';
 import logo from '@/assets/logo.webp';
 import { cn } from '@/lib/utils';
+import { aggregateTournamentStats } from '@/lib/tournamentStats';
 
 interface Tournament {
   id: string;
@@ -80,38 +81,13 @@ export default function LiveTournament() {
     };
   }, [id]);
 
-  // Aggregate stats from match_data.events across all matches
-  const stats = useMemo(() => {
-    const scorers = new Map<string, { name: string; goals: number }>();
-    const yellows = new Map<string, { name: string; count: number }>();
-    const reds = new Map<string, { name: string; count: number }>();
-
-    for (const m of matches) {
-      const evts: any[] = m.match_data?.events || [];
-      for (const e of evts) {
-        const name = e.playerName || 'N/D';
-        const key = (e.playerId || name).toString();
-        if (e.type === 'goal') {
-          const cur = scorers.get(key) || { name, goals: 0 };
-          cur.goals += 1;
-          scorers.set(key, cur);
-        } else if (e.type === 'yellow_card') {
-          const cur = yellows.get(key) || { name, count: 0 };
-          cur.count += 1;
-          yellows.set(key, cur);
-        } else if (e.type === 'red_card') {
-          const cur = reds.get(key) || { name, count: 0 };
-          cur.count += 1;
-          reds.set(key, cur);
-        }
-      }
-    }
-    return {
-      scorers: [...scorers.values()].sort((a, b) => b.goals - a.goals),
-      yellows: [...yellows.values()].sort((a, b) => b.count - a.count),
-      reds: [...reds.values()].sort((a, b) => b.count - a.count),
-    };
-  }, [matches]);
+  // Aggregate stats from match_data across all matches (Mia Squadra only),
+  // keyed strictly by player.id with name fallback for safety.
+  const stats = useMemo(() => aggregateTournamentStats(matches), [matches]);
+  const scorers = useMemo(() => stats.players.filter(p => p.goals > 0).sort((a, b) => b.goals - a.goals), [stats]);
+  const minutesRanking = useMemo(() => stats.players.filter(p => p.minutes > 0).sort((a, b) => b.minutes - a.minutes), [stats]);
+  const yellows = useMemo(() => stats.players.filter(p => p.yellowCards > 0).sort((a, b) => b.yellowCards - a.yellowCards), [stats]);
+  const reds = useMemo(() => stats.players.filter(p => p.redCards > 0).sort((a, b) => b.redCards - a.redCards), [stats]);
 
   if (loading) {
     return (
@@ -201,20 +177,20 @@ export default function LiveTournament() {
         </section>
 
         {/* Statistiche */}
-        {(stats.scorers.length > 0 || stats.yellows.length > 0 || stats.reds.length > 0) && (
+        {(scorers.length > 0 || minutesRanking.length > 0 || yellows.length > 0 || reds.length > 0) && (
           <section className="space-y-3">
             <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
               Statistiche torneo
             </h2>
 
-            {stats.scorers.length > 0 && (
+            {scorers.length > 0 && (
               <Card className="p-4">
                 <h3 className="text-xs font-bold uppercase text-muted-foreground mb-2 flex items-center gap-2">
                   <Target className="h-3.5 w-3.5" /> Marcatori
                 </h3>
                 <ul className="space-y-1">
-                  {stats.scorers.slice(0, 10).map((s, i) => (
-                    <li key={i} className="flex items-center justify-between text-sm">
+                  {scorers.slice(0, 10).map((s) => (
+                    <li key={s.key} className="flex items-center justify-between text-sm">
                       <span className="text-foreground truncate">{s.name}</span>
                       <span className="font-bold tabular-nums text-foreground">{s.goals}</span>
                     </li>
@@ -223,7 +199,26 @@ export default function LiveTournament() {
               </Card>
             )}
 
-            {(stats.yellows.length > 0 || stats.reds.length > 0) && (
+            {minutesRanking.length > 0 && (
+              <Card className="p-4">
+                <h3 className="text-xs font-bold uppercase text-muted-foreground mb-2 flex items-center gap-2">
+                  <Clock className="h-3.5 w-3.5" /> Minuti giocati
+                </h3>
+                <ul className="space-y-1">
+                  {minutesRanking.slice(0, 15).map((s) => (
+                    <li key={s.key} className="flex items-center justify-between text-sm">
+                      <span className="text-foreground truncate">
+                        {s.name}
+                        <span className="text-muted-foreground text-xs ml-1">({s.matchesPlayed})</span>
+                      </span>
+                      <span className="font-bold tabular-nums text-foreground">{s.minutes}'</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
+
+            {(yellows.length > 0 || reds.length > 0) && (
               <Card className="p-4">
                 <h3 className="text-xs font-bold uppercase text-muted-foreground mb-2 flex items-center gap-2">
                   <Square className="h-3.5 w-3.5" /> Disciplinare
@@ -232,25 +227,25 @@ export default function LiveTournament() {
                   <div>
                     <p className="text-[11px] font-semibold text-yellow-600 uppercase mb-1">Gialli</p>
                     <ul className="space-y-0.5">
-                      {stats.yellows.slice(0, 8).map((s, i) => (
-                        <li key={i} className="flex items-center justify-between">
+                      {yellows.slice(0, 8).map((s) => (
+                        <li key={s.key} className="flex items-center justify-between">
                           <span className="text-foreground truncate">{s.name}</span>
-                          <span className="font-bold tabular-nums">{s.count}</span>
+                          <span className="font-bold tabular-nums">{s.yellowCards}</span>
                         </li>
                       ))}
-                      {stats.yellows.length === 0 && <li className="text-muted-foreground text-xs">—</li>}
+                      {yellows.length === 0 && <li className="text-muted-foreground text-xs">—</li>}
                     </ul>
                   </div>
                   <div>
                     <p className="text-[11px] font-semibold text-red-600 uppercase mb-1">Rossi</p>
                     <ul className="space-y-0.5">
-                      {stats.reds.slice(0, 8).map((s, i) => (
-                        <li key={i} className="flex items-center justify-between">
+                      {reds.slice(0, 8).map((s) => (
+                        <li key={s.key} className="flex items-center justify-between">
                           <span className="text-foreground truncate">{s.name}</span>
-                          <span className="font-bold tabular-nums">{s.count}</span>
+                          <span className="font-bold tabular-nums">{s.redCards}</span>
                         </li>
                       ))}
-                      {stats.reds.length === 0 && <li className="text-muted-foreground text-xs">—</li>}
+                      {reds.length === 0 && <li className="text-muted-foreground text-xs">—</li>}
                     </ul>
                   </div>
                 </div>
