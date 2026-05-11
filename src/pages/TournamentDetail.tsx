@@ -355,7 +355,7 @@ export default function TournamentDetail() {
                       {stats.players.map((p) => {
                         const avg = p.matchesPlayed > 0 ? Math.round(p.minutes / p.matchesPlayed) : 0;
                         return (
-                          <TableRow key={p.name}>
+                          <TableRow key={p.key}>
                             <TableCell className="text-xs font-medium py-2 sticky left-0 bg-card z-10 min-w-[120px] shadow-[1px_0_0_0_hsl(var(--border))]">
                               {p.name}
                             </TableCell>
