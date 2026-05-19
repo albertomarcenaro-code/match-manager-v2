@@ -222,28 +222,35 @@ export function RosterSetup({
       }
 
       if (players && players.length > 0 && onBulkAddPlayers) {
-        const playerNames = players.map(p => p.name);
+        // Dedupe nomi (difesa frontend contro eventuali doppioni storici)
+        const seen = new Set<string>();
+        const playerNames = players
+          .map(p => p.name)
+          .filter(n => {
+            const k = (n || '').trim().toLowerCase();
+            if (!k || seen.has(k)) return false;
+            seen.add(k);
+            return true;
+          });
         onBulkAddPlayers(playerNames);
 
-        // For tournament mode: persist jersey numbers across all matches
-        // of the same tournament. Source of truth (in priority order):
-        //   1. Latest played match's playerStats (most recent assignments)
-        //   2. tournament.players (set when tournament was created)
+        // Tournament mode: eredita i numeri di maglia dalla PRIMA partita del torneo
+        // (cronologicamente più vecchia) per garantire continuità. Fallback a tournament.players.
         if (isTournamentMode && tournament.isActive) {
           const numbersByName: Record<string, number | null> = {};
 
-          // Base layer: tournament players (initial numbers from tournament start)
+          // Base layer: tournament players (numeri iniziali del torneo)
           tournament.players.forEach((p: any) => {
             if (p?.name && typeof p.number === 'number') {
               numbersByName[p.name] = p.number;
             }
           });
 
-          // Override with the most recent match's player numbers
+          // Override con i numeri della PRIMA partita giocata (matches è ordinato asc)
           if (tournament.matches.length > 0) {
-            const latestMatch = tournament.matches[tournament.matches.length - 1];
-            if (latestMatch?.playerStats) {
-              latestMatch.playerStats.forEach((stat: any) => {
+            const firstMatch = tournament.matches[0];
+            if (firstMatch?.playerStats) {
+              firstMatch.playerStats.forEach((stat: any) => {
                 if (stat.playerName && typeof stat.playerNumber === 'number') {
                   numbersByName[stat.playerName] = stat.playerNumber;
                 }
@@ -293,16 +300,34 @@ export function RosterSetup({
             .eq('id', dbId);
           if (error) throw error;
         } else {
-          const { data, error } = await supabase
+          // UPSERT-safe: se un giocatore con lo stesso nome esiste già (vincolo unique),
+          // aggiorna il numero invece di duplicare la riga.
+          const { data: existing } = await supabase
             .from('players')
-            .insert({ user_id: user.id, name: validatedPlayer.name, number: validatedPlayer.number })
-            .select('id, name');
+            .select('id')
+            .eq('user_id', user.id)
+            .ilike('name', validatedPlayer.name)
+            .maybeSingle();
 
-          if (error) throw error;
+          if (existing?.id) {
+            const { error } = await supabase
+              .from('players')
+              .update({ number: validatedPlayer.number })
+              .eq('id', existing.id);
+            if (error) throw error;
+            setDbPlayerIdsByName(prev => ({ ...prev, [validatedPlayer.name]: existing.id }));
+          } else {
+            const { data, error } = await supabase
+              .from('players')
+              .insert({ user_id: user.id, name: validatedPlayer.name, number: validatedPlayer.number })
+              .select('id, name');
 
-          const row = Array.isArray(data) ? data[0] : null;
-          if (row?.id && row?.name) {
-            setDbPlayerIdsByName(prev => ({ ...prev, [row.name]: row.id }));
+            if (error) throw error;
+
+            const row = Array.isArray(data) ? data[0] : null;
+            if (row?.id && row?.name) {
+              setDbPlayerIdsByName(prev => ({ ...prev, [row.name]: row.id }));
+            }
           }
         }
 
@@ -537,9 +562,9 @@ export function RosterSetup({
               }
             });
             if (tournament.matches.length > 0) {
-              const latestMatch = tournament.matches[tournament.matches.length - 1];
-              if (latestMatch?.playerStats) {
-                latestMatch.playerStats.forEach((stat: any) => {
+              const firstMatch = tournament.matches[0];
+              if (firstMatch?.playerStats) {
+                firstMatch.playerStats.forEach((stat: any) => {
                   if (stat.playerName && typeof stat.playerNumber === 'number') {
                     numbersByName[stat.playerName] = stat.playerNumber;
                   }
