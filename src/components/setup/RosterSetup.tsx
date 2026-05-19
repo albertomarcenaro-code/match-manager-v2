@@ -544,9 +544,9 @@ export function RosterSetup({
               }
             });
             if (tournament.matches.length > 0) {
-              const latestMatch = tournament.matches[tournament.matches.length - 1];
-              if (latestMatch?.playerStats) {
-                latestMatch.playerStats.forEach((stat: any) => {
+              const firstMatch = tournament.matches[0];
+              if (firstMatch?.playerStats) {
+                firstMatch.playerStats.forEach((stat: any) => {
                   if (stat.playerName && typeof stat.playerNumber === 'number') {
                     numbersByName[stat.playerName] = stat.playerNumber;
                   }
