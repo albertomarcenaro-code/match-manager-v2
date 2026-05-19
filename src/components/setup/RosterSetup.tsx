@@ -300,16 +300,34 @@ export function RosterSetup({
             .eq('id', dbId);
           if (error) throw error;
         } else {
-          const { data, error } = await supabase
+          // UPSERT-safe: se un giocatore con lo stesso nome esiste già (vincolo unique),
+          // aggiorna il numero invece di duplicare la riga.
+          const { data: existing } = await supabase
             .from('players')
-            .insert({ user_id: user.id, name: validatedPlayer.name, number: validatedPlayer.number })
-            .select('id, name');
+            .select('id')
+            .eq('user_id', user.id)
+            .ilike('name', validatedPlayer.name)
+            .maybeSingle();
 
-          if (error) throw error;
+          if (existing?.id) {
+            const { error } = await supabase
+              .from('players')
+              .update({ number: validatedPlayer.number })
+              .eq('id', existing.id);
+            if (error) throw error;
+            setDbPlayerIdsByName(prev => ({ ...prev, [validatedPlayer.name]: existing.id }));
+          } else {
+            const { data, error } = await supabase
+              .from('players')
+              .insert({ user_id: user.id, name: validatedPlayer.name, number: validatedPlayer.number })
+              .select('id, name');
 
-          const row = Array.isArray(data) ? data[0] : null;
-          if (row?.id && row?.name) {
-            setDbPlayerIdsByName(prev => ({ ...prev, [row.name]: row.id }));
+            if (error) throw error;
+
+            const row = Array.isArray(data) ? data[0] : null;
+            if (row?.id && row?.name) {
+              setDbPlayerIdsByName(prev => ({ ...prev, [row.name]: row.id }));
+            }
           }
         }
 
