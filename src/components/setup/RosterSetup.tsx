@@ -222,28 +222,35 @@ export function RosterSetup({
       }
 
       if (players && players.length > 0 && onBulkAddPlayers) {
-        const playerNames = players.map(p => p.name);
+        // Dedupe nomi (difesa frontend contro eventuali doppioni storici)
+        const seen = new Set<string>();
+        const playerNames = players
+          .map(p => p.name)
+          .filter(n => {
+            const k = (n || '').trim().toLowerCase();
+            if (!k || seen.has(k)) return false;
+            seen.add(k);
+            return true;
+          });
         onBulkAddPlayers(playerNames);
 
-        // For tournament mode: persist jersey numbers across all matches
-        // of the same tournament. Source of truth (in priority order):
-        //   1. Latest played match's playerStats (most recent assignments)
-        //   2. tournament.players (set when tournament was created)
+        // Tournament mode: eredita i numeri di maglia dalla PRIMA partita del torneo
+        // (cronologicamente più vecchia) per garantire continuità. Fallback a tournament.players.
         if (isTournamentMode && tournament.isActive) {
           const numbersByName: Record<string, number | null> = {};
 
-          // Base layer: tournament players (initial numbers from tournament start)
+          // Base layer: tournament players (numeri iniziali del torneo)
           tournament.players.forEach((p: any) => {
             if (p?.name && typeof p.number === 'number') {
               numbersByName[p.name] = p.number;
             }
           });
 
-          // Override with the most recent match's player numbers
+          // Override con i numeri della PRIMA partita giocata (matches è ordinato asc)
           if (tournament.matches.length > 0) {
-            const latestMatch = tournament.matches[tournament.matches.length - 1];
-            if (latestMatch?.playerStats) {
-              latestMatch.playerStats.forEach((stat: any) => {
+            const firstMatch = tournament.matches[0];
+            if (firstMatch?.playerStats) {
+              firstMatch.playerStats.forEach((stat: any) => {
                 if (stat.playerName && typeof stat.playerNumber === 'number') {
                   numbersByName[stat.playerName] = stat.playerNumber;
                 }
