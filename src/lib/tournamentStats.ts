@@ -101,6 +101,10 @@ export function aggregateTournamentStats(matches: MatchLike[]): AggregatedTourna
     }
   }
 
-  const players = [...map.values()].sort((a, b) => b.minutes - a.minutes || b.goals - a.goals);
+  // Regola di business: i giocatori senza numero di maglia assegnato non hanno
+  // partecipato al torneo → esclusi da TUTTE le classifiche (marcatori, minuti, cartellini).
+  const players = [...map.values()]
+    .filter(p => typeof p.number === 'number' && p.number !== null)
+    .sort((a, b) => b.minutes - a.minutes || b.goals - a.goals);
   return { wins, draws, losses, players };
 }
