@@ -125,14 +125,11 @@ export default function Auth() {
 
     setIsLoading(true);
     try {
-      // 1. Validate invitation code
-      const { data: codeData, error: codeError } = await supabase
-        .from('invitation_codes')
-        .select('id, current_uses, max_uses, is_active')
-        .eq('code', regInviteCode.trim())
-        .maybeSingle();
+      // 1. Validate invitation code via SECURITY DEFINER RPC (anon SELECT is blocked)
+      const { data: isValid, error: codeError } = await supabase
+        .rpc('validate_invitation_code', { p_code: regInviteCode.trim() });
 
-      if (codeError || !codeData || !codeData.is_active || codeData.current_uses >= codeData.max_uses) {
+      if (codeError || !isValid) {
         toast.error('Codice invito non valido o limite utilizzi raggiunto');
         setIsLoading(false);
         return;
