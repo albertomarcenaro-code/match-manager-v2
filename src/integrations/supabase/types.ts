@@ -49,6 +49,7 @@ export type Database = {
           home_score: number
           home_team_name: string
           id: string
+          is_public: boolean
           match_data: Json | null
           match_date: string
           status: string
@@ -62,6 +63,7 @@ export type Database = {
           home_score?: number
           home_team_name: string
           id?: string
+          is_public?: boolean
           match_data?: Json | null
           match_date?: string
           status?: string
@@ -75,6 +77,7 @@ export type Database = {
           home_score?: number
           home_team_name?: string
           id?: string
+          is_public?: boolean
           match_data?: Json | null
           match_date?: string
           status?: string
@@ -239,6 +242,7 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          is_public: boolean
           name: string
           players: Json
           team_name: string
@@ -249,6 +253,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          is_public?: boolean
           name: string
           players?: Json
           team_name: string
@@ -259,6 +264,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          is_public?: boolean
           name?: string
           players?: Json
           team_name?: string
@@ -273,6 +279,7 @@ export type Database = {
     }
     Functions: {
       use_invitation_code: { Args: { p_code: string }; Returns: boolean }
+      validate_invitation_code: { Args: { p_code: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
