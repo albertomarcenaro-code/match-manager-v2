@@ -10,8 +10,8 @@ interface SitemapEntry {
   priority?: string;
 }
 
-async function fetchPublicRows(table: string): Promise<{ id: string; updated_at: string | null }[]> {
-  const url = `${process.env.VITE_SUPABASE_URL}/rest/v1/${table}?select=id,updated_at&is_public=eq.true`;
+async function fetchPublicRows(table: string, timestampCol: string): Promise<{ id: string; ts: string | null }[]> {
+  const url = `${process.env.VITE_SUPABASE_URL}/rest/v1/${table}?select=id,${timestampCol}&is_public=eq.true`;
   const res = await fetch(url, {
     headers: {
       apikey: process.env.VITE_SUPABASE_PUBLISHABLE_KEY!,
@@ -22,7 +22,11 @@ async function fetchPublicRows(table: string): Promise<{ id: string; updated_at:
     console.warn(`Failed to fetch ${table}: ${res.status} ${res.statusText}`);
     return [];
   }
-  return res.json();
+  const data = await res.json();
+  return data.map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    ts: row[timestampCol] as string | null,
+  }));
 }
 
 function generateSitemap(entries: SitemapEntry[]): string {
@@ -57,19 +61,19 @@ async function main() {
     { path: "/overview", changefreq: "weekly", priority: "0.8" },
   ];
 
-  const publicMatches = await fetchPublicRows("matches");
-  const publicTournaments = await fetchPublicRows("tournaments");
+  const publicMatches = await fetchPublicRows("matches", "created_at");
+  const publicTournaments = await fetchPublicRows("tournaments", "updated_at");
 
   const dynamicEntries: SitemapEntry[] = [
     ...publicMatches.map((m) => ({
       path: `/live/match/${m.id}`,
-      lastmod: m.updated_at ? m.updated_at.split("T")[0] : undefined,
+      lastmod: m.ts ? m.ts.split("T")[0] : undefined,
       changefreq: "hourly" as const,
       priority: "0.7",
     })),
     ...publicTournaments.map((t) => ({
       path: `/live/tournament/${t.id}`,
-      lastmod: t.updated_at ? t.updated_at.split("T")[0] : undefined,
+      lastmod: t.ts ? t.ts.split("T")[0] : undefined,
       changefreq: "hourly" as const,
       priority: "0.7",
     })),
