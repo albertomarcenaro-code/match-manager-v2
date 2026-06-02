@@ -1153,7 +1153,39 @@ export const useMatch = () => {
     updateAwayPlayerNumber,
     bulkAddAwayPlayers,
     bulkAddPlayers: (names: string[]) => {
-      names.forEach(name => addPlayer(name));
+      // CRITICAL: dedupe by name (case-insensitive) against the incoming list
+      // AND against players already in state. Prevents the visual duplication
+      // glitch when loadUserData runs over an already-populated roster.
+      setState(prev => {
+        const existingKeys = new Set(
+          prev.homeTeam.players.map(p => p.name.trim().toUpperCase())
+        );
+        const seen = new Set<string>();
+        const toAdd: Player[] = [];
+        for (const raw of names) {
+          const upper = (raw || '').trim().toUpperCase();
+          if (!upper || seen.has(upper) || existingKeys.has(upper)) continue;
+          seen.add(upper);
+          toAdd.push({
+            id: generateId(),
+            name: upper,
+            number: null,
+            isOnField: false,
+            isStarter: false,
+            isExpelled: false,
+            goals: 0,
+            cards: { yellow: 0, red: 0 },
+            currentEntryTime: null,
+            totalSecondsPlayed: 0,
+            secondsPlayedPerPeriod: {},
+          });
+        }
+        if (toAdd.length === 0) return prev;
+        return {
+          ...prev,
+          homeTeam: { ...prev.homeTeam, players: [...prev.homeTeam.players, ...toAdd] },
+        };
+      });
     },
   };
 };
