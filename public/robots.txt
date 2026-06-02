@@ -12,3 +12,5 @@ Allow: /
 
 User-agent: *
 Allow: /
+
+Sitemap: https://matchmanager-live.lovable.app/sitemap.xml
