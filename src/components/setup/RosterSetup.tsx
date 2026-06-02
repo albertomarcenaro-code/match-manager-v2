@@ -221,7 +221,7 @@ export function RosterSetup({
         );
       }
 
-      if (players && players.length > 0 && onBulkAddPlayers) {
+      if (players && players.length > 0 && onBulkAddPlayers && homePlayers.length === 0) {
         // Dedupe nomi (difesa frontend contro eventuali doppioni storici)
         const seen = new Set<string>();
         const playerNames = players
