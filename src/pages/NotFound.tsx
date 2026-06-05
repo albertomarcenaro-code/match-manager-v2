@@ -1,4 +1,5 @@
 import { useLocation } from "react-router-dom";
+import { Helmet } from "react-helmet";
 
 export default function NotFound() {
   const location = useLocation();
