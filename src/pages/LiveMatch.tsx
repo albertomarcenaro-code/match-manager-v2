@@ -144,7 +144,7 @@ export default function LiveMatch() {
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border/40">
         <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <img src={logo} alt="Match Manager" className="h-7 w-7" />
+            <img src={logo} alt="Icona dell'app Match Manager Live" className="h-7 w-7" />
             <span className="font-bold text-sm text-foreground">Match Manager</span>
           </Link>
           <LiveBadge isLive={isLive} />

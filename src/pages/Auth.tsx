@@ -214,6 +214,7 @@ export default function Auth() {
       <Header />
       <main className="flex-1 flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-6">
+          <h1 className="text-center text-2xl font-bold text-foreground">Accedi a Match Manager</h1>
           <Card className="border-2 shadow-xl">
             <CardHeader className="text-center pb-2">
               <CardTitle className="text-2xl font-bold">Benvenuto</CardTitle>
