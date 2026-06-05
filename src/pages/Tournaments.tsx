@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Helmet } from "react-helmet";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -101,6 +102,10 @@ export default function Tournaments() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <Helmet>
+        <title>Tornei | Match Manager Live</title>
+        <meta name="description" content="Crea e gestisci tornei, consulta le partite disputate e le statistiche aggregate." />
+      </Helmet>
       <Header />
       <main className="flex-1 p-4 max-w-2xl mx-auto w-full pt-6">
         <div className="flex items-center gap-3 mb-6">

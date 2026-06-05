@@ -1,4 +1,4 @@
-import React from "react";
+import { Helmet } from "react-helmet";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Card } from "@/components/ui/card";
@@ -25,6 +25,10 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <Helmet>
+        <title>Dashboard | Match Manager Live</title>
+        <meta name="description" content="Scegli tra partita singola o torneo e accedi alle funzionalità di Match Manager." />
+      </Helmet>
       <Header />
       <main className="flex-1 p-4 sm:p-6 max-w-4xl mx-auto w-full flex flex-col items-center justify-center">
         <h1 className="text-2xl sm:text-3xl font-bold mb-8 text-center">

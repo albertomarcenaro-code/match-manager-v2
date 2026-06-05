@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Helmet } from "react-helmet";
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { LiveBadge } from '@/components/live/LiveBadge';
@@ -140,6 +141,10 @@ export default function LiveMatch() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <Helmet>
+        <title>{match.home_team_name} vs {match.away_team_name} | Live | Match Manager Live</title>
+        <meta name="description" content="Segui la partita in tempo reale con cronometro, risultato ed eventi live." />
+      </Helmet>
       {/* Top brand bar */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border/40">
         <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">

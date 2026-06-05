@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Helmet } from "react-helmet";
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMatch } from '@/hooks/useMatch';
 import { MatchHeader } from '@/components/match/MatchHeader';
@@ -94,6 +95,10 @@ const MatchApp = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>{state.homeTeam.name} vs {state.awayTeam.name} | Match Manager Live</title>
+        <meta name="description" content="Gestisci rose, titolari, cronometro ed eventi live della partita in tempo reale." />
+      </Helmet>
       {/* Global Header */}
       <Header />
 
