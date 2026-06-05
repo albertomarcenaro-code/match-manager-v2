@@ -186,6 +186,9 @@ export default function LiveMatch() {
       </header>
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-4 space-y-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-center text-foreground">
+          {match.home_team_name} vs {match.away_team_name}
+        </h1>
         {/* Scoreboard */}
         <Card className="p-4 sm:p-6">
           <div className="space-y-3">
