@@ -144,7 +144,7 @@ export default function LiveMatch() {
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border/40">
         <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <img src={logo} alt="Match Manager" className="h-7 w-7" />
+            <img src={logo} alt="Icona dell'app Match Manager Live" className="h-7 w-7" />
             <span className="font-bold text-sm text-foreground">Match Manager</span>
           </Link>
           <LiveBadge isLive={isLive} />
@@ -186,6 +186,9 @@ export default function LiveMatch() {
       </header>
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-4 space-y-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-center text-foreground">
+          {match.home_team_name} vs {match.away_team_name}
+        </h1>
         {/* Scoreboard */}
         <Card className="p-4 sm:p-6">
           <div className="space-y-3">

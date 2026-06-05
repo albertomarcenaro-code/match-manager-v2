@@ -99,7 +99,7 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(({
         
         {/* Left: Logo + Text */}
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/dashboard')}>
-          <img src={logo} alt="Match Manager Live Logo" className="h-8 w-8 object-contain" />
+          <img src={logo} alt="Icona dell'app Match Manager Live" className="h-8 w-8 object-contain" />
           <span className="font-bold text-sm sm:text-base tracking-tight leading-none whitespace-nowrap">
             <span className="text-foreground">Match Manager</span>{' '}
             <span className="text-secondary">Live</span>
@@ -201,7 +201,7 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(({
           ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Menu utente">
                   <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
                     <User className="h-4 w-4 text-primary" />
                   </div>
