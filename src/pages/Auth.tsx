@@ -210,6 +210,7 @@ export default function Auth() {
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30">
       <Helmet>
         <title>Match Manager Live - Gestione Partite Calcio</title>
+        <meta name="description" content="Accedi o registrati a Match Manager Live per gestire partite e tornei di calcio." />
       </Helmet>
       <Header />
       <main className="flex-1 flex items-center justify-center p-4">

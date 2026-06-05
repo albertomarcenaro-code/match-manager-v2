@@ -37,6 +37,7 @@ const Landing = () => {
     <div className="min-h-screen flex flex-col font-sans bg-background selection:bg-green-100">
       <Helmet>
         <title>Match Manager Live | Il tuo assistente di campo</title>
+        <meta name="description" content="Gestione professionale di partite di calcio e tornei in tempo reale con cronometro e statistiche." />
       </Helmet>
 
       <Header />
