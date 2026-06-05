@@ -113,6 +113,10 @@ export default function LiveTournament() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <Helmet>
+        <title>{tournament.name} | Torneo Live | Match Manager Live</title>
+        <meta name="description" content="Segui il torneo in diretta con calendario partite, marcatori e statistiche live." />
+      </Helmet>
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border/40">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 hover:opacity-80">

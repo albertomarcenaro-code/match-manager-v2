@@ -231,6 +231,10 @@ export default function MatchSummary() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <Helmet>
+        <title>{data.homeTeamName} vs {data.awayTeamName} | Riepilogo | Match Manager Live</title>
+        <meta name="description" content="Consulta il riepilogo completo con marcatori, minutaggi e cronaca degli eventi." />
+      </Helmet>
       <Header />
       <main className="flex-1 p-4 max-w-2xl mx-auto w-full pt-6 space-y-5">
         {/* Back button */}

@@ -128,6 +128,10 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <Helmet>
+        <title>Il mio Profilo | Match Manager Live</title>
+        <meta name="description" content="Gestisci le informazioni del tuo profilo allenatore su Match Manager Live." />
+      </Helmet>
       <Header />
       <main className="flex-1 p-4 sm:p-6 max-w-xl mx-auto w-full">
         <Button variant="ghost" size="sm" className="mb-4 gap-1" onClick={() => navigate(-1)}>

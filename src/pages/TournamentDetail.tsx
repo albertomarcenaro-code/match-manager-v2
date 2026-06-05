@@ -194,6 +194,10 @@ export default function TournamentDetail() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <Helmet>
+        <title>{tournament.name} | Torneo | Match Manager Live</title>
+        <meta name="description" content="Visualizza le partite, le statistiche globali e gestisci il calendario del torneo." />
+      </Helmet>
       <Header />
       <main className="flex-1 p-4 max-w-2xl mx-auto w-full pt-6">
         {/* Header */}
