@@ -81,6 +81,7 @@ const TournamentArchive = () => {
         <Header />
         <Helmet>
           <title>Archivio Torneo - Match Manager Live</title>
+          <meta name="description" content="Archivio torneo con statistiche giocatori, partite disputate e classifiche aggregate." />
         </Helmet>
         <main className="flex-1 bg-background p-4">
           <div className="max-w-4xl mx-auto">
@@ -113,6 +114,7 @@ const TournamentArchive = () => {
       <Header />
       <Helmet>
         <title>{tournament.name || 'Torneo'} - Archivio | Match Manager Live</title>
+        <meta name="description" content="Archivio torneo con statistiche giocatori, partite disputate e classifiche aggregate." />
       </Helmet>
       <main className="flex-1 bg-background p-4 pb-8">
         <div className="max-w-6xl mx-auto space-y-6">
