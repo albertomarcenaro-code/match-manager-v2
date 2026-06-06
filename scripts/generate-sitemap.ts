@@ -10,23 +10,32 @@ interface SitemapEntry {
   priority?: string;
 }
 
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://rhqaflmzqgtvinaeveuo.supabase.co";
+const SUPABASE_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJocWFmbG16cWd0dmluYWV2ZXVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNDUwODgsImV4cCI6MjA4MjkyMTA4OH0.8LmHdTP2vjfgVRyqprgCpuRfDBiE25r6J9dsHojFJ1Q";
+
 async function fetchPublicRows(table: string, timestampCol: string): Promise<{ id: string; ts: string | null }[]> {
-  const url = `${process.env.VITE_SUPABASE_URL}/rest/v1/${table}?select=id,${timestampCol}&is_public=eq.true`;
-  const res = await fetch(url, {
-    headers: {
-      apikey: process.env.VITE_SUPABASE_PUBLISHABLE_KEY!,
-      Authorization: `Bearer ${process.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-    },
-  });
-  if (!res.ok) {
-    console.warn(`Failed to fetch ${table}: ${res.status} ${res.statusText}`);
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.warn(`Skipping ${table}: Supabase env vars not available at build time.`);
     return [];
   }
-  const data = await res.json();
-  return data.map((row: Record<string, unknown>) => ({
-    id: row.id as string,
-    ts: row[timestampCol] as string | null,
-  }));
+  try {
+    const url = `${SUPABASE_URL}/rest/v1/${table}?select=id,${timestampCol}&is_public=eq.true`;
+    const res = await fetch(url, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!res.ok) {
+      console.warn(`Failed to fetch ${table}: ${res.status} ${res.statusText}`);
+      return [];
+    }
+    const data = await res.json();
+    return data.map((row: Record<string, unknown>) => ({
+      id: row.id as string,
+      ts: row[timestampCol] as string | null,
+    }));
+  } catch (err) {
+    console.warn(`Error fetching ${table}:`, err);
+    return [];
+  }
 }
 
 function generateSitemap(entries: SitemapEntry[]): string {
