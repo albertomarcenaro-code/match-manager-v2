@@ -184,6 +184,47 @@ export type Database = {
         }
         Relationships: []
       }
+      tournament_jersey_numbers: {
+        Row: {
+          created_at: string
+          id: string
+          jersey_number: number
+          player_id: string
+          player_name: string
+          tournament_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          jersey_number: number
+          player_id: string
+          player_name: string
+          tournament_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          jersey_number?: number
+          player_id?: string
+          player_name?: string
+          tournament_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_jersey_numbers_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tournament_matches: {
         Row: {
           away_score: number

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Helmet } from "react-helmet";
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMatch } from '@/hooks/useMatch';
@@ -17,6 +17,7 @@ import { Users, UserCheck, Play, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/layout/Header';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTournamentJerseys } from '@/hooks/useTournamentJerseys';
 
 const MatchApp = () => {
   const { id } = useParams();
@@ -61,6 +62,30 @@ const MatchApp = () => {
     fixStarterError,
   } = useMatch();
 
+  // Tournament-scoped jersey persistence (only active when tournamentId is present)
+  const { jerseys: tournamentJerseys, loaded: jerseysLoaded, upsertJersey } =
+    useTournamentJerseys(tournamentId);
+  const jerseysAppliedRef = useRef(false);
+
+  // Apply persisted tournament jerseys to the home roster ONCE per match load.
+  // Only fills players that currently have no number; never overwrites a manual edit.
+  useEffect(() => {
+    if (!tournamentId || !jerseysLoaded) return;
+    if (jerseysAppliedRef.current) return;
+    if (state.homeTeam.players.length === 0) return;
+
+    let didApply = false;
+    for (const p of state.homeTeam.players) {
+      if (p.number == null && tournamentJerseys.has(p.id)) {
+        updatePlayerNumber(p.id, tournamentJerseys.get(p.id)!);
+        didApply = true;
+      }
+    }
+    jerseysAppliedRef.current = true;
+    // didApply purely informational; effect runs once via ref guard
+    void didApply;
+  }, [tournamentId, jerseysLoaded, tournamentJerseys, state.homeTeam.players, updatePlayerNumber]);
+
   // Tab navigation: 'roster' | 'starters' | 'live'
   const [activeTab, setActiveTab] = useState<string>(() => {
     if (state.isMatchStarted && !state.needsStarterSelection) return 'live';
@@ -76,6 +101,28 @@ const MatchApp = () => {
     }, 250);
     return () => clearInterval(interval);
   }, [state.isRunning, state.isPaused, updateElapsedTime]);
+
+  // Wrapped number update — persists to tournament_jersey_numbers when in tournament context
+  const handleUpdatePlayerNumber = (playerId: string, number: number | null) => {
+    updatePlayerNumber(playerId, number);
+    if (tournamentId) {
+      const player = state.homeTeam.players.find(p => p.id === playerId);
+      if (player) {
+        upsertJersey({ id: playerId, name: player.name, number });
+      }
+    }
+  };
+
+  // Wrapped name update — keeps player_name in sync with the persisted jersey
+  const handleUpdateHomePlayerName = (playerId: string, name: string) => {
+    updateHomePlayerName(playerId, name);
+    if (tournamentId) {
+      const player = state.homeTeam.players.find(p => p.id === playerId);
+      if (player && player.number != null) {
+        upsertJersey({ id: playerId, name, number: player.number });
+      }
+    }
+  };
 
   // Handle starter confirmation
   const handleConfirmStarters = (homeStarters: string[], awayStarters: string[]) => {
@@ -161,8 +208,8 @@ const MatchApp = () => {
               onHomeTeamNameChange={setHomeTeamName}
               onAwayTeamNameChange={setAwayTeamName}
               onAddPlayer={(name) => addPlayer(name)}
-              onUpdatePlayerNumber={updatePlayerNumber}
-              onUpdateHomePlayerName={updateHomePlayerName}
+              onUpdatePlayerNumber={handleUpdatePlayerNumber}
+              onUpdateHomePlayerName={handleUpdateHomePlayerName}
               onRemovePlayer={removePlayer}
               onAddOpponentPlayer={addOpponentPlayer}
               onRemoveOpponentPlayer={removeOpponentPlayer}

@@ -24,6 +24,7 @@ import {
 import ExcelJS from "exceljs";
 import { ShareLiveButton } from "@/components/live/ShareLiveButton";
 import { aggregateTournamentStats } from "@/lib/tournamentStats";
+import { useTournamentJerseys } from "@/hooks/useTournamentJerseys";
 
 interface TournamentData {
   id: string;
@@ -129,7 +130,8 @@ export default function TournamentDetail() {
     (a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime()
   );
 
-  const computeGlobalStats = () => aggregateTournamentStats(orderedMatches);
+  const { jerseys: tournamentJerseys } = useTournamentJerseys(tournamentId ?? null);
+  const computeGlobalStats = () => aggregateTournamentStats(orderedMatches, tournamentJerseys);
 
   const exportExcel = async () => {
     const stats = computeGlobalStats();
