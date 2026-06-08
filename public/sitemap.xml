@@ -37,6 +37,12 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://matchmanager-live.lovable.app/live/match/f39df8e1-a550-4d2e-b0df-4d7a2e9d8454</loc>
+    <lastmod>2026-04-13</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://matchmanager-live.lovable.app/live/match/de3986a7-26be-4fa1-96fd-ca47546fe3eb</loc>
     <lastmod>2026-04-06</lastmod>
     <changefreq>hourly</changefreq>
@@ -55,12 +61,6 @@
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://matchmanager-live.lovable.app/live/match/f39df8e1-a550-4d2e-b0df-4d7a2e9d8454</loc>
-    <lastmod>2026-04-13</lastmod>
-    <changefreq>hourly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
     <loc>https://matchmanager-live.lovable.app/live/match/86131e05-c666-4e76-8c8d-c244f58cd474</loc>
     <lastmod>2026-05-09</lastmod>
     <changefreq>hourly</changefreq>
@@ -75,12 +75,6 @@
   <url>
     <loc>https://matchmanager-live.lovable.app/live/match/7851036c-e0e6-41ef-9fda-970c12554264</loc>
     <lastmod>2026-05-03</lastmod>
-    <changefreq>hourly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://matchmanager-live.lovable.app/live/match/6556894c-f521-4fbf-bdef-f4f72ad72187</loc>
-    <lastmod>2026-05-09</lastmod>
     <changefreq>hourly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -145,12 +139,6 @@
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://matchmanager-live.lovable.app/live/match/af695f75-14bd-47cc-9620-89dc3ad725d1</loc>
-    <lastmod>2026-05-03</lastmod>
-    <changefreq>hourly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
     <loc>https://matchmanager-live.lovable.app/live/match/01275676-bf69-48e5-992d-a3a14cdc632e</loc>
     <lastmod>2026-05-17</lastmod>
     <changefreq>hourly</changefreq>
@@ -199,8 +187,14 @@
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://matchmanager-live.lovable.app/live/tournament/4ef12919-4751-4480-a926-dfd9f8cab563</loc>
-    <lastmod>2026-06-02</lastmod>
+    <loc>https://matchmanager-live.lovable.app/live/match/6556894c-f521-4fbf-bdef-f4f72ad72187</loc>
+    <lastmod>2026-05-09</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://matchmanager-live.lovable.app/live/match/af695f75-14bd-47cc-9620-89dc3ad725d1</loc>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>hourly</changefreq>
     <priority>0.7</priority>
   </url>
