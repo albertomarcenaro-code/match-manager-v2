@@ -1,6 +1,9 @@
 // Shared tournament statistics aggregation.
 // Aggregates stats for the user's "home" team across all matches in a tournament.
-// Uniqueness is keyed by player.id when available, falling back to a normalized name.
+// Grouping is keyed primarily by player.id (unique uuid). When a tournament-level
+// jersey map is provided, the jersey number AND inclusion in the rankings come
+// EXCLUSIVELY from that map — players without an assigned tournament jersey are
+// excluded from every leaderboard.
 
 export interface AggregatedPlayerStats {
   key: string;
@@ -34,7 +37,10 @@ const normalizeName = (n?: string) => (n || 'Sconosciuto').trim().toLowerCase();
 const playerKey = (id?: string, name?: string) =>
   id ? `id:${id}` : `name:${normalizeName(name)}`;
 
-export function aggregateTournamentStats(matches: MatchLike[]): AggregatedTournamentStats {
+export function aggregateTournamentStats(
+  matches: MatchLike[],
+  jerseys?: Map<string, number> | null,
+): AggregatedTournamentStats {
   let wins = 0, draws = 0, losses = 0;
   const map = new Map<string, AggregatedPlayerStats>();
 
@@ -57,7 +63,6 @@ export function aggregateTournamentStats(matches: MatchLike[]): AggregatedTourna
       };
       map.set(key, p);
     } else {
-      // Backfill missing fields from later occurrences
       if (!p.id && id) p.id = id;
       if (p.number == null && number != null) p.number = number;
     }
@@ -73,7 +78,6 @@ export function aggregateTournamentStats(matches: MatchLike[]): AggregatedTourna
     const homePlayers: any[] = md.homeTeam?.players || md.homePlayers || [];
     const events: any[] = md.events || [];
 
-    // Minutes & roster presence (Mia Squadra only)
     for (const p of homePlayers) {
       const player = ensure(p.id, p.name, typeof p.number === 'number' ? p.number : null);
       const sec = Number(p.totalSecondsPlayed) || 0;
@@ -88,7 +92,6 @@ export function aggregateTournamentStats(matches: MatchLike[]): AggregatedTourna
       }
     }
 
-    // Events (only home team — "Mia Squadra")
     for (const ev of events) {
       if (ev.team !== 'home') continue;
       if (ev.type === 'goal') {
@@ -101,10 +104,48 @@ export function aggregateTournamentStats(matches: MatchLike[]): AggregatedTourna
     }
   }
 
-  // Regola di business: i giocatori senza numero di maglia assegnato non hanno
-  // partecipato al torneo → esclusi da TUTTE le classifiche (marcatori, minuti, cartellini).
-  const players = [...map.values()]
-    .filter(p => typeof p.number === 'number' && p.number !== null)
-    .sort((a, b) => b.minutes - a.minutes || b.goals - a.goals);
+  // ---- Second-pass merge: collapse rows that are clearly the same human player
+  // (same normalized name + same jersey number) but ended up under different ids
+  // because the player was recreated in a later match.
+  const merged = new Map<string, AggregatedPlayerStats>();
+  for (const p of map.values()) {
+    // Prefer tournament-level jersey when available — this drives both the
+    // displayed number AND inclusion (no entry => skip later).
+    const tournamentNumber = p.id && jerseys ? (jerseys.get(p.id) ?? null) : null;
+    const effectiveNumber = tournamentNumber ?? p.number;
+    const mergeKey = effectiveNumber != null
+      ? `n:${normalizeName(p.name)}|#${effectiveNumber}`
+      : `k:${p.key}`;
+
+    const existing = merged.get(mergeKey);
+    if (!existing) {
+      merged.set(mergeKey, { ...p, number: effectiveNumber });
+    } else {
+      existing.goals += p.goals;
+      existing.yellowCards += p.yellowCards;
+      existing.redCards += p.redCards;
+      existing.seconds += p.seconds;
+      existing.minutes = Math.round(existing.seconds / 60);
+      existing.matchesPlayed += p.matchesPlayed;
+      for (const [mid, mins] of Object.entries(p.perMatchMinutes)) {
+        if (mins != null) existing.perMatchMinutes[mid] = (existing.perMatchMinutes[mid] || 0) + mins;
+        else if (existing.perMatchMinutes[mid] === undefined) existing.perMatchMinutes[mid] = null;
+      }
+      if (!existing.id && p.id) existing.id = p.id;
+    }
+  }
+
+  // ---- Final filter: a player is part of the tournament rankings ONLY if they
+  // have a jersey number assigned for this tournament.
+  // - If we have a `jerseys` map: include only players present in it.
+  // - Otherwise (legacy): include players whose snapshot number is non-null.
+  let players = Array.from(merged.values());
+  if (jerseys) {
+    players = players.filter(p => p.id ? jerseys.has(p.id) : false);
+  } else {
+    players = players.filter(p => typeof p.number === 'number' && p.number !== null);
+  }
+
+  players.sort((a, b) => b.minutes - a.minutes || b.goals - a.goals);
   return { wins, draws, losses, players };
 }
