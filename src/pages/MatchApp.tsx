@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Helmet } from "react-helmet";
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMatch } from '@/hooks/useMatch';
@@ -17,6 +17,7 @@ import { Users, UserCheck, Play, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/layout/Header';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTournamentJerseys } from '@/hooks/useTournamentJerseys';
 
 const MatchApp = () => {
   const { id } = useParams();
