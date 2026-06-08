@@ -208,8 +208,8 @@ const MatchApp = () => {
               onHomeTeamNameChange={setHomeTeamName}
               onAwayTeamNameChange={setAwayTeamName}
               onAddPlayer={(name) => addPlayer(name)}
-              onUpdatePlayerNumber={updatePlayerNumber}
-              onUpdateHomePlayerName={updateHomePlayerName}
+              onUpdatePlayerNumber={handleUpdatePlayerNumber}
+              onUpdateHomePlayerName={handleUpdateHomePlayerName}
               onRemovePlayer={removePlayer}
               onAddOpponentPlayer={addOpponentPlayer}
               onRemoveOpponentPlayer={removeOpponentPlayer}
