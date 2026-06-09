@@ -1,0 +1,13 @@
+# Match Manager Live
+
+> Gestione professionale di partite di calcio e tornei in tempo reale con cronometro, statistiche e condivisione report.
+
+Match Manager Live è un'applicazione web pensata per allenatori, dirigenti e mister che vogliono gestire le partite dal bordo campo in modo digitale. Permette di creare rose, avviare un cronometro live, registrare gol, assist, cartellini e sostituzioni, e generare report pronti per essere condivisi su WhatsApp o esportati in PDF. L'app è cookie-free, funziona come PWA e offre sia partite singole che tornei completi con classifiche e statistiche aggregate.
+
+## Pages
+
+- [/](/): Pagina principale con presentazione del prodotto, funzionalità chiave e link all'installazione PWA.
+- [About](/about): Chi Siamo, la visione del progetto, supporto e contatti.
+- [Overview](/overview): Guida visuale in tre passaggi su come preparare la partita, gestirla dal vivo e condividere il report finale.
+- [Terms](/terms): Termini e condizioni d'uso del servizio.
+- [Privacy](/privacy): Informativa sulla privacy e zero-cookie policy.
