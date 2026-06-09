@@ -325,6 +325,29 @@ export const useMatch = () => {
     }));
   }, []);
 
+  // Load tournament players into the home roster, preserving their original IDs
+  // so the tournament-jersey persistence layer keys correctly across matches.
+  const loadTournamentPlayers = useCallback((players: Array<{ id: string; name: string; number: number | null }>) => {
+    if (!Array.isArray(players) || players.length === 0) return;
+    setState(prev => {
+      if (prev.homeTeam.players.length > 0) return prev; // never overwrite
+      const fresh: Player[] = players.map(p => ({
+        id: p.id,
+        name: (p.name || '').toUpperCase(),
+        number: p.number ?? null,
+        isOnField: false,
+        isStarter: false,
+        isExpelled: false,
+        goals: 0,
+        cards: { yellow: 0, red: 0 },
+        currentEntryTime: null,
+        totalSecondsPlayed: 0,
+        secondsPlayedPerPeriod: {},
+      }));
+      return { ...prev, homeTeam: { ...prev.homeTeam, players: fresh } };
+    });
+  }, []);
+
   // NEW: Add away player with full name and number
   const addOpponentPlayer = useCallback((number: number) => {
     const newPlayer: Player = {
@@ -1138,6 +1161,7 @@ export const useMatch = () => {
     forceStarterSelection,
     updatePlayerNumber,
     updateHomePlayerName,
+    loadTournamentPlayers,
     removePlayer,
     addOpponentPlayer,
     removeOpponentPlayer,

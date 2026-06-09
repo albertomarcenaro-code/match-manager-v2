@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Helmet } from "react-helmet";
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useMatch } from '@/hooks/useMatch';
 import { MatchHeader } from '@/components/match/MatchHeader';
 import { TeamPanel } from '@/components/match/TeamPanel';
@@ -23,8 +23,10 @@ const MatchApp = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const { user, isGuest } = useAuth();
   const tournamentId = searchParams.get('tournamentId');
+  const preloadedHomePlayers = ((location.state as any)?.preloadedHomePlayers ?? []) as Array<{ id: string; name: string; number: number | null }>;
 
   const {
     state,
@@ -60,12 +62,25 @@ const MatchApp = () => {
     updateAwayPlayerNumber,
     bulkAddAwayPlayers,
     fixStarterError,
+    loadTournamentPlayers,
   } = useMatch();
 
   // Tournament-scoped jersey persistence (only active when tournamentId is present)
   const { jerseys: tournamentJerseys, loaded: jerseysLoaded, upsertJersey } =
     useTournamentJerseys(tournamentId);
   const jerseysAppliedRef = useRef(false);
+  const preloadAppliedRef = useRef(false);
+
+  // Preload home roster from tournament players on a brand-new tournament match.
+  // Preserves original player IDs so tournament_jersey_numbers lookups match.
+  useEffect(() => {
+    if (preloadAppliedRef.current) return;
+    if (!tournamentId) return;
+    if (preloadedHomePlayers.length === 0) return;
+    if (state.homeTeam.players.length > 0) return;
+    loadTournamentPlayers(preloadedHomePlayers);
+    preloadAppliedRef.current = true;
+  }, [tournamentId, preloadedHomePlayers, state.homeTeam.players.length, loadTournamentPlayers]);
 
   // Apply persisted tournament jerseys to the home roster ONCE per match load.
   // Only fills players that currently have no number; never overwrites a manual edit.
