@@ -76,7 +76,8 @@ export default function Tournaments() {
       setNewTournamentName("");
       loadTournaments();
     } catch (error: any) {
-      toast.error(`Errore: ${error.message}`);
+      console.error('[tournaments] create', error);
+      toast.error('Errore nella creazione del torneo. Riprova.');
     } finally {
       setIsCreating(false);
     }
@@ -94,7 +95,8 @@ export default function Tournaments() {
       setTournaments((prev) => prev.filter((t) => t.id !== deleteTarget));
       toast.success("Torneo eliminato");
     } catch (error: any) {
-      toast.error(`Errore: ${error.message}`);
+      console.error('[tournaments] delete', error);
+      toast.error('Errore durante l\'eliminazione. Riprova.');
     } finally {
       setDeleteTarget(null);
     }
