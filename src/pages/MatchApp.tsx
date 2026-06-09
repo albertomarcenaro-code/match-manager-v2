@@ -69,6 +69,18 @@ const MatchApp = () => {
   const { jerseys: tournamentJerseys, loaded: jerseysLoaded, upsertJersey } =
     useTournamentJerseys(tournamentId);
   const jerseysAppliedRef = useRef(false);
+  const preloadAppliedRef = useRef(false);
+
+  // Preload home roster from tournament players on a brand-new tournament match.
+  // Preserves original player IDs so tournament_jersey_numbers lookups match.
+  useEffect(() => {
+    if (preloadAppliedRef.current) return;
+    if (!tournamentId) return;
+    if (preloadedHomePlayers.length === 0) return;
+    if (state.homeTeam.players.length > 0) return;
+    loadTournamentPlayers(preloadedHomePlayers);
+    preloadAppliedRef.current = true;
+  }, [tournamentId, preloadedHomePlayers, state.homeTeam.players.length, loadTournamentPlayers]);
 
   // Apply persisted tournament jerseys to the home roster ONCE per match load.
   // Only fills players that currently have no number; never overwrites a manual edit.
