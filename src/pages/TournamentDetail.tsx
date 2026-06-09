@@ -95,7 +95,9 @@ export default function TournamentDetail() {
     if (!tournamentId) return;
     // Must be a valid UUID — DB column matches.id is uuid
     const matchId = crypto.randomUUID();
-    navigate(`/match/${matchId}?tournamentId=${tournamentId}`);
+    navigate(`/match/${matchId}?tournamentId=${tournamentId}`, {
+      state: { preloadedHomePlayers: tournament?.players ?? [] },
+    });
   };
 
   const confirmDeleteMatch = async () => {
