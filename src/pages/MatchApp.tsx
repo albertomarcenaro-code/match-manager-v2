@@ -23,8 +23,10 @@ const MatchApp = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const { user, isGuest } = useAuth();
   const tournamentId = searchParams.get('tournamentId');
+  const preloadedHomePlayers = ((location.state as any)?.preloadedHomePlayers ?? []) as Array<{ id: string; name: string; number: number | null }>;
 
   const {
     state,
