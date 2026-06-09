@@ -110,7 +110,8 @@ export default function TournamentDetail() {
       setMatches((prev) => prev.filter((m) => m.id !== deleteTarget));
       toast.success("Partita eliminata dal torneo");
     } catch (error: any) {
-      toast.error(`Errore: ${error.message}`);
+      console.error('[tournament-detail] delete match', error);
+      toast.error('Errore durante l\'eliminazione. Riprova.');
     } finally {
       setDeleteTarget(null);
     }

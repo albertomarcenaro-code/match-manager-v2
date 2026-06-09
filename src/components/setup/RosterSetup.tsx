@@ -523,7 +523,7 @@ export function RosterSetup({
       toast.success('Rosa salvata!');
     } catch (error: any) {
       console.error('Error saving roster:', error);
-      toast.error(`Errore nel salvataggio: ${error?.message ?? ''}`);
+      toast.error('Errore nel salvataggio della rosa. Riprova.');
     } finally {
       setIsSaving(false);
     }

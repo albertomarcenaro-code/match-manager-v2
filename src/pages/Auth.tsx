@@ -96,7 +96,8 @@ export default function Auth() {
     try {
       const { error } = await signIn(email, password);
       if (error) {
-        toast.error(error.message === 'Invalid login credentials' ? 'Email o password errati' : error.message);
+        console.error('[auth] sign-in', error);
+        toast.error(error.message === 'Invalid login credentials' ? 'Email o password errati' : 'Accesso non riuscito. Riprova.');
       } else {
         toast.success('Accesso effettuato!');
         navigate('/dashboard');
@@ -144,7 +145,8 @@ export default function Auth() {
       });
 
       if (signUpError) {
-        toast.error(signUpError.message);
+        console.error('[auth] sign-up', signUpError);
+        toast.error('Registrazione non riuscita. Riprova.');
         setIsLoading(false);
         return;
       }
