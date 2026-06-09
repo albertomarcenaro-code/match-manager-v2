@@ -62,6 +62,7 @@ const MatchApp = () => {
     updateAwayPlayerNumber,
     bulkAddAwayPlayers,
     fixStarterError,
+    loadTournamentPlayers,
   } = useMatch();
 
   // Tournament-scoped jersey persistence (only active when tournamentId is present)
