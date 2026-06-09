@@ -1161,6 +1161,7 @@ export const useMatch = () => {
     forceStarterSelection,
     updatePlayerNumber,
     updateHomePlayerName,
+    loadTournamentPlayers,
     removePlayer,
     addOpponentPlayer,
     removeOpponentPlayer,
