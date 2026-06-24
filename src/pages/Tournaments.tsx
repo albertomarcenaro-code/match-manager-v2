@@ -62,7 +62,7 @@ export default function Tournaments() {
     if (!user) return;
     setIsCreating(true);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("tournaments")
         .insert([
           {
@@ -70,11 +70,17 @@ export default function Tournaments() {
             user_id: user.id,
             team_name: "La mia squadra",
           },
-        ]);
+        ])
+        .select("id")
+        .single();
       if (error) throw error;
-      toast.success("Torneo creato!");
+      toast.success("Torneo creato! Configura la rosa.");
       setNewTournamentName("");
-      loadTournaments();
+      if (data?.id) {
+        navigate(`/tournament/${data.id}/roster`);
+      } else {
+        loadTournaments();
+      }
     } catch (error: any) {
       console.error('[tournaments] create', error);
       toast.error('Errore nella creazione del torneo. Riprova.');

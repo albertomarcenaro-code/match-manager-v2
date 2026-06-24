@@ -199,6 +199,30 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://matchmanager-live.lovable.app/live/match/9201897a-5782-4df2-903a-d8d35891cd29</loc>
+    <lastmod>2026-06-13</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://matchmanager-live.lovable.app/live/match/94c54141-93f0-49f9-8522-03ecfa4f6823</loc>
+    <lastmod>2026-06-13</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://matchmanager-live.lovable.app/live/match/ee67bc41-a44e-41e6-9fe1-194b6d8381c8</loc>
+    <lastmod>2026-06-13</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://matchmanager-live.lovable.app/live/match/8910e016-10a6-410a-aec9-9faf66951a47</loc>
+    <lastmod>2026-06-13</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://matchmanager-live.lovable.app/live/tournament/c5ee7c52-8a9b-45b8-9d3e-4af2faa7c9d6</loc>
     <lastmod>2026-06-02</lastmod>
     <changefreq>hourly</changefreq>
@@ -219,6 +243,12 @@
   <url>
     <loc>https://matchmanager-live.lovable.app/live/tournament/a2be146c-568f-4f34-97ac-bad20f63f832</loc>
     <lastmod>2026-06-02</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://matchmanager-live.lovable.app/live/tournament/eda6ad81-86ae-4e62-a55c-749afef58907</loc>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>hourly</changefreq>
     <priority>0.7</priority>
   </url>

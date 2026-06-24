@@ -6,7 +6,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
-  Trophy, Plus, Trash2, ChevronLeft, Loader2, BarChart3, Eye, Download, ChevronsRight, ChevronsLeft,
+  Trophy, Plus, Trash2, ChevronLeft, Loader2, BarChart3, Eye, Download, ChevronsRight, ChevronsLeft, Users,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -56,6 +56,10 @@ export default function TournamentDetail() {
   const [showStats, setShowStats] = useState(false);
   const [showMatchDetail, setShowMatchDetail] = useState(false);
 
+  // Hook always called at top level (order stability)
+  const { jerseys: tournamentJerseys, roster: tournamentRoster } =
+    useTournamentJerseys(tournamentId ?? null);
+
   useEffect(() => {
     if (user && tournamentId) loadTournament();
     else setLoading(false);
@@ -93,10 +97,21 @@ export default function TournamentDetail() {
 
   const handleNewMatch = () => {
     if (!tournamentId) return;
+    if (tournamentRoster.length === 0) {
+      toast.error("Configura prima la rosa del torneo");
+      navigate(`/tournament/${tournamentId}/roster`);
+      return;
+    }
     // Must be a valid UUID — DB column matches.id is uuid
     const matchId = crypto.randomUUID();
     navigate(`/match/${matchId}?tournamentId=${tournamentId}`, {
-      state: { preloadedHomePlayers: tournament?.players ?? [] },
+      state: {
+        preloadedHomePlayers: tournamentRoster.map(r => ({
+          id: r.id,
+          name: r.name,
+          number: r.number,
+        })),
+      },
     });
   };
 
@@ -133,7 +148,6 @@ export default function TournamentDetail() {
     (a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime()
   );
 
-  const { jerseys: tournamentJerseys } = useTournamentJerseys(tournamentId ?? null);
   const computeGlobalStats = () => aggregateTournamentStats(orderedMatches, tournamentJerseys);
 
   const exportExcel = async () => {
@@ -222,13 +236,23 @@ export default function TournamentDetail() {
         </div>
 
         {/* Action buttons */}
-        <div className="flex flex-col sm:flex-row gap-2 mb-6">
+        <div className="flex flex-col sm:flex-row gap-2 mb-3">
           <Button onClick={handleNewMatch} className="flex-1 gap-2">
             <Plus className="h-4 w-4" /> Nuova Partita nel Torneo
           </Button>
           {tournamentId && (
             <ShareLiveButton type="tournament" id={tournamentId} variant="outline" size="default" />
           )}
+        </div>
+        <div className="mb-6">
+          <Button
+            variant="outline"
+            className="w-full gap-2"
+            onClick={() => navigate(`/tournament/${tournamentId}/roster`)}
+          >
+            <Users className="h-4 w-4" />
+            Gestisci Rosa del Torneo ({tournamentRoster.length})
+          </Button>
         </div>
 
         {/* Match list */}
