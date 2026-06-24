@@ -334,9 +334,15 @@ export default function TournamentRoster() {
           )}
         </div>
 
-        <Button variant="outline" className="w-full gap-2 mb-6" onClick={addPlayer}>
-          <Plus className="h-4 w-4" /> Aggiungi giocatore
-        </Button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6">
+          <Button variant="outline" className="w-full gap-2" onClick={addPlayer}>
+            <Plus className="h-4 w-4" /> Aggiungi giocatore
+          </Button>
+          <Button variant="outline" className="w-full gap-2" onClick={openSavedTeams}>
+            <Download className="h-4 w-4" /> Importa da Mia Squadra
+          </Button>
+        </div>
+
 
         <div className="sticky bottom-4 flex flex-col gap-2">
           <Button
