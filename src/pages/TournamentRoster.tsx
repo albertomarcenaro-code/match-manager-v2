@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  Users, Plus, Trash2, ChevronLeft, Loader2, Save, Trophy,
+  Users, Plus, Trash2, ChevronLeft, Loader2, Save, Trophy, Download,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,7 +16,17 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
 import { useTournamentJerseys, RosterEntry } from "@/hooks/useTournamentJerseys";
+
+interface SavedTeam {
+  id: string;
+  name: string;
+  category: string;
+  players: { name: string; number: number | null }[];
+}
 
 interface DraftPlayer {
   id: string;
