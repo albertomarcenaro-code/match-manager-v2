@@ -373,6 +373,63 @@ export default function TournamentRoster() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={savedTeamsOpen} onOpenChange={setSavedTeamsOpen}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Le mie squadre salvate</DialogTitle>
+            <DialogDescription>
+              Scegli una squadra da importare nella rosa del torneo. Verranno copiati nomi e numeri di maglia.
+            </DialogDescription>
+          </DialogHeader>
+          {loadingSavedTeams ? (
+            <div className="py-8 flex justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : savedTeams.length === 0 ? (
+            <div className="py-6 text-center space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Non hai ancora squadre salvate.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => { setSavedTeamsOpen(false); navigate("/my-teams"); }}>
+                Vai a Mia Squadra
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {savedTeams.map(team => (
+                <button
+                  key={team.id}
+                  type="button"
+                  onClick={() => handlePickSavedTeam(team)}
+                  className="w-full text-left p-3 rounded-lg border border-input bg-card hover:bg-accent transition-colors"
+                >
+                  <div className="font-semibold">{team.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {team.category && <span>{team.category} · </span>}
+                    {team.players.length} giocatori
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!importTarget} onOpenChange={(open) => !open && setImportTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sostituire la rosa attuale?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La bozza corrente verrà sostituita con i giocatori di "{importTarget?.name}". I dati già salvati nel torneo restano fino al prossimo salvataggio.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmReplace}>Sostituisci</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
