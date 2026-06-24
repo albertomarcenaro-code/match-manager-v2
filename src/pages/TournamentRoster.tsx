@@ -48,6 +48,73 @@ export default function TournamentRoster() {
   const [deleteTarget, setDeleteTarget] = useState<DraftPlayer | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Saved teams import
+  const [savedTeamsOpen, setSavedTeamsOpen] = useState(false);
+  const [loadingSavedTeams, setLoadingSavedTeams] = useState(false);
+  const [savedTeams, setSavedTeams] = useState<SavedTeam[]>([]);
+  const [importTarget, setImportTarget] = useState<SavedTeam | null>(null);
+
+  const openSavedTeams = async () => {
+    if (!user) {
+      toast.error("Devi essere loggato per usare le squadre salvate");
+      return;
+    }
+    setSavedTeamsOpen(true);
+    setLoadingSavedTeams(true);
+    try {
+      const { data, error } = await supabase
+        .from("saved_teams")
+        .select("id, name, category, players")
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      setSavedTeams((data || []).map(t => ({
+        id: t.id,
+        name: t.name,
+        category: t.category || "",
+        players: (t.players as unknown as { name: string; number: number | null }[]) || [],
+      })));
+    } catch (e) {
+      console.error(e);
+      toast.error("Errore nel caricamento delle squadre");
+    } finally {
+      setLoadingSavedTeams(false);
+    }
+  };
+
+  const handlePickSavedTeam = (team: SavedTeam) => {
+    setSavedTeamsOpen(false);
+    if (players.some(p => p.name.trim() || p.number != null)) {
+      setImportTarget(team);
+    } else {
+      applyImport(team);
+    }
+  };
+
+  const applyImport = (team: SavedTeam) => {
+    const usedNumbers = new Set<number>();
+    const imported: DraftPlayer[] = team.players.map(tp => {
+      let n = tp.number;
+      if (n != null) {
+        if (usedNumbers.has(n)) n = null;
+        else usedNumbers.add(n);
+      }
+      return {
+        id: crypto.randomUUID(),
+        name: (tp.name || "").toUpperCase(),
+        number: n,
+        existed: false,
+      };
+    });
+    setPlayers(imported);
+    toast.success(`Squadra "${team.name}" caricata. Assegna/verifica i numeri di maglia.`);
+  };
+
+  const confirmReplace = () => {
+    if (importTarget) applyImport(importTarget);
+    setImportTarget(null);
+  };
+
+
   // Load tournament metadata
   useEffect(() => {
     if (!user || !tournamentId) { setLoadingMeta(false); return; }
