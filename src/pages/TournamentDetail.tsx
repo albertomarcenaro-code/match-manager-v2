@@ -236,13 +236,23 @@ export default function TournamentDetail() {
         </div>
 
         {/* Action buttons */}
-        <div className="flex flex-col sm:flex-row gap-2 mb-6">
+        <div className="flex flex-col sm:flex-row gap-2 mb-3">
           <Button onClick={handleNewMatch} className="flex-1 gap-2">
             <Plus className="h-4 w-4" /> Nuova Partita nel Torneo
           </Button>
           {tournamentId && (
             <ShareLiveButton type="tournament" id={tournamentId} variant="outline" size="default" />
           )}
+        </div>
+        <div className="mb-6">
+          <Button
+            variant="outline"
+            className="w-full gap-2"
+            onClick={() => navigate(`/tournament/${tournamentId}/roster`)}
+          >
+            <Users className="h-4 w-4" />
+            Gestisci Rosa del Torneo ({tournamentRoster.length})
+          </Button>
         </div>
 
         {/* Match list */}
