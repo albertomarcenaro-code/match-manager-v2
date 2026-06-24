@@ -16,6 +16,7 @@ const MatchApp = lazy(() => import("./pages/MatchApp"));
 const TournamentArchive = lazy(() => import("./pages/TournamentArchive"));
 const Tournaments = lazy(() => import("./pages/Tournaments"));
 const TournamentDetail = lazy(() => import("./pages/TournamentDetail"));
+const TournamentRoster = lazy(() => import("./pages/TournamentRoster"));
 const MatchSummary = lazy(() => import("./pages/MatchSummary"));
 const MyTeams = lazy(() => import("./pages/MyTeams"));
 const Profile = lazy(() => import("./pages/Profile"));
