@@ -148,7 +148,6 @@ export default function TournamentDetail() {
     (a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime()
   );
 
-  const { jerseys: tournamentJerseys } = useTournamentJerseys(tournamentId ?? null);
   const computeGlobalStats = () => aggregateTournamentStats(orderedMatches, tournamentJerseys);
 
   const exportExcel = async () => {
