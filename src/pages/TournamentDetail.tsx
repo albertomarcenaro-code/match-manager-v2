@@ -97,10 +97,21 @@ export default function TournamentDetail() {
 
   const handleNewMatch = () => {
     if (!tournamentId) return;
+    if (tournamentRoster.length === 0) {
+      toast.error("Configura prima la rosa del torneo");
+      navigate(`/tournament/${tournamentId}/roster`);
+      return;
+    }
     // Must be a valid UUID — DB column matches.id is uuid
     const matchId = crypto.randomUUID();
     navigate(`/match/${matchId}?tournamentId=${tournamentId}`, {
-      state: { preloadedHomePlayers: tournament?.players ?? [] },
+      state: {
+        preloadedHomePlayers: tournamentRoster.map(r => ({
+          id: r.id,
+          name: r.name,
+          number: r.number,
+        })),
+      },
     });
   };
 
