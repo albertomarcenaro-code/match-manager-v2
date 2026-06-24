@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  Users, Plus, Trash2, ChevronLeft, Loader2, Save, Trophy,
+  Users, Plus, Trash2, ChevronLeft, Loader2, Save, Trophy, Download,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,7 +16,17 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
 import { useTournamentJerseys, RosterEntry } from "@/hooks/useTournamentJerseys";
+
+interface SavedTeam {
+  id: string;
+  name: string;
+  category: string;
+  players: { name: string; number: number | null }[];
+}
 
 interface DraftPlayer {
   id: string;
@@ -37,6 +47,73 @@ export default function TournamentRoster() {
   const [players, setPlayers] = useState<DraftPlayer[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<DraftPlayer | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Saved teams import
+  const [savedTeamsOpen, setSavedTeamsOpen] = useState(false);
+  const [loadingSavedTeams, setLoadingSavedTeams] = useState(false);
+  const [savedTeams, setSavedTeams] = useState<SavedTeam[]>([]);
+  const [importTarget, setImportTarget] = useState<SavedTeam | null>(null);
+
+  const openSavedTeams = async () => {
+    if (!user) {
+      toast.error("Devi essere loggato per usare le squadre salvate");
+      return;
+    }
+    setSavedTeamsOpen(true);
+    setLoadingSavedTeams(true);
+    try {
+      const { data, error } = await supabase
+        .from("saved_teams")
+        .select("id, name, category, players")
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      setSavedTeams((data || []).map(t => ({
+        id: t.id,
+        name: t.name,
+        category: t.category || "",
+        players: (t.players as unknown as { name: string; number: number | null }[]) || [],
+      })));
+    } catch (e) {
+      console.error(e);
+      toast.error("Errore nel caricamento delle squadre");
+    } finally {
+      setLoadingSavedTeams(false);
+    }
+  };
+
+  const handlePickSavedTeam = (team: SavedTeam) => {
+    setSavedTeamsOpen(false);
+    if (players.some(p => p.name.trim() || p.number != null)) {
+      setImportTarget(team);
+    } else {
+      applyImport(team);
+    }
+  };
+
+  const applyImport = (team: SavedTeam) => {
+    const usedNumbers = new Set<number>();
+    const imported: DraftPlayer[] = team.players.map(tp => {
+      let n = tp.number;
+      if (n != null) {
+        if (usedNumbers.has(n)) n = null;
+        else usedNumbers.add(n);
+      }
+      return {
+        id: crypto.randomUUID(),
+        name: (tp.name || "").toUpperCase(),
+        number: n,
+        existed: false,
+      };
+    });
+    setPlayers(imported);
+    toast.success(`Squadra "${team.name}" caricata. Assegna/verifica i numeri di maglia.`);
+  };
+
+  const confirmReplace = () => {
+    if (importTarget) applyImport(importTarget);
+    setImportTarget(null);
+  };
+
 
   // Load tournament metadata
   useEffect(() => {
@@ -257,9 +334,15 @@ export default function TournamentRoster() {
           )}
         </div>
 
-        <Button variant="outline" className="w-full gap-2 mb-6" onClick={addPlayer}>
-          <Plus className="h-4 w-4" /> Aggiungi giocatore
-        </Button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6">
+          <Button variant="outline" className="w-full gap-2" onClick={addPlayer}>
+            <Plus className="h-4 w-4" /> Aggiungi giocatore
+          </Button>
+          <Button variant="outline" className="w-full gap-2" onClick={openSavedTeams}>
+            <Download className="h-4 w-4" /> Importa da Mia Squadra
+          </Button>
+        </div>
+
 
         <div className="sticky bottom-4 flex flex-col gap-2">
           <Button
@@ -287,6 +370,63 @@ export default function TournamentRoster() {
           <AlertDialogFooter>
             <AlertDialogCancel>Annulla</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete}>Rimuovi</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={savedTeamsOpen} onOpenChange={setSavedTeamsOpen}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Le mie squadre salvate</DialogTitle>
+            <DialogDescription>
+              Scegli una squadra da importare nella rosa del torneo. Verranno copiati nomi e numeri di maglia.
+            </DialogDescription>
+          </DialogHeader>
+          {loadingSavedTeams ? (
+            <div className="py-8 flex justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : savedTeams.length === 0 ? (
+            <div className="py-6 text-center space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Non hai ancora squadre salvate.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => { setSavedTeamsOpen(false); navigate("/my-teams"); }}>
+                Vai a Mia Squadra
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {savedTeams.map(team => (
+                <button
+                  key={team.id}
+                  type="button"
+                  onClick={() => handlePickSavedTeam(team)}
+                  className="w-full text-left p-3 rounded-lg border border-input bg-card hover:bg-accent transition-colors"
+                >
+                  <div className="font-semibold">{team.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {team.category && <span>{team.category} · </span>}
+                    {team.players.length} giocatori
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!importTarget} onOpenChange={(open) => !open && setImportTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sostituire la rosa attuale?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La bozza corrente verrà sostituita con i giocatori di "{importTarget?.name}". I dati già salvati nel torneo restano fino al prossimo salvataggio.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmReplace}>Sostituisci</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
