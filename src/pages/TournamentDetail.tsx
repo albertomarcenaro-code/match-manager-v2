@@ -56,6 +56,10 @@ export default function TournamentDetail() {
   const [showStats, setShowStats] = useState(false);
   const [showMatchDetail, setShowMatchDetail] = useState(false);
 
+  // Hook always called at top level (order stability)
+  const { jerseys: tournamentJerseys, roster: tournamentRoster } =
+    useTournamentJerseys(tournamentId ?? null);
+
   useEffect(() => {
     if (user && tournamentId) loadTournament();
     else setLoading(false);
