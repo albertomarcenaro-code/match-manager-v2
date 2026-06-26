@@ -283,6 +283,18 @@ export default function MatchSummary() {
           )}
         </Card>
 
+        {/* Export & Share Actions */}
+        {data.fullState && (
+          <Card className="p-4">
+            <div className="flex items-center justify-center gap-6">
+              <ExportButton state={data.fullState} />
+              <PDFExportButton state={data.fullState} />
+              <WhatsAppShareButton state={data.fullState} />
+            </div>
+          </Card>
+        )}
+
+
         {/* Scorers */}
         {(homeScorers.length > 0 || awayScorers.length > 0) && (
           <Card className="p-4">
