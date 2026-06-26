@@ -11,6 +11,10 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { ExportButton } from "@/components/match/ExportButton";
+import { PDFExportButton } from "@/components/match/PDFExportButton";
+import { WhatsAppShareButton } from "@/components/match/WhatsAppShareButton";
+import { MatchState } from "@/types/match";
 
 interface PlayerSummary {
   name: string;
