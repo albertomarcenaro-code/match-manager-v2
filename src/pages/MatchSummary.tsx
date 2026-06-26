@@ -11,6 +11,10 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { ExportButton } from "@/components/match/ExportButton";
+import { PDFExportButton } from "@/components/match/PDFExportButton";
+import { WhatsAppShareButton } from "@/components/match/WhatsAppShareButton";
+import { MatchState } from "@/types/match";
 
 interface PlayerSummary {
   name: string;
@@ -33,6 +37,7 @@ interface MatchSummaryData {
   homePlayers: any[];
   awayPlayers: any[];
   matchDate: string;
+  fullState: MatchState | null;
 }
 
 export default function MatchSummary() {
@@ -75,6 +80,7 @@ export default function MatchSummary() {
         homePlayers: md.homeTeam?.players || md.homePlayers || [],
         awayPlayers: md.awayTeam?.players || md.awayPlayers || [],
         matchDate: m.match_date,
+        fullState: (md && md.homeTeam && md.awayTeam) ? (md as MatchState) : null,
       });
     } catch (err: any) {
       console.error("Load match error:", err);
@@ -100,6 +106,7 @@ export default function MatchSummary() {
         homePlayers: s.homeTeam?.players || [],
         awayPlayers: s.awayTeam?.players || [],
         matchDate: "",
+        fullState: s as MatchState,
       });
     } catch {
       setData(null);
@@ -275,6 +282,18 @@ export default function MatchSummary() {
             </div>
           )}
         </Card>
+
+        {/* Export & Share Actions */}
+        {data.fullState && (
+          <Card className="p-4">
+            <div className="flex items-center justify-center gap-6">
+              <ExportButton state={data.fullState} />
+              <PDFExportButton state={data.fullState} />
+              <WhatsAppShareButton state={data.fullState} />
+            </div>
+          </Card>
+        )}
+
 
         {/* Scorers */}
         {(homeScorers.length > 0 || awayScorers.length > 0) && (
