@@ -37,6 +37,7 @@ interface MatchSummaryData {
   homePlayers: any[];
   awayPlayers: any[];
   matchDate: string;
+  fullState: MatchState | null;
 }
 
 export default function MatchSummary() {
