@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.2.4",
   "type": "module",
-"scripts": {
+  "scripts": {
     "predev": "bunx tsx scripts/generate-sitemap.ts",
     "dev": "vite",
     "prebuild": "bunx tsx scripts/generate-sitemap.ts",
@@ -53,7 +53,7 @@
     "exceljs": "^4.4.0",
     "framer-motion": "^11.0.0",
     "input-otp": "^1.4.2",
-    "jspdf": "^4.0.0",
+    "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
