@@ -184,6 +184,42 @@ export type Database = {
         }
         Relationships: []
       }
+      team_members: {
+        Row: {
+          birth_date: string | null
+          created_at: string
+          figc_number: string | null
+          fiscal_code: string | null
+          full_name: string
+          id: string
+          role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          birth_date?: string | null
+          created_at?: string
+          figc_number?: string | null
+          fiscal_code?: string | null
+          full_name: string
+          id?: string
+          role?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          birth_date?: string | null
+          created_at?: string
+          figc_number?: string | null
+          fiscal_code?: string | null
+          full_name?: string
+          id?: string
+          role?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       tournament_jersey_numbers: {
         Row: {
           created_at: string
