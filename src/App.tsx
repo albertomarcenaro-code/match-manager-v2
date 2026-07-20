@@ -81,6 +81,7 @@ const App = () => {
               <Route path="/tournament/:id/roster" element={<RegisteredRoute><TournamentRoster /></RegisteredRoute>} />
               <Route path="/tournament-archive" element={<RegisteredRoute><TournamentArchive /></RegisteredRoute>} />
               <Route path="/my-teams" element={<RegisteredRoute><MyTeams /></RegisteredRoute>} />
+              <Route path="/team-members" element={<RegisteredRoute><TeamMembers /></RegisteredRoute>} />
               <Route path="/profile" element={<RegisteredRoute><Profile /></RegisteredRoute>} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
