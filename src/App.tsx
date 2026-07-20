@@ -19,6 +19,7 @@ const TournamentDetail = lazy(() => import("./pages/TournamentDetail"));
 const TournamentRoster = lazy(() => import("./pages/TournamentRoster"));
 const MatchSummary = lazy(() => import("./pages/MatchSummary"));
 const MyTeams = lazy(() => import("./pages/MyTeams"));
+const TeamMembers = lazy(() => import("./pages/TeamMembers"));
 const Profile = lazy(() => import("./pages/Profile"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Terms = lazy(() => import("./pages/Terms"));
@@ -80,6 +81,7 @@ const App = () => {
               <Route path="/tournament/:id/roster" element={<RegisteredRoute><TournamentRoster /></RegisteredRoute>} />
               <Route path="/tournament-archive" element={<RegisteredRoute><TournamentArchive /></RegisteredRoute>} />
               <Route path="/my-teams" element={<RegisteredRoute><MyTeams /></RegisteredRoute>} />
+              <Route path="/team-members" element={<RegisteredRoute><TeamMembers /></RegisteredRoute>} />
               <Route path="/profile" element={<RegisteredRoute><Profile /></RegisteredRoute>} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
