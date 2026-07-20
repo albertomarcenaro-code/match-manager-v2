@@ -6,8 +6,9 @@ import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
-  Trophy, Plus, Trash2, ChevronLeft, Loader2, BarChart3, Eye, Download, ChevronsRight, ChevronsLeft, Users,
+  Trophy, Plus, Trash2, ChevronLeft, Loader2, BarChart3, Eye, Download, ChevronsRight, ChevronsLeft, Users, FileText,
 } from "lucide-react";
+import { GenerateLineupSheet } from "@/components/match/GenerateLineupSheet";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -55,6 +56,7 @@ export default function TournamentDetail() {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [showStats, setShowStats] = useState(false);
   const [showMatchDetail, setShowMatchDetail] = useState(false);
+  const [lineupMatch, setLineupMatch] = useState<TournamentMatchRow | null>(null);
 
   // Hook always called at top level (order stability)
   const { jerseys: tournamentJerseys, roster: tournamentRoster } =
@@ -283,6 +285,10 @@ export default function TournamentDetail() {
                   <div className="flex items-center justify-between pt-1">
                     <span className="text-xs text-muted-foreground">{formatDate(m.match_date)}</span>
                     <div className="flex items-center gap-1 shrink-0">
+                      <Button size="sm" variant="outline" className="h-8 gap-1 px-2 text-xs"
+                        onClick={() => setLineupMatch(m)} title="Genera Distinta Gara">
+                        <FileText className="h-3.5 w-3.5" /> Distinta
+                      </Button>
                       <Button size="sm" variant="outline" className="h-8 w-8 p-0"
                         onClick={() => navigate(`/match-summary/${m.id}?source=db&backTo=/tournament/${tournamentId}`)}>
                         <Eye className="h-3.5 w-3.5" />
