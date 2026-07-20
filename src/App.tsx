@@ -19,6 +19,7 @@ const TournamentDetail = lazy(() => import("./pages/TournamentDetail"));
 const TournamentRoster = lazy(() => import("./pages/TournamentRoster"));
 const MatchSummary = lazy(() => import("./pages/MatchSummary"));
 const MyTeams = lazy(() => import("./pages/MyTeams"));
+const TeamMembers = lazy(() => import("./pages/TeamMembers"));
 const Profile = lazy(() => import("./pages/Profile"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Terms = lazy(() => import("./pages/Terms"));
