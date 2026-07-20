@@ -432,6 +432,23 @@ export default function TournamentDetail() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Genera Distinta Gara */}
+      <GenerateLineupSheet
+        open={!!lineupMatch}
+        onOpenChange={(o) => !o && setLineupMatch(null)}
+        tournamentName={tournament.name}
+        homeTeamName={lineupMatch?.home_team_name}
+        awayTeamName={lineupMatch?.away_team_name}
+        matchDate={lineupMatch?.match_date}
+        rosterNumbers={(() => {
+          const map = new Map<string, number>();
+          for (const r of tournamentRoster) {
+            if (r.number != null) map.set(r.name.trim().toLowerCase(), r.number);
+          }
+          return map;
+        })()}
+      />
     </div>
   );
 }
