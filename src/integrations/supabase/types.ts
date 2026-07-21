@@ -192,7 +192,9 @@ export type Database = {
           fiscal_code: string | null
           full_name: string
           id: string
+          jersey_number: number | null
           role: string
+          team_id: string
           updated_at: string
           user_id: string
         }
@@ -203,7 +205,9 @@ export type Database = {
           fiscal_code?: string | null
           full_name: string
           id?: string
+          jersey_number?: number | null
           role?: string
+          team_id: string
           updated_at?: string
           user_id: string
         }
@@ -214,11 +218,21 @@ export type Database = {
           fiscal_code?: string | null
           full_name?: string
           id?: string
+          jersey_number?: number | null
           role?: string
+          team_id?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "team_members_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "saved_teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tournament_jersey_numbers: {
         Row: {
