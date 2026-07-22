@@ -341,8 +341,16 @@ export default function TeamMembers() {
       };
 
       const payload = rows.map((r) => {
-        const name = pick(r, ["cognomenome", "cognomeenome", "nome", "nominativo"]);
-        if (!name) return null;
+        // Prefer separate "Cognome" + "Nome" columns; fallback to a single combined column
+        const cognome = pick(r, ["cognome"]);
+        const nomeOnly = pick(r, ["nome"]);
+        let name: any = null;
+        if (cognome && nomeOnly) {
+          name = `${String(cognome).trim()} ${String(nomeOnly).trim()}`;
+        } else {
+          name = pick(r, ["cognomenome", "cognomeenome", "nominativo", "nomecompleto", "fullname", "cognome", "nome"]);
+        }
+        if (!name || !String(name).trim()) return null;
         const role = String(pick(r, ["qualifica", "ruolo"]) || "Giocatore").trim();
         return {
           user_id: user.id,
