@@ -181,13 +181,19 @@ export default function TeamMembers() {
     const payload = { name, category: encodeCategory(teamForm.leva, teamForm.category) };
     if (editingTeam) {
       const { error } = await supabase.from("saved_teams").update(payload).eq("id", editingTeam.id);
-      if (error) return toast.error("Errore nel salvataggio");
+      if (error) {
+        if ((error as any).code === "23505") return toast.error("Esiste già una squadra con questo nome");
+        return toast.error(`Errore nel salvataggio: ${error.message}`);
+      }
     } else {
       const { data, error } = await supabase
         .from("saved_teams")
         .insert({ user_id: user.id, players: [] as unknown as Json, ...payload })
         .select("id").single();
-      if (error) return toast.error("Errore nel salvataggio");
+      if (error) {
+        if ((error as any).code === "23505") return toast.error("Esiste già una squadra con questo nome");
+        return toast.error(`Errore nel salvataggio: ${error.message}`);
+      }
       if (data?.id) setSelectedTeamId(data.id);
     }
     toast.success("Squadra salvata");
