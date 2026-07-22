@@ -181,13 +181,19 @@ export default function TeamMembers() {
     const payload = { name, category: encodeCategory(teamForm.leva, teamForm.category) };
     if (editingTeam) {
       const { error } = await supabase.from("saved_teams").update(payload).eq("id", editingTeam.id);
-      if (error) return toast.error("Errore nel salvataggio");
+      if (error) {
+        if ((error as any).code === "23505") return toast.error("Esiste già una squadra con questo nome");
+        return toast.error(`Errore nel salvataggio: ${error.message}`);
+      }
     } else {
       const { data, error } = await supabase
         .from("saved_teams")
         .insert({ user_id: user.id, players: [] as unknown as Json, ...payload })
         .select("id").single();
-      if (error) return toast.error("Errore nel salvataggio");
+      if (error) {
+        if ((error as any).code === "23505") return toast.error("Esiste già una squadra con questo nome");
+        return toast.error(`Errore nel salvataggio: ${error.message}`);
+      }
       if (data?.id) setSelectedTeamId(data.id);
     }
     toast.success("Squadra salvata");
@@ -358,35 +364,32 @@ export default function TeamMembers() {
 
       if (payload.length === 0) { toast.error("Nessun record valido nel file"); return; }
 
-      const withFiscal = payload.filter(p => p.fiscal_code);
-      const withoutFiscal = payload.filter(p => !p.fiscal_code);
+      const { data: existing } = await supabase
+        .from("team_members")
+        .select("id, full_name, fiscal_code")
+        .eq("team_id", selectedTeamId);
+      const byFiscal = new Map<string, string>();
+      const byName = new Map<string, string>();
+      (existing || []).forEach((e: any) => {
+        if (e.fiscal_code) byFiscal.set(String(e.fiscal_code).toLowerCase().trim(), e.id);
+        byName.set((e.full_name || "").toLowerCase().trim(), e.id);
+      });
 
       let ok = 0;
-      if (withFiscal.length) {
-        const { error } = await supabase
-          .from("team_members")
-          .upsert(withFiscal, { onConflict: "team_id,fiscal_code" });
-        if (error) throw error;
-        ok += withFiscal.length;
-      }
-      if (withoutFiscal.length) {
-        const { data: existing } = await supabase
-          .from("team_members")
-          .select("id, full_name")
-          .eq("team_id", selectedTeamId);
-        const existingMap = new Map<string, string>(
-          (existing || []).map((e: any) => [e.full_name.toLowerCase().trim(), e.id])
-        );
-        for (const p of withoutFiscal) {
-          const key = p.full_name.toLowerCase().trim();
-          if (existingMap.has(key)) {
-            await supabase.from("team_members").update(p).eq("id", existingMap.get(key)!);
-          } else {
-            await supabase.from("team_members").insert(p);
-          }
-          ok += 1;
+      for (const p of payload) {
+        const fkey = p.fiscal_code ? String(p.fiscal_code).toLowerCase().trim() : "";
+        const nkey = p.full_name.toLowerCase().trim();
+        const existingId = (fkey && byFiscal.get(fkey)) || byName.get(nkey);
+        const { error } = existingId
+          ? await supabase.from("team_members").update(p).eq("id", existingId)
+          : await supabase.from("team_members").insert(p);
+        if (error) {
+          console.error("Row import error:", error, p);
+          continue;
         }
+        ok += 1;
       }
+
 
       await syncSavedTeamPlayers(selectedTeamId);
       toast.success(`Importati/aggiornati ${ok} membri`);
