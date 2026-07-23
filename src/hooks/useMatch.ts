@@ -26,6 +26,26 @@ const createEmptyPlayer = (): Player => ({
   secondsPlayedPerPeriod: {}
 });
 
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const nowHHMM = () => {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
+const emptyMetadata = (): MatchMetadata => ({
+  tournamentLabel: '',
+  groupName: '',
+  leva: '',
+  category: '',
+  matchDate: todayISO(),
+  matchTime: nowHHMM(),
+  venue: '',
+  isHomeTeam: true,
+  teamId: null,
+  lineupSelection: null,
+  detailsConfirmed: false,
+});
+
 const initialState: MatchState = {
   homeTeam: { name: 'Casa', players: [], score: 0 },
   awayTeam: { name: 'Ospiti', players: [], score: 0 },
@@ -43,7 +63,9 @@ const initialState: MatchState = {
   periodStartTimestamp: null,
   accumulatedPauseTime: 0,
   pauseStartTimestamp: null,
+  metadata: emptyMetadata(),
 };
+
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
