@@ -12,9 +12,11 @@ import { PDFExportButton } from '@/components/match/PDFExportButton';
 import { WhatsAppShareButton } from '@/components/match/WhatsAppShareButton';
 import { ShareLiveButton } from '@/components/live/ShareLiveButton';
 import { RosterSetup } from '@/components/setup/RosterSetup';
+import { MatchDetailsTab } from '@/components/match/MatchDetailsTab';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Users, UserCheck, Play, Home } from 'lucide-react';
+import { FileText, Users, UserCheck, Play, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+
 import { Header } from '@/components/layout/Header';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTournamentJerseys } from '@/hooks/useTournamentJerseys';
