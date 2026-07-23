@@ -189,7 +189,11 @@ const MatchApp = () => {
               </Button>
 
               {/* Tab navigation */}
-              <TabsList className="flex-1 grid grid-cols-3 h-9">
+              <TabsList className="flex-1 grid grid-cols-4 h-9">
+                <TabsTrigger value="distinta" className="gap-1 text-xs sm:text-sm h-8">
+                  <FileText className="h-3.5 w-3.5" />
+                  Distinta
+                </TabsTrigger>
                 <TabsTrigger value="roster" className="gap-1 text-xs sm:text-sm h-8">
                   <Users className="h-3.5 w-3.5" />
                   Rose
@@ -203,6 +207,7 @@ const MatchApp = () => {
                   Live
                 </TabsTrigger>
               </TabsList>
+
             </div>
           </Tabs>
         </div>
