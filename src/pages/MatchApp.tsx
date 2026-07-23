@@ -12,9 +12,11 @@ import { PDFExportButton } from '@/components/match/PDFExportButton';
 import { WhatsAppShareButton } from '@/components/match/WhatsAppShareButton';
 import { ShareLiveButton } from '@/components/live/ShareLiveButton';
 import { RosterSetup } from '@/components/setup/RosterSetup';
+import { MatchDetailsTab } from '@/components/match/MatchDetailsTab';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Users, UserCheck, Play, Home } from 'lucide-react';
+import { FileText, Users, UserCheck, Play, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+
 import { Header } from '@/components/layout/Header';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTournamentJerseys } from '@/hooks/useTournamentJerseys';
@@ -32,7 +34,11 @@ const MatchApp = () => {
     state,
     setHomeTeamName,
     setAwayTeamName,
+    setMetadata,
+    setHomeRosterFromMembers,
+    saveNow,
     addPlayer,
+
     setStarters,
     confirmStarters,
     startPeriod,
@@ -105,8 +111,10 @@ const MatchApp = () => {
   const [activeTab, setActiveTab] = useState<string>(() => {
     if (state.isMatchStarted && !state.needsStarterSelection) return 'live';
     if (state.isMatchStarted && state.needsStarterSelection) return 'starters';
-    return 'roster';
+    if (state.metadata?.detailsConfirmed) return 'roster';
+    return 'distinta';
   });
+
 
   // Timer tick interval (UI refresh only)
   useEffect(() => {
@@ -181,7 +189,11 @@ const MatchApp = () => {
               </Button>
 
               {/* Tab navigation */}
-              <TabsList className="flex-1 grid grid-cols-3 h-9">
+              <TabsList className="flex-1 grid grid-cols-4 h-9">
+                <TabsTrigger value="distinta" className="gap-1 text-xs sm:text-sm h-8">
+                  <FileText className="h-3.5 w-3.5" />
+                  Distinta
+                </TabsTrigger>
                 <TabsTrigger value="roster" className="gap-1 text-xs sm:text-sm h-8">
                   <Users className="h-3.5 w-3.5" />
                   Rose
@@ -195,6 +207,7 @@ const MatchApp = () => {
                   Live
                 </TabsTrigger>
               </TabsList>
+
             </div>
           </Tabs>
         </div>
@@ -208,13 +221,31 @@ const MatchApp = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           {/* Hidden TabsList to keep Tabs context working */}
           <TabsList className="hidden">
+            <TabsTrigger value="distinta">Distinta</TabsTrigger>
             <TabsTrigger value="roster">Rose</TabsTrigger>
             <TabsTrigger value="starters">Titolari</TabsTrigger>
             <TabsTrigger value="live">Live</TabsTrigger>
           </TabsList>
 
+          {/* Distinta Tab */}
+          <TabsContent value="distinta" className="mt-0">
+            <MatchDetailsTab
+              metadata={state.metadata}
+              homeTeamName={state.homeTeam.name}
+              awayTeamName={state.awayTeam.name}
+              onMetadataChange={setMetadata}
+              onHomeTeamNameChange={setHomeTeamName}
+              onAwayTeamNameChange={setAwayTeamName}
+              onSaveNow={saveNow}
+              onSetHomeRosterFromMembers={setHomeRosterFromMembers}
+              onGoToRoster={() => setActiveTab('roster')}
+              isMatchStarted={state.isMatchStarted}
+            />
+          </TabsContent>
+
           {/* Rose Tab */}
           <TabsContent value="roster" className="mt-0">
+
             <RosterSetup
               homeTeamName={state.homeTeam.name}
               awayTeamName={state.awayTeam.name}

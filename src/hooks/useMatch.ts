@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { MatchState, Player, TeamType, CardType, MatchEvent } from '../types/match';
+import { MatchState, Player, TeamType, CardType, MatchEvent, MatchMetadata, LineupSelection } from '../types/match';
+
 import { useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,6 +26,26 @@ const createEmptyPlayer = (): Player => ({
   secondsPlayedPerPeriod: {}
 });
 
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const nowHHMM = () => {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
+const emptyMetadata = (): MatchMetadata => ({
+  tournamentLabel: '',
+  groupName: '',
+  leva: '',
+  category: '',
+  matchDate: todayISO(),
+  matchTime: nowHHMM(),
+  venue: '',
+  isHomeTeam: true,
+  teamId: null,
+  lineupSelection: null,
+  detailsConfirmed: false,
+});
+
 const initialState: MatchState = {
   homeTeam: { name: 'Casa', players: [], score: 0 },
   awayTeam: { name: 'Ospiti', players: [], score: 0 },
@@ -42,7 +63,9 @@ const initialState: MatchState = {
   periodStartTimestamp: null,
   accumulatedPauseTime: 0,
   pauseStartTimestamp: null,
+  metadata: emptyMetadata(),
 };
+
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -91,12 +114,31 @@ export const useMatch = () => {
         if (data) {
           dbMatchIdRef.current = data.id;
           const md = (data.match_data as any) || {};
+          const row: any = data;
+          const dbMeta: Partial<MatchMetadata> = {
+            tournamentLabel: row.tournament_label ?? '',
+            groupName: row.group_name ?? '',
+            leva: row.leva ?? '',
+            category: row.category ?? '',
+            matchDate: row.match_date ? new Date(row.match_date).toISOString().slice(0, 10) : todayISO(),
+            matchTime: row.match_time ?? nowHHMM(),
+            venue: row.venue ?? '',
+            isHomeTeam: row.is_home_team ?? true,
+            teamId: row.team_id ?? null,
+            lineupSelection: (row.lineup_selection as LineupSelection) ?? null,
+            detailsConfirmed: !!(row.tournament_label || row.venue || row.match_time || row.team_id || row.lineup_selection),
+          };
           const localSaved = localStorage.getItem(storageKey);
           if (!localSaved && md.fullState) {
-            setState({ ...initialState, ...md.fullState });
+            const restored: MatchState = { ...initialState, ...md.fullState };
+            restored.metadata = { ...emptyMetadata(), ...(md.fullState.metadata || {}), ...dbMeta };
+            setState(restored);
+          } else if (!localSaved) {
+            setState(prev => ({ ...prev, metadata: { ...prev.metadata, ...dbMeta } }));
           }
           return;
         }
+
 
         // No DB match yet. If this is a tournament match and we have no local cache,
         // try to pre-populate roster + jersey numbers from the latest match in same tournament.
@@ -166,7 +208,20 @@ export const useMatch = () => {
       };
       
       const status = currentState.isMatchEnded ? 'completed' : 'in_progress';
-      
+
+      const meta = currentState.metadata || emptyMetadata();
+      const extraCols: Record<string, any> = {
+        tournament_label: meta.tournamentLabel || null,
+        group_name: meta.groupName || null,
+        leva: meta.leva || null,
+        category: meta.category || null,
+        venue: meta.venue || null,
+        match_time: meta.matchTime || null,
+        is_home_team: !!meta.isHomeTeam,
+        team_id: meta.teamId || null,
+        lineup_selection: (meta.lineupSelection as any) || null,
+      };
+
       if (dbMatchIdRef.current) {
         // Update existing match
         const { error } = await supabase
@@ -178,7 +233,8 @@ export const useMatch = () => {
             away_score: currentState.awayTeam.score,
             match_data: matchData as any,
             status,
-          })
+            ...extraCols,
+          } as any)
           .eq('id', dbMatchIdRef.current);
         
         if (error) throw error;
@@ -196,7 +252,8 @@ export const useMatch = () => {
             away_score: currentState.awayTeam.score,
             match_data: matchData as any,
             status,
-          })
+            ...extraCols,
+          } as any)
           .select('id')
           .single();
         
@@ -205,6 +262,7 @@ export const useMatch = () => {
           dbMatchIdRef.current = data.id;
         }
       }
+
     } catch (err: any) {
       console.error('Failed to save match to DB:', {
         message: err?.message,
@@ -245,11 +303,12 @@ export const useMatch = () => {
       return;
     }
     
-    // Debounced save for other changes (roster edits, etc.)
-    if (state.isMatchStarted) {
+    // Debounced save for other changes (roster edits, metadata, lineup selection)
+    if (state.isMatchStarted || state.metadata.detailsConfirmed || dbMatchIdRef.current) {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = setTimeout(() => saveToDb(state), 5000);
+      saveTimeoutRef.current = setTimeout(() => saveToDb(state), 2000);
     }
+
     
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -265,6 +324,37 @@ export const useMatch = () => {
   const setAwayTeamName = useCallback((name: string) => setState(prev => ({
     ...prev, awayTeam: { ...prev.awayTeam, name }
   })), []);
+
+  const setMetadata = useCallback((patch: Partial<MatchMetadata>) => {
+    setState(prev => ({ ...prev, metadata: { ...prev.metadata, ...patch } }));
+  }, []);
+
+  // Replace home roster with members from anagrafica (pre-match only).
+  // Preserves numbers if member.jersey_number is set; otherwise null.
+  const setHomeRosterFromMembers = useCallback((members: Array<{ id: string; name: string; number: number | null }>) => {
+    setState(prev => {
+      if (prev.isMatchStarted) return prev; // safety: never replace mid-match
+      const fresh: Player[] = members.map(m => ({
+        id: m.id,
+        name: (m.name || '').toUpperCase(),
+        number: m.number ?? null,
+        isOnField: false,
+        isStarter: false,
+        isExpelled: false,
+        goals: 0,
+        cards: { yellow: 0, red: 0 },
+        currentEntryTime: null,
+        totalSecondsPlayed: 0,
+        secondsPlayedPerPeriod: {},
+      }));
+      return { ...prev, homeTeam: { ...prev.homeTeam, players: fresh } };
+    });
+  }, []);
+
+  const saveNow = useCallback(() => {
+    saveToDb(state);
+  }, [saveToDb, state]);
+
 
   const addPlayer = useCallback((name: string) => {
     const newPlayer: Player = { 
@@ -1145,7 +1235,11 @@ export const useMatch = () => {
     state,
     setHomeTeamName,
     setAwayTeamName,
+    setMetadata,
+    setHomeRosterFromMembers,
+    saveNow,
     addPlayer,
+
     setStarters,
     confirmStarters,
     startPeriod,
