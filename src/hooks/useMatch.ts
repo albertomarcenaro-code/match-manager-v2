@@ -303,11 +303,12 @@ export const useMatch = () => {
       return;
     }
     
-    // Debounced save for other changes (roster edits, etc.)
-    if (state.isMatchStarted) {
+    // Debounced save for other changes (roster edits, metadata, lineup selection)
+    if (state.isMatchStarted || state.metadata.detailsConfirmed || dbMatchIdRef.current) {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = setTimeout(() => saveToDb(state), 5000);
+      saveTimeoutRef.current = setTimeout(() => saveToDb(state), 2000);
     }
+
     
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
