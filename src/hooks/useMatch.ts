@@ -325,6 +325,37 @@ export const useMatch = () => {
     ...prev, awayTeam: { ...prev.awayTeam, name }
   })), []);
 
+  const setMetadata = useCallback((patch: Partial<MatchMetadata>) => {
+    setState(prev => ({ ...prev, metadata: { ...prev.metadata, ...patch } }));
+  }, []);
+
+  // Replace home roster with members from anagrafica (pre-match only).
+  // Preserves numbers if member.jersey_number is set; otherwise null.
+  const setHomeRosterFromMembers = useCallback((members: Array<{ id: string; name: string; number: number | null }>) => {
+    setState(prev => {
+      if (prev.isMatchStarted) return prev; // safety: never replace mid-match
+      const fresh: Player[] = members.map(m => ({
+        id: m.id,
+        name: (m.name || '').toUpperCase(),
+        number: m.number ?? null,
+        isOnField: false,
+        isStarter: false,
+        isExpelled: false,
+        goals: 0,
+        cards: { yellow: 0, red: 0 },
+        currentEntryTime: null,
+        totalSecondsPlayed: 0,
+        secondsPlayedPerPeriod: {},
+      }));
+      return { ...prev, homeTeam: { ...prev.homeTeam, players: fresh } };
+    });
+  }, []);
+
+  const saveNow = useCallback(() => {
+    saveToDb(state);
+  }, [saveToDb, state]);
+
+
   const addPlayer = useCallback((name: string) => {
     const newPlayer: Player = { 
       id: generateId(), 
