@@ -208,7 +208,20 @@ export const useMatch = () => {
       };
       
       const status = currentState.isMatchEnded ? 'completed' : 'in_progress';
-      
+
+      const meta = currentState.metadata || emptyMetadata();
+      const extraCols: Record<string, any> = {
+        tournament_label: meta.tournamentLabel || null,
+        group_name: meta.groupName || null,
+        leva: meta.leva || null,
+        category: meta.category || null,
+        venue: meta.venue || null,
+        match_time: meta.matchTime || null,
+        is_home_team: !!meta.isHomeTeam,
+        team_id: meta.teamId || null,
+        lineup_selection: (meta.lineupSelection as any) || null,
+      };
+
       if (dbMatchIdRef.current) {
         // Update existing match
         const { error } = await supabase
@@ -220,7 +233,8 @@ export const useMatch = () => {
             away_score: currentState.awayTeam.score,
             match_data: matchData as any,
             status,
-          })
+            ...extraCols,
+          } as any)
           .eq('id', dbMatchIdRef.current);
         
         if (error) throw error;
@@ -238,7 +252,8 @@ export const useMatch = () => {
             away_score: currentState.awayTeam.score,
             match_data: matchData as any,
             status,
-          })
+            ...extraCols,
+          } as any)
           .select('id')
           .single();
         
@@ -247,6 +262,7 @@ export const useMatch = () => {
           dbMatchIdRef.current = data.id;
         }
       }
+
     } catch (err: any) {
       console.error('Failed to save match to DB:', {
         message: err?.message,
