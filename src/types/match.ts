@@ -60,6 +60,26 @@ export interface PeriodScore {
   awayScore: number;
 }
 
+export interface LineupSelection {
+  playerIds: string[]; // team_members ids
+  captains: Record<string, 'C' | 'VC' | ''>;
+  staffRoles: Record<string, string>; // memberId -> slot label
+}
+
+export interface MatchMetadata {
+  tournamentLabel: string;
+  groupName: string;
+  leva: string;
+  category: string;
+  matchDate: string;   // YYYY-MM-DD
+  matchTime: string;   // HH:MM
+  venue: string;
+  isHomeTeam: boolean; // true = playing at home
+  teamId: string | null; // saved_teams.id (anagrafica used)
+  lineupSelection: LineupSelection | null;
+  detailsConfirmed: boolean;
+}
+
 export interface MatchState {
   homeTeam: Team;
   awayTeam: Team;
@@ -78,5 +98,7 @@ export interface MatchState {
   periodStartTimestamp: number | null; // when the period timer started
   accumulatedPauseTime: number; // total ms spent paused in current period
   pauseStartTimestamp: number | null; // when the current pause started (null if not paused)
+  metadata: MatchMetadata;
 }
+
 
