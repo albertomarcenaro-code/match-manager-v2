@@ -114,12 +114,31 @@ export const useMatch = () => {
         if (data) {
           dbMatchIdRef.current = data.id;
           const md = (data.match_data as any) || {};
+          const row: any = data;
+          const dbMeta: Partial<MatchMetadata> = {
+            tournamentLabel: row.tournament_label ?? '',
+            groupName: row.group_name ?? '',
+            leva: row.leva ?? '',
+            category: row.category ?? '',
+            matchDate: row.match_date ? new Date(row.match_date).toISOString().slice(0, 10) : todayISO(),
+            matchTime: row.match_time ?? nowHHMM(),
+            venue: row.venue ?? '',
+            isHomeTeam: row.is_home_team ?? true,
+            teamId: row.team_id ?? null,
+            lineupSelection: (row.lineup_selection as LineupSelection) ?? null,
+            detailsConfirmed: !!(row.tournament_label || row.venue || row.match_time || row.team_id || row.lineup_selection),
+          };
           const localSaved = localStorage.getItem(storageKey);
           if (!localSaved && md.fullState) {
-            setState({ ...initialState, ...md.fullState });
+            const restored: MatchState = { ...initialState, ...md.fullState };
+            restored.metadata = { ...emptyMetadata(), ...(md.fullState.metadata || {}), ...dbMeta };
+            setState(restored);
+          } else if (!localSaved) {
+            setState(prev => ({ ...prev, metadata: { ...prev.metadata, ...dbMeta } }));
           }
           return;
         }
+
 
         // No DB match yet. If this is a tournament match and we have no local cache,
         // try to pre-populate roster + jersey numbers from the latest match in same tournament.
