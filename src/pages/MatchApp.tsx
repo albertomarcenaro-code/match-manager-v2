@@ -111,8 +111,10 @@ const MatchApp = () => {
   const [activeTab, setActiveTab] = useState<string>(() => {
     if (state.isMatchStarted && !state.needsStarterSelection) return 'live';
     if (state.isMatchStarted && state.needsStarterSelection) return 'starters';
-    return 'roster';
+    if (state.metadata?.detailsConfirmed) return 'roster';
+    return 'distinta';
   });
+
 
   // Timer tick interval (UI refresh only)
   useEffect(() => {
