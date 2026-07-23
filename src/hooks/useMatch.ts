@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { MatchState, Player, TeamType, CardType, MatchEvent } from '../types/match';
+import { MatchState, Player, TeamType, CardType, MatchEvent, MatchMetadata, LineupSelection } from '../types/match';
+
 import { useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
