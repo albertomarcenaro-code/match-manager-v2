@@ -45,44 +45,71 @@ export type Database = {
         Row: {
           away_score: number
           away_team_name: string
+          category: string | null
           created_at: string
+          group_name: string | null
           home_score: number
           home_team_name: string
           id: string
+          is_home_team: boolean
           is_public: boolean
+          leva: string | null
+          lineup_selection: Json | null
           match_data: Json | null
           match_date: string
+          match_time: string | null
           status: string
+          team_id: string | null
           tournament_id: string | null
+          tournament_label: string | null
           user_id: string
+          venue: string | null
         }
         Insert: {
           away_score?: number
           away_team_name: string
+          category?: string | null
           created_at?: string
+          group_name?: string | null
           home_score?: number
           home_team_name: string
           id?: string
+          is_home_team?: boolean
           is_public?: boolean
+          leva?: string | null
+          lineup_selection?: Json | null
           match_data?: Json | null
           match_date?: string
+          match_time?: string | null
           status?: string
+          team_id?: string | null
           tournament_id?: string | null
+          tournament_label?: string | null
           user_id: string
+          venue?: string | null
         }
         Update: {
           away_score?: number
           away_team_name?: string
+          category?: string | null
           created_at?: string
+          group_name?: string | null
           home_score?: number
           home_team_name?: string
           id?: string
+          is_home_team?: boolean
           is_public?: boolean
+          leva?: string | null
+          lineup_selection?: Json | null
           match_data?: Json | null
           match_date?: string
+          match_time?: string | null
           status?: string
+          team_id?: string | null
           tournament_id?: string | null
+          tournament_label?: string | null
           user_id?: string
+          venue?: string | null
         }
         Relationships: [
           {
