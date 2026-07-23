@@ -221,13 +221,31 @@ const MatchApp = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           {/* Hidden TabsList to keep Tabs context working */}
           <TabsList className="hidden">
+            <TabsTrigger value="distinta">Distinta</TabsTrigger>
             <TabsTrigger value="roster">Rose</TabsTrigger>
             <TabsTrigger value="starters">Titolari</TabsTrigger>
             <TabsTrigger value="live">Live</TabsTrigger>
           </TabsList>
 
+          {/* Distinta Tab */}
+          <TabsContent value="distinta" className="mt-0">
+            <MatchDetailsTab
+              metadata={state.metadata}
+              homeTeamName={state.homeTeam.name}
+              awayTeamName={state.awayTeam.name}
+              onMetadataChange={setMetadata}
+              onHomeTeamNameChange={setHomeTeamName}
+              onAwayTeamNameChange={setAwayTeamName}
+              onSaveNow={saveNow}
+              onSetHomeRosterFromMembers={setHomeRosterFromMembers}
+              onGoToRoster={() => setActiveTab('roster')}
+              isMatchStarted={state.isMatchStarted}
+            />
+          </TabsContent>
+
           {/* Rose Tab */}
           <TabsContent value="roster" className="mt-0">
+
             <RosterSetup
               homeTeamName={state.homeTeam.name}
               awayTeamName={state.awayTeam.name}
