@@ -319,17 +319,22 @@ export default function TeamMembers() {
         return null;
       };
       const parseDate = (v: any): string | null => {
-        if (!v) return null;
+        if (v == null) return null;
         if (v instanceof Date && !isNaN(v.getTime())) return v.toISOString().slice(0, 10);
         const s = String(v).trim();
-        if (!s || s === ".") return null;
-        const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+        if (!s) return null;
+        // Reject placeholder/invalid tokens
+        if (/^[.\-\/_nN\\a\s]+$/.test(s)) return null;
+        if (s.toLowerCase() === "nan" || s.toLowerCase() === "null" || s.toLowerCase() === "n/a") return null;
+        const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
         if (m) {
           const d = m[1].padStart(2, "0");
           const mo = m[2].padStart(2, "0");
           let y = m[3];
           if (y.length === 2) y = (parseInt(y) > 30 ? "19" : "20") + y;
-          return `${y}-${mo}-${d}`;
+          const iso = `${y}-${mo}-${d}`;
+          const test = new Date(iso);
+          return isNaN(test.getTime()) ? null : iso;
         }
         const d = new Date(s);
         return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
@@ -339,37 +344,42 @@ export default function TeamMembers() {
         const n = parseInt(String(v).trim(), 10);
         return Number.isFinite(n) ? n : null;
       };
+      const cleanStr = (v: any): string | null => {
+        if (v == null) return null;
+        const s = String(v).trim();
+        if (!s) return null;
+        if (/^[.\-_\\\/\s]+$/.test(s)) return null;
+        if (["nan", "null", "n/a"].includes(s.toLowerCase())) return null;
+        return s;
+      };
 
+      const totalRows = rows.length;
       const payload = rows.map((r) => {
         // Prefer separate "Cognome" + "Nome" columns; fallback to a single combined column
-        const cognome = pick(r, ["cognome"]);
-        const nomeOnly = pick(r, ["nome"]);
-        let name: any = null;
+        const cognome = cleanStr(pick(r, ["cognome"]));
+        const nomeOnly = cleanStr(pick(r, ["nome"]));
+        let name: string | null = null;
         if (cognome && nomeOnly) {
-          name = `${String(cognome).trim()} ${String(nomeOnly).trim()}`;
+          name = `${cognome} ${nomeOnly}`;
         } else {
-          name = pick(r, ["cognomenome", "cognomeenome", "nominativo", "nomecompleto", "fullname", "cognome", "nome"]);
+          name = cleanStr(pick(r, ["cognomenome", "cognomeenome", "nominativo", "nomecompleto", "fullname", "cognome", "nome"]));
         }
-        if (!name || !String(name).trim()) return null;
-        const role = String(pick(r, ["qualifica", "ruolo"]) || "Giocatore").trim();
+        if (!name) return null;
+        const role = cleanStr(pick(r, ["qualifica", "ruolo"])) || "Giocatore";
+        const fc = cleanStr(pick(r, ["codicefiscale", "cf"]));
         return {
           user_id: user.id,
           team_id: selectedTeamId,
-          full_name: String(name).trim(),
+          full_name: name,
           birth_date: parseDate(pick(r, ["datadinascita", "datanascita"])),
-          figc_number: (() => {
-            const v = pick(r, ["nmatricolafigc", "matricolafigc", "matricola", "nmatricola"]);
-            return v ? String(v).trim() : null;
-          })(),
-          fiscal_code: (() => {
-            const v = pick(r, ["codicefiscale", "cf"]);
-            return v ? String(v).trim().toUpperCase() : null;
-          })(),
-          role: role || "Giocatore",
+          figc_number: cleanStr(pick(r, ["nmatricolafigc", "matricolafigc", "matricola", "nmatricola"])),
+          fiscal_code: fc ? fc.toUpperCase() : null,
+          role,
           jersey_number: parseInt2(pick(r, ["nmaglia", "maglia", "numero", "n"])),
         };
       }).filter(Boolean) as any[];
 
+      const skippedEmpty = totalRows - payload.length;
       if (payload.length === 0) { toast.error("Nessun record valido nel file"); return; }
 
       const { data: existing } = await supabase
@@ -384,23 +394,36 @@ export default function TeamMembers() {
       });
 
       let ok = 0;
+      let failed = 0;
       for (const p of payload) {
-        const fkey = p.fiscal_code ? String(p.fiscal_code).toLowerCase().trim() : "";
-        const nkey = p.full_name.toLowerCase().trim();
-        const existingId = (fkey && byFiscal.get(fkey)) || byName.get(nkey);
-        const { error } = existingId
-          ? await supabase.from("team_members").update(p).eq("id", existingId)
-          : await supabase.from("team_members").insert(p);
-        if (error) {
-          console.error("Row import error:", error, p);
-          continue;
+        try {
+          const fkey = p.fiscal_code ? String(p.fiscal_code).toLowerCase().trim() : "";
+          const nkey = p.full_name.toLowerCase().trim();
+          const existingId = (fkey && byFiscal.get(fkey)) || byName.get(nkey);
+          const { error } = existingId
+            ? await supabase.from("team_members").update(p).eq("id", existingId)
+            : await supabase.from("team_members").insert(p);
+          if (error) {
+            console.error("Errore riga:", p, error);
+            failed += 1;
+            continue;
+          }
+          ok += 1;
+        } catch (rowErr) {
+          console.error("Errore riga:", p, rowErr);
+          failed += 1;
         }
-        ok += 1;
       }
 
 
       await syncSavedTeamPlayers(selectedTeamId);
-      toast.success(`Importati/aggiornati ${ok} membri`);
+      if (failed === 0 && skippedEmpty === 0) {
+        toast.success(`Importati/aggiornati con successo ${ok} membri su ${totalRows}`);
+      } else {
+        toast.warning(
+          `Importati ${ok} membri su ${totalRows}. ${failed > 0 ? `${failed} scartati per errore` : ""}${failed > 0 && skippedEmpty > 0 ? ", " : ""}${skippedEmpty > 0 ? `${skippedEmpty} righe vuote/senza nome` : ""}. Controlla la console per i dettagli.`
+        );
+      }
       loadMembers(selectedTeamId);
       loadTeams();
     } catch (err: any) {
