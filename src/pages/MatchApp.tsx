@@ -34,7 +34,11 @@ const MatchApp = () => {
     state,
     setHomeTeamName,
     setAwayTeamName,
+    setMetadata,
+    setHomeRosterFromMembers,
+    saveNow,
     addPlayer,
+
     setStarters,
     confirmStarters,
     startPeriod,
