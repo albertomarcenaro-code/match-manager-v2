@@ -318,27 +318,49 @@ export default function TeamMembers() {
         for (const k of Object.keys(r)) if (keys.includes(norm(k))) return r[k];
         return null;
       };
-      const parseDate = (v: any): string | null => {
-        if (v == null) return null;
-        if (v instanceof Date && !isNaN(v.getTime())) return v.toISOString().slice(0, 10);
+      const fmtLocal = (d: Date): string | null => {
+        if (!(d instanceof Date) || isNaN(d.getTime())) return null;
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      };
+      const parseExcelDate = (v: any): string | null => {
+        if (v == null || v === "") return null;
+        // Already a Date object (cellDates: true)
+        if (v instanceof Date) return fmtLocal(v);
+        // Excel serial number
+        if (typeof v === "number" && Number.isFinite(v)) {
+          try {
+            const parsed = (XLSX as any).SSF?.parse_date_code?.(v);
+            if (parsed) {
+              const d = new Date(parsed.y, (parsed.m || 1) - 1, parsed.d || 1);
+              return fmtLocal(d);
+            }
+          } catch { /* fall through */ }
+          return fmtLocal(new Date(Math.round((v - 25569) * 86400 * 1000)));
+        }
         const s = String(v).trim();
         if (!s) return null;
-        // Reject placeholder/invalid tokens
-        if (/^[.\-\/_nN\\a\s]+$/.test(s)) return null;
-        if (s.toLowerCase() === "nan" || s.toLowerCase() === "null" || s.toLowerCase() === "n/a") return null;
+        if (/^[.\-\/_\\\s]+$/.test(s)) return null;
+        if (["nan", "null", "n/a", "na", "-"].includes(s.toLowerCase())) return null;
+        // Italian DD/MM/YYYY or DD-MM-YYYY (also DD.MM.YYYY)
         const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
         if (m) {
-          const d = m[1].padStart(2, "0");
-          const mo = m[2].padStart(2, "0");
+          const day = m[1].padStart(2, "0");
+          const mon = m[2].padStart(2, "0");
           let y = m[3];
-          if (y.length === 2) y = (parseInt(y) > 30 ? "19" : "20") + y;
-          const iso = `${y}-${mo}-${d}`;
-          const test = new Date(iso);
+          if (y.length === 2) y = (parseInt(y, 10) > 30 ? "19" : "20") + y;
+          const iso = `${y}-${mon}-${day}`;
+          const test = new Date(`${iso}T00:00:00`);
           return isNaN(test.getTime()) ? null : iso;
         }
+        // ISO YYYY-MM-DD
+        const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+        // Numeric string serial
+        if (/^\d+(\.\d+)?$/.test(s)) return parseExcelDate(Number(s));
         const d = new Date(s);
-        return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+        return fmtLocal(d);
       };
+      const parseDate = parseExcelDate;
       const parseInt2 = (v: any): number | null => {
         if (v == null || v === "") return null;
         const n = parseInt(String(v).trim(), 10);
