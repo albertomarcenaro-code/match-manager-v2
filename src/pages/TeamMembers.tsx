@@ -7,6 +7,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { ItalianDateInput } from "@/components/ui/italian-date-input";
 import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -614,11 +615,11 @@ export default function TeamMembers() {
                           </Select>
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">
-                          <Input
-                            type="date" className="h-8"
+                          <ItalianDateInput
+                            className="h-8"
                             value={m.birth_date || ""}
-                            onChange={e => setMembers(prev => prev.map(x => x.id === m.id ? { ...x, birth_date: e.target.value } : x))}
-                            onBlur={e => updateCell(m, { birth_date: e.target.value })}
+                            onChange={(iso) => setMembers(prev => prev.map(x => x.id === m.id ? { ...x, birth_date: iso } : x))}
+                            onBlurIso={(iso) => updateCell(m, { birth_date: iso })}
                           />
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
@@ -697,7 +698,7 @@ export default function TeamMembers() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Data di nascita</Label>
-                <Input type="date" value={memberForm.birth_date || ""} onChange={e => setMemberForm({ ...memberForm, birth_date: e.target.value })} />
+                <ItalianDateInput value={memberForm.birth_date || ""} onChange={(iso) => setMemberForm({ ...memberForm, birth_date: iso })} />
               </div>
               <div><Label>Qualifica</Label>
                 <Select value={memberForm.role} onValueChange={v => setMemberForm({ ...memberForm, role: v })}>

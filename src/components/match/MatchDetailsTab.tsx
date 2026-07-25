@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ItalianDateInput } from "@/components/ui/italian-date-input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -172,7 +173,7 @@ export function MatchDetailsTab(props: Props) {
 
         <div>
           <Label>Data partita</Label>
-          <Input type="date" value={metadata.matchDate} onChange={(e) => onMetadataChange({ matchDate: e.target.value })} />
+          <ItalianDateInput value={metadata.matchDate} onChange={(iso) => onMetadataChange({ matchDate: iso })} />
         </div>
         <div>
           <Label>Ora partita</Label>
