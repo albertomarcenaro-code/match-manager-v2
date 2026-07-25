@@ -614,11 +614,11 @@ export default function TeamMembers() {
                           </Select>
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">
-                          <Input
-                            type="date" className="h-8"
+                          <ItalianDateInput
+                            className="h-8"
                             value={m.birth_date || ""}
-                            onChange={e => setMembers(prev => prev.map(x => x.id === m.id ? { ...x, birth_date: e.target.value } : x))}
-                            onBlur={e => updateCell(m, { birth_date: e.target.value })}
+                            onChange={(iso) => setMembers(prev => prev.map(x => x.id === m.id ? { ...x, birth_date: iso } : x))}
+                            onBlurIso={(iso) => updateCell(m, { birth_date: iso })}
                           />
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
