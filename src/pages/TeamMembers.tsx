@@ -697,7 +697,7 @@ export default function TeamMembers() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Data di nascita</Label>
-                <Input type="date" value={memberForm.birth_date || ""} onChange={e => setMemberForm({ ...memberForm, birth_date: e.target.value })} />
+                <ItalianDateInput value={memberForm.birth_date || ""} onChange={(iso) => setMemberForm({ ...memberForm, birth_date: iso })} />
               </div>
               <div><Label>Qualifica</Label>
                 <Select value={memberForm.role} onValueChange={v => setMemberForm({ ...memberForm, role: v })}>
