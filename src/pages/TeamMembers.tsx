@@ -310,7 +310,9 @@ export default function TeamMembers() {
       const rows: any[] = [];
       for (const sheetName of wb.SheetNames) {
         const ws = wb.Sheets[sheetName];
-        rows.push(...(XLSX.utils.sheet_to_json(ws, { defval: null, raw: false }) as any[]));
+        // raw: true → date cells arrive as Date objects (no locale-formatted string),
+        // numeric cells as numbers; parseExcelDate handles all three shapes.
+        rows.push(...(XLSX.utils.sheet_to_json(ws, { defval: null, raw: true }) as any[]));
       }
 
       const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "").replace(/[.]/g, "");
