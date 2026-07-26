@@ -136,7 +136,7 @@ export default function TeamMembers() {
     setLoadingTeams(true);
     const { data: teamsData, error } = await supabase
       .from("saved_teams")
-      .select("id, name, category")
+      .select("id, name, category, season")
       .order("updated_at", { ascending: false });
     if (error) { toast.error("Errore nel caricamento squadre"); setLoadingTeams(false); return; }
     const { data: countsData } = await supabase
@@ -147,7 +147,7 @@ export default function TeamMembers() {
     (countsData || []).forEach((r: any) => counts.set(r.team_id, (counts.get(r.team_id) || 0) + 1));
     setTeams((teamsData || []).map((t: any) => {
       const { leva, category } = decodeCategory(t.category);
-      return { id: t.id, name: t.name, leva, category, memberCount: counts.get(t.id) || 0 };
+      return { id: t.id, name: t.name, leva, category, season: t.season || "", memberCount: counts.get(t.id) || 0 };
     }));
     setLoadingTeams(false);
   };
