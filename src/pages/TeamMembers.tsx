@@ -518,6 +518,7 @@ export default function TeamMembers() {
                         <div className="flex flex-wrap gap-1.5 mt-1">
                           {t.leva && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{t.leva}</span>}
                           {t.category && <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{t.category}</span>}
+                          {t.season && <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{t.season}</span>}
                           <span className="text-xs text-muted-foreground">{t.memberCount} membri</span>
                         </div>
                       </button>
