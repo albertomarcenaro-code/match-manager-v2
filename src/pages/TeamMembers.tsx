@@ -549,6 +549,7 @@ export default function TeamMembers() {
                 <div className="flex flex-wrap gap-1.5 mt-1">
                   {selectedTeam.leva && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{selectedTeam.leva}</span>}
                   {selectedTeam.category && <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{selectedTeam.category}</span>}
+                  {selectedTeam.season && <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{selectedTeam.season}</span>}
                 </div>
               </div>
               <Button size="sm" variant="outline" onClick={() => openEditTeam(selectedTeam)}>
