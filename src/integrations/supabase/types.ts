@@ -188,6 +188,7 @@ export type Database = {
           id: string
           name: string
           players: Json
+          season: string | null
           updated_at: string
           user_id: string
         }
@@ -197,6 +198,7 @@ export type Database = {
           id?: string
           name: string
           players?: Json
+          season?: string | null
           updated_at?: string
           user_id: string
         }
@@ -206,6 +208,7 @@ export type Database = {
           id?: string
           name?: string
           players?: Json
+          season?: string | null
           updated_at?: string
           user_id?: string
         }
