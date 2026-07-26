@@ -49,6 +49,7 @@ interface TeamRow {
   name: string;
   category: string;
   leva: string;
+  season: string;
   memberCount: number;
 }
 
