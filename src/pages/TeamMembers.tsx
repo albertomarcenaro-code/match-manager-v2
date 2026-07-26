@@ -106,7 +106,7 @@ export default function TeamMembers() {
 
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<TeamRow | null>(null);
-  const [teamForm, setTeamForm] = useState({ name: "", leva: "", category: "" });
+  const [teamForm, setTeamForm] = useState({ name: "", leva: "", category: "", season: "" });
 
   const [memberDialogOpen, setMemberDialogOpen] = useState(false);
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
