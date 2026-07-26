@@ -49,6 +49,7 @@ interface TeamRow {
   name: string;
   category: string;
   leva: string;
+  season: string;
   memberCount: number;
 }
 
@@ -105,7 +106,7 @@ export default function TeamMembers() {
 
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<TeamRow | null>(null);
-  const [teamForm, setTeamForm] = useState({ name: "", leva: "", category: "" });
+  const [teamForm, setTeamForm] = useState({ name: "", leva: "", category: "", season: "" });
 
   const [memberDialogOpen, setMemberDialogOpen] = useState(false);
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
@@ -135,7 +136,7 @@ export default function TeamMembers() {
     setLoadingTeams(true);
     const { data: teamsData, error } = await supabase
       .from("saved_teams")
-      .select("id, name, category")
+      .select("id, name, category, season")
       .order("updated_at", { ascending: false });
     if (error) { toast.error("Errore nel caricamento squadre"); setLoadingTeams(false); return; }
     const { data: countsData } = await supabase
@@ -146,7 +147,7 @@ export default function TeamMembers() {
     (countsData || []).forEach((r: any) => counts.set(r.team_id, (counts.get(r.team_id) || 0) + 1));
     setTeams((teamsData || []).map((t: any) => {
       const { leva, category } = decodeCategory(t.category);
-      return { id: t.id, name: t.name, leva, category, memberCount: counts.get(t.id) || 0 };
+      return { id: t.id, name: t.name, leva, category, season: t.season || "", memberCount: counts.get(t.id) || 0 };
     }));
     setLoadingTeams(false);
   };
@@ -167,19 +168,21 @@ export default function TeamMembers() {
   // ---------- Teams CRUD ----------
   const openCreateTeam = () => {
     setEditingTeam(null);
-    setTeamForm({ name: "", leva: "", category: "" });
+    setTeamForm({ name: "", leva: "", category: "", season: "" });
     setTeamDialogOpen(true);
   };
   const openEditTeam = (t: TeamRow) => {
     setEditingTeam(t);
-    setTeamForm({ name: t.name, leva: t.leva, category: t.category });
+    setTeamForm({ name: t.name, leva: t.leva, category: t.category, season: t.season });
     setTeamDialogOpen(true);
   };
   const saveTeam = async () => {
     if (!user) return;
     const name = teamForm.name.trim();
     if (!name) return toast.error("Nome squadra obbligatorio");
-    const payload = { name, category: encodeCategory(teamForm.leva, teamForm.category) };
+    const season = teamForm.season.trim();
+    if (season && !/^\d{4}-\d{4}$/.test(season)) return toast.error("Stagione non valida (formato 2024-2025)");
+    const payload = { name, category: encodeCategory(teamForm.leva, teamForm.category), season: season || null };
     if (editingTeam) {
       const { error } = await supabase.from("saved_teams").update(payload).eq("id", editingTeam.id);
       if (error) {
@@ -515,6 +518,7 @@ export default function TeamMembers() {
                         <div className="flex flex-wrap gap-1.5 mt-1">
                           {t.leva && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{t.leva}</span>}
                           {t.category && <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{t.category}</span>}
+                          {t.season && <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{t.season}</span>}
                           <span className="text-xs text-muted-foreground">{t.memberCount} membri</span>
                         </div>
                       </button>
@@ -545,6 +549,7 @@ export default function TeamMembers() {
                 <div className="flex flex-wrap gap-1.5 mt-1">
                   {selectedTeam.leva && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{selectedTeam.leva}</span>}
                   {selectedTeam.category && <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{selectedTeam.category}</span>}
+                  {selectedTeam.season && <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{selectedTeam.season}</span>}
                 </div>
               </div>
               <Button size="sm" variant="outline" onClick={() => openEditTeam(selectedTeam)}>
@@ -679,6 +684,16 @@ export default function TeamMembers() {
                 <Label>Categoria</Label>
                 <Input value={teamForm.category} onChange={e => setTeamForm({ ...teamForm, category: e.target.value })} placeholder="Es. Pulcini" />
               </div>
+            </div>
+            <div>
+              <Label>Stagione (opzionale)</Label>
+              <Input
+                value={teamForm.season}
+                onChange={e => setTeamForm({ ...teamForm, season: e.target.value })}
+                placeholder="Es. 2024-2025"
+                inputMode="numeric"
+                maxLength={9}
+              />
             </div>
           </div>
           <DialogFooter>
