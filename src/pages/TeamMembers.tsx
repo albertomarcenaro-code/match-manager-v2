@@ -168,19 +168,21 @@ export default function TeamMembers() {
   // ---------- Teams CRUD ----------
   const openCreateTeam = () => {
     setEditingTeam(null);
-    setTeamForm({ name: "", leva: "", category: "" });
+    setTeamForm({ name: "", leva: "", category: "", season: "" });
     setTeamDialogOpen(true);
   };
   const openEditTeam = (t: TeamRow) => {
     setEditingTeam(t);
-    setTeamForm({ name: t.name, leva: t.leva, category: t.category });
+    setTeamForm({ name: t.name, leva: t.leva, category: t.category, season: t.season });
     setTeamDialogOpen(true);
   };
   const saveTeam = async () => {
     if (!user) return;
     const name = teamForm.name.trim();
     if (!name) return toast.error("Nome squadra obbligatorio");
-    const payload = { name, category: encodeCategory(teamForm.leva, teamForm.category) };
+    const season = teamForm.season.trim();
+    if (season && !/^\d{4}-\d{4}$/.test(season)) return toast.error("Stagione non valida (formato 2024-2025)");
+    const payload = { name, category: encodeCategory(teamForm.leva, teamForm.category), season: season || null };
     if (editingTeam) {
       const { error } = await supabase.from("saved_teams").update(payload).eq("id", editingTeam.id);
       if (error) {
