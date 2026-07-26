@@ -683,6 +683,16 @@ export default function TeamMembers() {
                 <Input value={teamForm.category} onChange={e => setTeamForm({ ...teamForm, category: e.target.value })} placeholder="Es. Pulcini" />
               </div>
             </div>
+            <div>
+              <Label>Stagione (opzionale)</Label>
+              <Input
+                value={teamForm.season}
+                onChange={e => setTeamForm({ ...teamForm, season: e.target.value })}
+                placeholder="Es. 2024-2025"
+                inputMode="numeric"
+                maxLength={9}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTeamDialogOpen(false)}>Annulla</Button>
