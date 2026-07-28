@@ -50,8 +50,22 @@ interface TeamRow {
   category: string;
   leva: string;
   season: string;
+  vat_number: string;
+  fiscal_code: string;
+  sdi_code: string;
+  address: string;
+  phone: string;
+  email: string;
+  logo_url: string;
   memberCount: number;
 }
+
+const emptyTeamForm = {
+  name: "", leva: "", category: "", season: "",
+  vat_number: "", fiscal_code: "", sdi_code: "",
+  address: "", phone: "", email: "", logo_url: "",
+};
+
 
 const emptyMember: Omit<TeamMember, "id" | "team_id"> = {
   full_name: "",
@@ -106,7 +120,11 @@ export default function TeamMembers() {
 
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<TeamRow | null>(null);
-  const [teamForm, setTeamForm] = useState({ name: "", leva: "", category: "", season: "" });
+  const [teamForm, setTeamForm] = useState({ ...emptyTeamForm });
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoFileRef = useRef<HTMLInputElement>(null);
+
 
   const [memberDialogOpen, setMemberDialogOpen] = useState(false);
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
