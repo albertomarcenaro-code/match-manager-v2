@@ -24,8 +24,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   ChevronLeft, Upload, Plus, Trash2, Loader2, Pencil, IdCard,
-  Download, Users, ArrowLeft,
+  Download, Users, ArrowLeft, Image as ImageIcon,
 } from "lucide-react";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -726,17 +727,18 @@ export default function TeamMembers() {
 
       {/* Team dialog */}
       <Dialog open={teamDialogOpen} onOpenChange={setTeamDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editingTeam ? "Modifica Squadra" : "Nuova Squadra"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
               <Label>Nome identificativo *</Label>
               <Input value={teamForm.name} onChange={e => setTeamForm({ ...teamForm, name: e.target.value })} placeholder="Es. Athletic Club Albaro" />
+              <p className="text-[11px] text-muted-foreground mt-1">Unico campo obbligatorio. Possono esistere più squadre con lo stesso nome.</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Leva</Label>
-                <Input value={teamForm.leva} onChange={e => setTeamForm({ ...teamForm, leva: e.target.value })} placeholder="Es. 2012" />
+                <Input value={teamForm.leva} onChange={e => setTeamForm({ ...teamForm, leva: e.target.value })} placeholder="Es. 2018" />
               </div>
               <div>
                 <Label>Categoria</Label>
@@ -744,15 +746,68 @@ export default function TeamMembers() {
               </div>
             </div>
             <div>
-              <Label>Stagione (opzionale)</Label>
+              <Label>Stagione</Label>
               <Input
                 value={teamForm.season}
                 onChange={e => setTeamForm({ ...teamForm, season: e.target.value })}
-                placeholder="Es. 2024-2025"
+                placeholder="Es. 2025-2026"
                 inputMode="numeric"
                 maxLength={9}
               />
             </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>P. IVA</Label>
+                <Input value={teamForm.vat_number} onChange={e => setTeamForm({ ...teamForm, vat_number: e.target.value })} placeholder="Es. 02201200991" />
+              </div>
+              <div>
+                <Label>Cod. Fisc.</Label>
+                <Input className="font-mono uppercase" value={teamForm.fiscal_code} onChange={e => setTeamForm({ ...teamForm, fiscal_code: e.target.value.toUpperCase() })} placeholder="Es. 95166490102" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Cod. SDI</Label>
+                <Input value={teamForm.sdi_code} onChange={e => setTeamForm({ ...teamForm, sdi_code: e.target.value })} placeholder="Es. N924-LON" />
+              </div>
+              <div>
+                <Label>Tel/Fax</Label>
+                <Input value={teamForm.phone} onChange={e => setTeamForm({ ...teamForm, phone: e.target.value })} placeholder="Es. 010 4040118" />
+              </div>
+            </div>
+            <div>
+              <Label>Sede</Label>
+              <Input value={teamForm.address} onChange={e => setTeamForm({ ...teamForm, address: e.target.value })} placeholder="Es. Via dei Ciclamini 1w - 16147 Genova (GE)" />
+            </div>
+            <div>
+              <Label>Email</Label>
+              <Input type="email" value={teamForm.email} onChange={e => setTeamForm({ ...teamForm, email: e.target.value })} placeholder="Es. info@societa.it" />
+            </div>
+
+            <div>
+              <Label>Logo Squadra</Label>
+              <div className="flex items-center gap-3 mt-1">
+                <div className="h-16 w-16 rounded-md border bg-muted/30 flex items-center justify-center overflow-hidden shrink-0">
+                  {logoPreview
+                    ? <img src={logoPreview} alt="Logo squadra" className="h-full w-full object-contain" />
+                    : <ImageIcon className="h-6 w-6 text-muted-foreground opacity-50" />}
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" size="sm" className="gap-2" disabled={uploadingLogo} onClick={() => logoFileRef.current?.click()}>
+                    {uploadingLogo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                    {teamForm.logo_url ? "Sostituisci" : "Carica logo"}
+                  </Button>
+                  {teamForm.logo_url && (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => { setTeamForm({ ...teamForm, logo_url: "" }); setLogoPreview(null); }}>
+                      Rimuovi
+                    </Button>
+                  )}
+                </div>
+                <input ref={logoFileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+              </div>
+            </div>
+
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTeamDialogOpen(false)}>Annulla</Button>
