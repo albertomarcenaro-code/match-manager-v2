@@ -30,6 +30,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Json } from "@/integrations/supabase/types";
+import { LOGO_BUCKET, TEAM_PROFILE_COLUMNS, mapTeamProfile, getLogoSignedUrl } from "@/lib/teamProfile";
+
 
 const ROLES = ["Giocatore", "Allenatore", "Dirigente", "Massaggiatore"];
 
