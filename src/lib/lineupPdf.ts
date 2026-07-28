@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { TeamMember } from "@/pages/TeamMembers";
 import type { LineupSelection, MatchMetadata } from "@/types/match";
+import type { TeamProfile } from "@/lib/teamProfile";
 
 interface BuildOpts {
   members: TeamMember[];
@@ -11,6 +12,10 @@ interface BuildOpts {
   awayTeamName: string;
   /** jersey numbers keyed by member name (lower/trim). */
   rosterNumbersByName?: Map<string, number>;
+  /** Anagrafica societaria della squadra (header distinta). */
+  teamProfile?: TeamProfile | null;
+  /** Logo squadra come data URL (base64). */
+  logoDataUrl?: string | null;
 }
 
 const staffSlots: Array<{ label: string }> = [
@@ -28,26 +33,62 @@ const formatItDate = (iso: string) => {
 };
 
 export function buildLineupPdf(opts: BuildOpts): jsPDF {
-  const { members, selection, metadata, homeTeamName, awayTeamName, rosterNumbersByName } = opts;
+  const { members, selection, metadata, homeTeamName, awayTeamName, rosterNumbersByName, teamProfile, logoDataUrl } = opts;
 
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const margin = 12;
   let y = margin;
 
-  // Header societario
+  // ---------- Header societario: logo in alto, dati allineati a sinistra sotto ----------
+  if (logoDataUrl) {
+    try {
+      const props = (doc as any).getImageProperties(logoDataUrl);
+      const maxH = 20;
+      const maxW = 40;
+      const ratio = props.width / props.height;
+      let h = maxH;
+      let w = h * ratio;
+      if (w > maxW) { w = maxW; h = w / ratio; }
+      doc.addImage(logoDataUrl, margin, y, w, h);
+      y += h + 4;
+    } catch {
+      /* logo non valido: prosegui senza */
+    }
+  }
+
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.text("S.S.D A.R.L. ATHLETIC CLUB ALBARO", pageW / 2, y, { align: "center" });
-  y += 4;
+  doc.setFontSize(12);
+  doc.text((teamProfile?.name || homeTeamName || "").toUpperCase(), margin, y);
+  y += 5;
+
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  doc.text("P.I. 02201200991 - Cod. Fisc. 95166490102 - Cod SDI N924-LON", pageW / 2, y, { align: "center" });
-  y += 3.5;
-  doc.text("Sede Via dei Ciclamini 1w - 16147 Genova (GE) - Tel/Fax: 010 4040118", pageW / 2, y, { align: "center" });
-  y += 3.5;
-  doc.text("mail: albaroathleticclub@gmail.com", pageW / 2, y, { align: "center" });
-  y += 6;
+  const infoLines: string[] = [];
+  const levaStagione = [
+    teamProfile?.leva ? `Leva ${teamProfile.leva}` : "",
+    teamProfile?.category || "",
+    teamProfile?.season ? `Stagione ${teamProfile.season}` : "",
+  ].filter(Boolean).join(" · ");
+  if (levaStagione) infoLines.push(levaStagione);
+  const fiscali = [
+    teamProfile?.vat_number ? `P. IVA ${teamProfile.vat_number}` : "",
+    teamProfile?.fiscal_code ? `Cod. Fisc. ${teamProfile.fiscal_code}` : "",
+    teamProfile?.sdi_code ? `Cod. SDI ${teamProfile.sdi_code}` : "",
+  ].filter(Boolean).join(" - ");
+  if (fiscali) infoLines.push(fiscali);
+  if (teamProfile?.address) infoLines.push(`Sede: ${teamProfile.address}`);
+  const contatti = [
+    teamProfile?.phone ? `Tel/Fax: ${teamProfile.phone}` : "",
+    teamProfile?.email ? `Mail: ${teamProfile.email}` : "",
+  ].filter(Boolean).join(" - ");
+  if (contatti) infoLines.push(contatti);
+
+  for (const line of infoLines) {
+    doc.text(line, margin, y);
+    y += 3.6;
+  }
+  y += 3;
 
   doc.setDrawColor(0);
   doc.line(margin, y, pageW - margin, y);
@@ -57,6 +98,7 @@ export function buildLineupPdf(opts: BuildOpts): jsPDF {
   doc.setFontSize(12);
   doc.text("DISTINTA DEI GIOCATORI PARTECIPANTI ALLA GARA", pageW / 2, y, { align: "center" });
   y += 7;
+
 
   // Compose header fields from metadata; respect home/away order
   const home = metadata.isHomeTeam ? homeTeamName : awayTeamName;
