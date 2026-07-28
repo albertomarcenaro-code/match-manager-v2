@@ -24,12 +24,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   ChevronLeft, Upload, Plus, Trash2, Loader2, Pencil, IdCard,
-  Download, Users, ArrowLeft,
+  Download, Users, ArrowLeft, Image as ImageIcon,
 } from "lucide-react";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Json } from "@/integrations/supabase/types";
+import { LOGO_BUCKET, TEAM_PROFILE_COLUMNS, mapTeamProfile, getLogoSignedUrl } from "@/lib/teamProfile";
+
 
 const ROLES = ["Giocatore", "Allenatore", "Dirigente", "Massaggiatore"];
 
@@ -50,8 +53,22 @@ interface TeamRow {
   category: string;
   leva: string;
   season: string;
+  vat_number: string;
+  fiscal_code: string;
+  sdi_code: string;
+  address: string;
+  phone: string;
+  email: string;
+  logo_url: string;
   memberCount: number;
 }
+
+const emptyTeamForm = {
+  name: "", leva: "", category: "", season: "",
+  vat_number: "", fiscal_code: "", sdi_code: "",
+  address: "", phone: "", email: "", logo_url: "",
+};
+
 
 const emptyMember: Omit<TeamMember, "id" | "team_id"> = {
   full_name: "",
@@ -106,7 +123,11 @@ export default function TeamMembers() {
 
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<TeamRow | null>(null);
-  const [teamForm, setTeamForm] = useState({ name: "", leva: "", category: "", season: "" });
+  const [teamForm, setTeamForm] = useState({ ...emptyTeamForm });
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoFileRef = useRef<HTMLInputElement>(null);
+
 
   const [memberDialogOpen, setMemberDialogOpen] = useState(false);
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
@@ -136,7 +157,7 @@ export default function TeamMembers() {
     setLoadingTeams(true);
     const { data: teamsData, error } = await supabase
       .from("saved_teams")
-      .select("id, name, category, season")
+      .select(TEAM_PROFILE_COLUMNS)
       .order("updated_at", { ascending: false });
     if (error) { toast.error("Errore nel caricamento squadre"); setLoadingTeams(false); return; }
     const { data: countsData } = await supabase
@@ -145,10 +166,10 @@ export default function TeamMembers() {
       .eq("user_id", user.id);
     const counts = new Map<string, number>();
     (countsData || []).forEach((r: any) => counts.set(r.team_id, (counts.get(r.team_id) || 0) + 1));
-    setTeams((teamsData || []).map((t: any) => {
-      const { leva, category } = decodeCategory(t.category);
-      return { id: t.id, name: t.name, leva, category, season: t.season || "", memberCount: counts.get(t.id) || 0 };
-    }));
+    setTeams((teamsData || []).map((t: any) => ({
+      ...mapTeamProfile(t),
+      memberCount: counts.get(t.id) || 0,
+    })));
     setLoadingTeams(false);
   };
 
@@ -168,42 +189,80 @@ export default function TeamMembers() {
   // ---------- Teams CRUD ----------
   const openCreateTeam = () => {
     setEditingTeam(null);
-    setTeamForm({ name: "", leva: "", category: "", season: "" });
+    setTeamForm({ ...emptyTeamForm });
+    setLogoPreview(null);
     setTeamDialogOpen(true);
   };
-  const openEditTeam = (t: TeamRow) => {
+  const openEditTeam = async (t: TeamRow) => {
     setEditingTeam(t);
-    setTeamForm({ name: t.name, leva: t.leva, category: t.category, season: t.season });
+    setTeamForm({
+      name: t.name, leva: t.leva, category: t.category, season: t.season,
+      vat_number: t.vat_number, fiscal_code: t.fiscal_code, sdi_code: t.sdi_code,
+      address: t.address, phone: t.phone, email: t.email, logo_url: t.logo_url,
+    });
+    setLogoPreview(null);
     setTeamDialogOpen(true);
+    if (t.logo_url) setLogoPreview(await getLogoSignedUrl(t.logo_url));
   };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    if (!file.type.startsWith("image/")) { toast.error("Seleziona un file immagine"); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error("Immagine troppo grande (max 2MB)"); return; }
+    setUploadingLogo(true);
+    try {
+      const ext = (file.name.split(".").pop() || "png").toLowerCase();
+      const path = `${user.id}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from(LOGO_BUCKET).upload(path, file, { upsert: true });
+      if (error) throw error;
+      setTeamForm(prev => ({ ...prev, logo_url: path }));
+      setLogoPreview(await getLogoSignedUrl(path));
+      toast.success("Logo caricato");
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Errore nel caricamento del logo");
+    } finally {
+      setUploadingLogo(false);
+      if (logoFileRef.current) logoFileRef.current.value = "";
+    }
+  };
+
   const saveTeam = async () => {
     if (!user) return;
     const name = teamForm.name.trim();
     if (!name) return toast.error("Nome squadra obbligatorio");
     const season = teamForm.season.trim();
     if (season && !/^\d{4}-\d{4}$/.test(season)) return toast.error("Stagione non valida (formato 2024-2025)");
-    const payload = { name, category: encodeCategory(teamForm.leva, teamForm.category), season: season || null };
+    const clean = (v: string) => v.trim() || null;
+    const payload = {
+      name,
+      category: encodeCategory(teamForm.leva, teamForm.category),
+      season: season || null,
+      vat_number: clean(teamForm.vat_number),
+      fiscal_code: teamForm.fiscal_code.trim().toUpperCase() || null,
+      sdi_code: clean(teamForm.sdi_code),
+      address: clean(teamForm.address),
+      phone: clean(teamForm.phone),
+      email: clean(teamForm.email),
+      logo_url: clean(teamForm.logo_url),
+    };
     if (editingTeam) {
       const { error } = await supabase.from("saved_teams").update(payload).eq("id", editingTeam.id);
-      if (error) {
-        if ((error as any).code === "23505") return toast.error("Esiste già una squadra con questo nome");
-        return toast.error(`Errore nel salvataggio: ${error.message}`);
-      }
+      if (error) return toast.error(`Errore nel salvataggio: ${error.message}`);
     } else {
       const { data, error } = await supabase
         .from("saved_teams")
         .insert({ user_id: user.id, players: [] as unknown as Json, ...payload })
         .select("id").single();
-      if (error) {
-        if ((error as any).code === "23505") return toast.error("Esiste già una squadra con questo nome");
-        return toast.error(`Errore nel salvataggio: ${error.message}`);
-      }
+      if (error) return toast.error(`Errore nel salvataggio: ${error.message}`);
       if (data?.id) setSelectedTeamId(data.id);
     }
     toast.success("Squadra salvata");
     setTeamDialogOpen(false);
     loadTeams();
   };
+
   const confirmDeleteTeam = async () => {
     if (!deleteTeam) return;
     const { error } = await supabase.from("saved_teams").delete().eq("id", deleteTeam.id);
@@ -668,17 +727,18 @@ export default function TeamMembers() {
 
       {/* Team dialog */}
       <Dialog open={teamDialogOpen} onOpenChange={setTeamDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editingTeam ? "Modifica Squadra" : "Nuova Squadra"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
               <Label>Nome identificativo *</Label>
               <Input value={teamForm.name} onChange={e => setTeamForm({ ...teamForm, name: e.target.value })} placeholder="Es. Athletic Club Albaro" />
+              <p className="text-[11px] text-muted-foreground mt-1">Unico campo obbligatorio. Possono esistere più squadre con lo stesso nome.</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Leva</Label>
-                <Input value={teamForm.leva} onChange={e => setTeamForm({ ...teamForm, leva: e.target.value })} placeholder="Es. 2012" />
+                <Input value={teamForm.leva} onChange={e => setTeamForm({ ...teamForm, leva: e.target.value })} placeholder="Es. 2018" />
               </div>
               <div>
                 <Label>Categoria</Label>
@@ -686,15 +746,68 @@ export default function TeamMembers() {
               </div>
             </div>
             <div>
-              <Label>Stagione (opzionale)</Label>
+              <Label>Stagione</Label>
               <Input
                 value={teamForm.season}
                 onChange={e => setTeamForm({ ...teamForm, season: e.target.value })}
-                placeholder="Es. 2024-2025"
+                placeholder="Es. 2025-2026"
                 inputMode="numeric"
                 maxLength={9}
               />
             </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>P. IVA</Label>
+                <Input value={teamForm.vat_number} onChange={e => setTeamForm({ ...teamForm, vat_number: e.target.value })} placeholder="Es. 02201200991" />
+              </div>
+              <div>
+                <Label>Cod. Fisc.</Label>
+                <Input className="font-mono uppercase" value={teamForm.fiscal_code} onChange={e => setTeamForm({ ...teamForm, fiscal_code: e.target.value.toUpperCase() })} placeholder="Es. 95166490102" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Cod. SDI</Label>
+                <Input value={teamForm.sdi_code} onChange={e => setTeamForm({ ...teamForm, sdi_code: e.target.value })} placeholder="Es. N924-LON" />
+              </div>
+              <div>
+                <Label>Tel/Fax</Label>
+                <Input value={teamForm.phone} onChange={e => setTeamForm({ ...teamForm, phone: e.target.value })} placeholder="Es. 010 4040118" />
+              </div>
+            </div>
+            <div>
+              <Label>Sede</Label>
+              <Input value={teamForm.address} onChange={e => setTeamForm({ ...teamForm, address: e.target.value })} placeholder="Es. Via dei Ciclamini 1w - 16147 Genova (GE)" />
+            </div>
+            <div>
+              <Label>Email</Label>
+              <Input type="email" value={teamForm.email} onChange={e => setTeamForm({ ...teamForm, email: e.target.value })} placeholder="Es. info@societa.it" />
+            </div>
+
+            <div>
+              <Label>Logo Squadra</Label>
+              <div className="flex items-center gap-3 mt-1">
+                <div className="h-16 w-16 rounded-md border bg-muted/30 flex items-center justify-center overflow-hidden shrink-0">
+                  {logoPreview
+                    ? <img src={logoPreview} alt="Logo squadra" className="h-full w-full object-contain" />
+                    : <ImageIcon className="h-6 w-6 text-muted-foreground opacity-50" />}
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" size="sm" className="gap-2" disabled={uploadingLogo} onClick={() => logoFileRef.current?.click()}>
+                    {uploadingLogo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                    {teamForm.logo_url ? "Sostituisci" : "Carica logo"}
+                  </Button>
+                  {teamForm.logo_url && (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => { setTeamForm({ ...teamForm, logo_url: "" }); setLogoPreview(null); }}>
+                      Rimuovi
+                    </Button>
+                  )}
+                </div>
+                <input ref={logoFileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+              </div>
+            </div>
+
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTeamDialogOpen(false)}>Annulla</Button>

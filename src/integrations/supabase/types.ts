@@ -183,34 +183,55 @@ export type Database = {
       }
       saved_teams: {
         Row: {
+          address: string | null
           category: string | null
           created_at: string
+          email: string | null
+          fiscal_code: string | null
           id: string
+          logo_url: string | null
           name: string
+          phone: string | null
           players: Json
+          sdi_code: string | null
           season: string | null
           updated_at: string
           user_id: string
+          vat_number: string | null
         }
         Insert: {
+          address?: string | null
           category?: string | null
           created_at?: string
+          email?: string | null
+          fiscal_code?: string | null
           id?: string
+          logo_url?: string | null
           name: string
+          phone?: string | null
           players?: Json
+          sdi_code?: string | null
           season?: string | null
           updated_at?: string
           user_id: string
+          vat_number?: string | null
         }
         Update: {
+          address?: string | null
           category?: string | null
           created_at?: string
+          email?: string | null
+          fiscal_code?: string | null
           id?: string
+          logo_url?: string | null
           name?: string
+          phone?: string | null
           players?: Json
+          sdi_code?: string | null
           season?: string | null
           updated_at?: string
           user_id?: string
+          vat_number?: string | null
         }
         Relationships: []
       }

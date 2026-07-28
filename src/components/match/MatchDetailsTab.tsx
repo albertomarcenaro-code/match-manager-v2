@@ -16,6 +16,8 @@ import { FileText, Save, Users, ClipboardList, Loader2, ChevronRight, ArrowLeft,
 import type { MatchMetadata, LineupSelection } from "@/types/match";
 import type { TeamMember } from "@/pages/TeamMembers";
 import { buildLineupPdf, suggestedFilename } from "@/lib/lineupPdf";
+import { fetchTeamProfile, getLogoDataUrl } from "@/lib/teamProfile";
+
 
 interface Props {
   metadata: MatchMetadata;
@@ -293,18 +295,27 @@ export function MatchDetailsTab(props: Props) {
     updateSelection({ staffRoles: next });
   };
 
-  const downloadPdf = () => {
+  const downloadPdf = async () => {
     if (selection.playerIds.length === 0) return toast.error("Seleziona almeno un giocatore");
+    let teamProfile = null;
+    let logoDataUrl: string | null = null;
+    if (metadata.teamId) {
+      teamProfile = await fetchTeamProfile(metadata.teamId);
+      if (teamProfile?.logo_url) logoDataUrl = await getLogoDataUrl(teamProfile.logo_url);
+    }
     const doc = buildLineupPdf({
       members,
       selection,
       metadata,
       homeTeamName,
       awayTeamName,
+      teamProfile,
+      logoDataUrl,
     });
     doc.save(suggestedFilename(metadata, homeTeamName, awayTeamName));
     toast.success("Distinta generata");
   };
+
 
   const saveAndProceed = () => {
     if (selection.playerIds.length === 0) return toast.error("Seleziona almeno un giocatore");
