@@ -154,7 +154,7 @@ export default function TeamMembers() {
     setLoadingTeams(true);
     const { data: teamsData, error } = await supabase
       .from("saved_teams")
-      .select("id, name, category, season")
+      .select(TEAM_PROFILE_COLUMNS)
       .order("updated_at", { ascending: false });
     if (error) { toast.error("Errore nel caricamento squadre"); setLoadingTeams(false); return; }
     const { data: countsData } = await supabase
@@ -163,10 +163,10 @@ export default function TeamMembers() {
       .eq("user_id", user.id);
     const counts = new Map<string, number>();
     (countsData || []).forEach((r: any) => counts.set(r.team_id, (counts.get(r.team_id) || 0) + 1));
-    setTeams((teamsData || []).map((t: any) => {
-      const { leva, category } = decodeCategory(t.category);
-      return { id: t.id, name: t.name, leva, category, season: t.season || "", memberCount: counts.get(t.id) || 0 };
-    }));
+    setTeams((teamsData || []).map((t: any) => ({
+      ...mapTeamProfile(t),
+      memberCount: counts.get(t.id) || 0,
+    })));
     setLoadingTeams(false);
   };
 
@@ -186,42 +186,80 @@ export default function TeamMembers() {
   // ---------- Teams CRUD ----------
   const openCreateTeam = () => {
     setEditingTeam(null);
-    setTeamForm({ name: "", leva: "", category: "", season: "" });
+    setTeamForm({ ...emptyTeamForm });
+    setLogoPreview(null);
     setTeamDialogOpen(true);
   };
-  const openEditTeam = (t: TeamRow) => {
+  const openEditTeam = async (t: TeamRow) => {
     setEditingTeam(t);
-    setTeamForm({ name: t.name, leva: t.leva, category: t.category, season: t.season });
+    setTeamForm({
+      name: t.name, leva: t.leva, category: t.category, season: t.season,
+      vat_number: t.vat_number, fiscal_code: t.fiscal_code, sdi_code: t.sdi_code,
+      address: t.address, phone: t.phone, email: t.email, logo_url: t.logo_url,
+    });
+    setLogoPreview(null);
     setTeamDialogOpen(true);
+    if (t.logo_url) setLogoPreview(await getLogoSignedUrl(t.logo_url));
   };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    if (!file.type.startsWith("image/")) { toast.error("Seleziona un file immagine"); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error("Immagine troppo grande (max 2MB)"); return; }
+    setUploadingLogo(true);
+    try {
+      const ext = (file.name.split(".").pop() || "png").toLowerCase();
+      const path = `${user.id}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from(LOGO_BUCKET).upload(path, file, { upsert: true });
+      if (error) throw error;
+      setTeamForm(prev => ({ ...prev, logo_url: path }));
+      setLogoPreview(await getLogoSignedUrl(path));
+      toast.success("Logo caricato");
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Errore nel caricamento del logo");
+    } finally {
+      setUploadingLogo(false);
+      if (logoFileRef.current) logoFileRef.current.value = "";
+    }
+  };
+
   const saveTeam = async () => {
     if (!user) return;
     const name = teamForm.name.trim();
     if (!name) return toast.error("Nome squadra obbligatorio");
     const season = teamForm.season.trim();
     if (season && !/^\d{4}-\d{4}$/.test(season)) return toast.error("Stagione non valida (formato 2024-2025)");
-    const payload = { name, category: encodeCategory(teamForm.leva, teamForm.category), season: season || null };
+    const clean = (v: string) => v.trim() || null;
+    const payload = {
+      name,
+      category: encodeCategory(teamForm.leva, teamForm.category),
+      season: season || null,
+      vat_number: clean(teamForm.vat_number),
+      fiscal_code: teamForm.fiscal_code.trim().toUpperCase() || null,
+      sdi_code: clean(teamForm.sdi_code),
+      address: clean(teamForm.address),
+      phone: clean(teamForm.phone),
+      email: clean(teamForm.email),
+      logo_url: clean(teamForm.logo_url),
+    };
     if (editingTeam) {
       const { error } = await supabase.from("saved_teams").update(payload).eq("id", editingTeam.id);
-      if (error) {
-        if ((error as any).code === "23505") return toast.error("Esiste già una squadra con questo nome");
-        return toast.error(`Errore nel salvataggio: ${error.message}`);
-      }
+      if (error) return toast.error(`Errore nel salvataggio: ${error.message}`);
     } else {
       const { data, error } = await supabase
         .from("saved_teams")
         .insert({ user_id: user.id, players: [] as unknown as Json, ...payload })
         .select("id").single();
-      if (error) {
-        if ((error as any).code === "23505") return toast.error("Esiste già una squadra con questo nome");
-        return toast.error(`Errore nel salvataggio: ${error.message}`);
-      }
+      if (error) return toast.error(`Errore nel salvataggio: ${error.message}`);
       if (data?.id) setSelectedTeamId(data.id);
     }
     toast.success("Squadra salvata");
     setTeamDialogOpen(false);
     loadTeams();
   };
+
   const confirmDeleteTeam = async () => {
     if (!deleteTeam) return;
     const { error } = await supabase.from("saved_teams").delete().eq("id", deleteTeam.id);
