@@ -36,8 +36,10 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
   },
   plugins: [
+    buildCounter(),
     react(),
     mode === "development" && componentTagger(),
+
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: "script-defer",
