@@ -1,9 +1,11 @@
 import { toast } from "sonner";
+import { APP_VERSION } from "@/version";
 
 export function Footer() {
-  // Queste variabili vengono riempite automaticamente durante il caricamento (Build)
-  const version = import.meta.env.VITE_APP_VERSION || "0.2.6";
+  // Versione: maggiore manuale (src/version.ts) + build number automatico
+  const version = APP_VERSION;
   const buildDate = import.meta.env.VITE_APP_BUILD_DATE || "11/03/2026";
+
 
   const handleForceRefresh = async () => {
     toast("Controllo aggiornamenti in corso...", {
@@ -43,6 +45,7 @@ export function Footer() {
         aria-label="Forza aggiornamento all'ultima versione"
       >
         Release {version} • {buildDate}
+
       </button>
     </footer>
   );

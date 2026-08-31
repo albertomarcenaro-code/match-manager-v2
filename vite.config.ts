@@ -1,19 +1,45 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import fs from "fs";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 import pkg from './package.json';
 
+// Incrementa automaticamente il build number ad ogni build di produzione
+function buildCounter(): Plugin {
+  return {
+    name: "build-counter",
+    apply: "build",
+    enforce: "pre",
+    buildStart() {
+      try {
+        const file = path.resolve(__dirname, "./src/version.ts");
+        const src = fs.readFileSync(file, "utf-8");
+        const next = src.replace(
+          /(\/\/ AUTO-GENERATED-BUILD-NUMBER\s*\nexport const BUILD_NUMBER = )(\d+)/,
+          (_m, prefix, n) => `${prefix}${Number(n) + 1}`
+        );
+        if (next !== src) fs.writeFileSync(file, next);
+      } catch {
+        // non bloccare mai la build per il contatore
+      }
+    },
+  };
+}
+
 // https://vitejs.dev/config/
+
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
   },
   plugins: [
+    buildCounter(),
     react(),
     mode === "development" && componentTagger(),
+
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: "script-defer",
