@@ -45,6 +45,7 @@ export function Footer() {
         aria-label="Forza aggiornamento all'ultima versione"
       >
         Release {version} • {buildDate}
+
       </button>
     </footer>
   );
