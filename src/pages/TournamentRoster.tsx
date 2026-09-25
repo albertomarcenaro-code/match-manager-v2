@@ -6,6 +6,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Users, Plus, Trash2, ChevronLeft, Loader2, Save, Trophy, Download,
 } from "lucide-react";
@@ -32,6 +33,7 @@ interface DraftPlayer {
   id: string;
   name: string;
   number: number | null;
+  selected: boolean; // convocato per il torneo
   existed: boolean; // was loaded from DB
 }
 
@@ -102,11 +104,12 @@ export default function TournamentRoster() {
         id: crypto.randomUUID(),
         name: (tp.name || "").toUpperCase(),
         number: n,
+        selected: true,
         existed: false,
       };
     });
     setPlayers(imported);
-    toast.success(`Squadra "${team.name}" caricata. Assegna/verifica i numeri di maglia.`);
+    toast.success(`Squadra "${team.name}" caricata. Tutti i giocatori sono convocati: verifica i numeri di maglia.`);
   };
 
   const confirmReplace = () => {
@@ -145,6 +148,7 @@ export default function TournamentRoster() {
         id: r.id,
         name: r.name,
         number: r.number,
+        selected: true,
         existed: true,
       }));
     });
@@ -153,7 +157,7 @@ export default function TournamentRoster() {
   const addPlayer = () => {
     setPlayers(prev => [
       ...prev,
-      { id: crypto.randomUUID(), name: "", number: null, existed: false },
+      { id: crypto.randomUUID(), name: "", number: null, selected: true, existed: false },
     ]);
   };
 
@@ -164,6 +168,10 @@ export default function TournamentRoster() {
   const updateNumber = (id: string, raw: string) => {
     const n = raw.trim() === "" ? null : Math.max(0, Math.min(99, parseInt(raw, 10) || 0));
     setPlayers(prev => prev.map(p => p.id === id ? { ...p, number: n } : p));
+  };
+
+  const toggleSelected = (id: string) => {
+    setPlayers(prev => prev.map(p => p.id === id ? { ...p, selected: !p.selected } : p));
   };
 
   const requestDelete = (p: DraftPlayer) => setDeleteTarget(p);
@@ -185,20 +193,22 @@ export default function TournamentRoster() {
     // Validate
     const cleaned = players
       .map(p => ({ ...p, name: p.name.trim().toUpperCase() }))
-      .filter(p => p.name.length > 0);
+      .filter(p => p.name.length > 0 || p.selected);
 
-    // Duplicate name check
+    const selected = cleaned.filter(p => p.selected && p.name.length > 0);
+
+    // Duplicate name check (among selected)
     const namesSeen = new Set<string>();
-    for (const p of cleaned) {
+    for (const p of selected) {
       if (namesSeen.has(p.name)) {
         toast.error(`Nome duplicato: ${p.name}`);
         return;
       }
       namesSeen.add(p.name);
     }
-    // Duplicate number check (only those with a number)
+    // Duplicate number check (only selected players with a number)
     const numsSeen = new Set<number>();
-    for (const p of cleaned) {
+    for (const p of selected) {
       if (p.number == null) continue;
       if (numsSeen.has(p.number)) {
         toast.error(`Numero maglia duplicato: ${p.number}`);
@@ -209,25 +219,25 @@ export default function TournamentRoster() {
 
     setSaving(true);
     try {
-      // Persist only those with a valid number (others are excluded from the tournament).
+      // Persist all selected players (number optional — fixed for the whole tournament once set)
       await upsertMany(
-        cleaned
-          .filter(p => typeof p.number === "number" && p.number !== null)
-          .map(p => ({ id: p.id, name: p.name, number: p.number as number })),
+        selected.map(p => ({ id: p.id, name: p.name, number: p.number })),
       );
 
-      // Remove DB rows for players whose number was cleared
-      const toRemove = players.filter(p => p.existed && (p.number == null || p.name.trim() === ""));
+      // Remove DB rows for players that were unselected or emptied
+      const selectedIds = new Set(selected.map(p => p.id));
+      const toRemove = players.filter(p => p.existed && !selectedIds.has(p.id));
       for (const p of toRemove) {
         await removePlayer(p.id);
       }
 
-      // Refresh local draft state from cleaned set so existed flags update
+      // Refresh local draft state so existed flags update
       setPlayers(cleaned.map(p => ({
         id: p.id,
         name: p.name,
         number: p.number,
-        existed: p.number != null,
+        selected: p.selected && p.name.length > 0,
+        existed: p.selected && p.name.length > 0,
       })));
 
       toast.success("Rosa del torneo salvata");
@@ -252,7 +262,8 @@ export default function TournamentRoster() {
     );
   }
 
-  const validCount = players.filter(p => p.name.trim() && p.number != null).length;
+  const selectedCount = players.filter(p => p.selected && p.name.trim()).length;
+  const numberedCount = players.filter(p => p.selected && p.name.trim() && p.number != null).length;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -260,7 +271,7 @@ export default function TournamentRoster() {
         <title>Rosa del Torneo | Match Manager Live</title>
         <meta
           name="description"
-          content="Configura la rosa fissa della tua squadra per il torneo, con nomi e numeri di maglia persistenti."
+          content="Seleziona i convocati del torneo e assegna i numeri di maglia fissi, riproposti automaticamente in ogni partita."
         />
       </Helmet>
       <Header />
@@ -286,10 +297,9 @@ export default function TournamentRoster() {
           <div className="flex items-start gap-2">
             <Users className="h-4 w-4 mt-0.5 text-primary shrink-0" />
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Definisci qui i giocatori della <strong>Mia Squadra</strong> e i loro numeri di maglia.
-              Verranno precompilati automaticamente in ogni partita del torneo.
-              I giocatori <strong>senza numero</strong> non parteciperanno al torneo e
-              saranno esclusi dalle statistiche.
+              <strong>Spunta</strong> i giocatori convocati per il torneo e assegna loro il numero di maglia
+              (facoltativo in questa fase). I numeri inseriti qui diventano <strong>fissi per l'intero torneo</strong> e
+              verranno riproposti automaticamente nella distinta di ogni partita, con possibilità di modifica puntuale.
             </p>
           </div>
         </Card>
@@ -303,7 +313,13 @@ export default function TournamentRoster() {
             </Card>
           ) : (
             players.map((p) => (
-              <Card key={p.id} className="p-3 flex items-center gap-2">
+              <Card key={p.id} className={`p-3 flex items-center gap-2 ${p.selected ? "" : "opacity-60"}`}>
+                <Checkbox
+                  checked={p.selected}
+                  onCheckedChange={() => toggleSelected(p.id)}
+                  aria-label={`Convoca ${p.name || "giocatore"}`}
+                  className="shrink-0"
+                />
                 <Input
                   type="number"
                   inputMode="numeric"
@@ -312,6 +328,7 @@ export default function TournamentRoster() {
                   placeholder="#"
                   value={p.number ?? ""}
                   onChange={(e) => updateNumber(p.id, e.target.value)}
+                  disabled={!p.selected}
                   className="w-16 text-center font-bold tabular-nums"
                 />
                 <Input
@@ -351,7 +368,7 @@ export default function TournamentRoster() {
             disabled={saving}
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Salva Rosa ({validCount} giocatori attivi)
+            Salva Rosa ({selectedCount} convocati · {numberedCount} con numero)
           </Button>
         </div>
       </main>
@@ -379,7 +396,7 @@ export default function TournamentRoster() {
           <DialogHeader>
             <DialogTitle>Le mie squadre salvate</DialogTitle>
             <DialogDescription>
-              Scegli una squadra da importare nella rosa del torneo. Verranno copiati nomi e numeri di maglia.
+              Scegli una squadra da importare nella rosa del torneo. Tutti i giocatori verranno convocati con i loro numeri di maglia.
             </DialogDescription>
           </DialogHeader>
           {loadingSavedTeams ? (

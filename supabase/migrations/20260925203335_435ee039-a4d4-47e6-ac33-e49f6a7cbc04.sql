@@ -1,0 +1,1 @@
+ALTER TABLE public.tournament_jersey_numbers ALTER COLUMN jersey_number DROP NOT NULL;

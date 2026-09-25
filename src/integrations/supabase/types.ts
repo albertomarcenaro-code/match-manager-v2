@@ -289,7 +289,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          jersey_number: number
+          jersey_number: number | null
           player_id: string
           player_name: string
           tournament_id: string
@@ -299,7 +299,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
-          jersey_number: number
+          jersey_number?: number | null
           player_id: string
           player_name: string
           tournament_id: string
@@ -309,7 +309,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
-          jersey_number?: number
+          jersey_number?: number | null
           player_id?: string
           player_name?: string
           tournament_id?: string

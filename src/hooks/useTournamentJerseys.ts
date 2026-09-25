@@ -11,19 +11,22 @@ export interface JerseyEntry {
 export interface RosterEntry {
   id: string;
   name: string;
-  number: number;
+  number: number | null;
 }
 
 /**
  * Persistent jersey-number storage per tournament.
  * Source of truth for "Mia Squadra" jersey numbers across matches of the same tournament.
  *
- * Each row in tournament_jersey_numbers represents a player IN the tournament roster.
+ * Each row in tournament_jersey_numbers represents a player SELECTED (convocato)
+ * for the tournament roster. The jersey number is optional at selection time and
+ * can be assigned later; once set, it is fixed for the whole tournament and
+ * auto-proposed in every match of that tournament.
  * A player without an entry here is NOT considered part of the tournament.
  */
 export function useTournamentJerseys(tournamentId: string | null | undefined) {
   const { user, isGuest } = useAuth();
-  const [jerseys, setJerseys] = useState<Map<string, number>>(new Map());
+  const [jerseys, setJerseys] = useState<Map<string, number | null>>(new Map());
   const [names, setNames] = useState<Map<string, string>>(new Map());
   const [loaded, setLoaded] = useState(false);
   const flushTimer = useRef<number | null>(null);
@@ -47,7 +50,7 @@ export function useTournamentJerseys(tournamentId: string | null | undefined) {
         .eq('user_id', user.id);
       if (cancelled) return;
       if (!error && data) {
-        const jm = new Map<string, number>();
+        const jm = new Map<string, number | null>();
         const nm = new Map<string, string>();
         for (const row of data) {
           jm.set(row.player_id, row.jersey_number);
@@ -71,31 +74,20 @@ export function useTournamentJerseys(tournamentId: string | null | undefined) {
     if (!entries.length) return;
 
     const toUpsert = entries
-      .filter(e => typeof e.number === 'number' && e.number !== null && e.id && e.name)
+      .filter(e => e.id && e.name)
       .map(e => ({
         tournament_id: tournamentId,
         user_id: user.id,
         player_id: e.id,
         player_name: e.name,
-        jersey_number: e.number as number,
+        jersey_number: e.number,
       }));
-    const toDelete = entries
-      .filter(e => e.number == null && e.id)
-      .map(e => e.id);
 
     try {
       if (toUpsert.length) {
         await supabase
           .from('tournament_jersey_numbers')
           .upsert(toUpsert, { onConflict: 'tournament_id,player_id' });
-      }
-      if (toDelete.length) {
-        await supabase
-          .from('tournament_jersey_numbers')
-          .delete()
-          .eq('tournament_id', tournamentId)
-          .eq('user_id', user.id)
-          .in('player_id', toDelete);
       }
     } catch (e) {
       console.error('Failed to persist tournament jerseys:', e);
@@ -113,21 +105,19 @@ export function useTournamentJerseys(tournamentId: string | null | undefined) {
   const applyLocal = useCallback((entry: JerseyEntry) => {
     setJerseys(prev => {
       const next = new Map(prev);
-      if (entry.number == null) next.delete(entry.id);
-      else next.set(entry.id, entry.number);
+      next.set(entry.id, entry.number);
       return next;
     });
     setNames(prev => {
       const next = new Map(prev);
-      if (entry.number == null) next.delete(entry.id);
-      else next.set(entry.id, entry.name);
+      next.set(entry.id, entry.name);
       return next;
     });
   }, []);
 
   /**
    * Optimistic local update + debounced persistence.
-   * Pass number=null to clear (deletes the row).
+   * number=null keeps the player selected but without a jersey number.
    */
   const upsertJersey = useCallback((entry: JerseyEntry) => {
     if (!entry.id) return;
@@ -152,24 +142,55 @@ export function useTournamentJerseys(tournamentId: string | null | undefined) {
 
   const removePlayer = useCallback(async (playerId: string) => {
     if (!playerId) return;
-    applyLocal({ id: playerId, name: '', number: null });
-    pending.current.set(playerId, { id: playerId, name: '', number: null });
+    setJerseys(prev => {
+      const next = new Map(prev);
+      next.delete(playerId);
+      return next;
+    });
+    setNames(prev => {
+      const next = new Map(prev);
+      next.delete(playerId);
+      return next;
+    });
+    pending.current.delete(playerId);
     if (flushTimer.current) {
       window.clearTimeout(flushTimer.current);
       flushTimer.current = null;
     }
-    await flush();
-  }, [applyLocal, flush]);
+    if (!tournamentId || !user || isGuest) return;
+    try {
+      await supabase
+        .from('tournament_jersey_numbers')
+        .delete()
+        .eq('tournament_id', tournamentId)
+        .eq('user_id', user.id)
+        .eq('player_id', playerId);
+    } catch (e) {
+      console.error('Failed to remove tournament player:', e);
+    }
+  }, [tournamentId, user?.id, isGuest]);
 
   const getNumber = useCallback(
-    (playerId: string): number | null => (jerseys.has(playerId) ? jerseys.get(playerId)! : null),
+    (playerId: string): number | null => {
+      const n = jerseys.get(playerId);
+      return n == null ? null : n;
+    },
     [jerseys]
   );
 
-  /** Full roster derived from persisted state. Only players with a jersey number. */
+  /**
+   * Full roster derived from persisted state — all SELECTED players,
+   * with or without a jersey number. Numbered players first (by number),
+   * then unnumbered (alphabetical).
+   */
   const roster: RosterEntry[] = Array.from(jerseys.entries())
     .map(([id, number]) => ({ id, name: names.get(id) || '', number }))
-    .sort((a, b) => a.number - b.number);
+    .sort((a, b) => {
+      if (a.number != null && b.number != null) return a.number - b.number;
+      if (a.number != null) return -1;
+      if (b.number != null) return 1;
+      return a.name.localeCompare(b.name, 'it');
+    });
 
   return {
     jerseys,
