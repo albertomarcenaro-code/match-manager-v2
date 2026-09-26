@@ -30,6 +30,8 @@ interface Props {
   onSetHomeRosterFromMembers: (players: Array<{ id: string; name: string; number: number | null }>) => void;
   onGoToRoster: () => void;
   isMatchStarted: boolean;
+  /** Fixed tournament jersey numbers (player id → number), matched by id or normalized name. */
+  tournamentRoster?: Array<{ id: string; name: string; number: number | null }>;
 }
 
 interface TeamRow { id: string; name: string; leva: string; category: string; }
@@ -55,7 +57,18 @@ export function MatchDetailsTab(props: Props) {
     metadata, homeTeamName, awayTeamName,
     onMetadataChange, onHomeTeamNameChange, onAwayTeamNameChange,
     onSaveNow, onSetHomeRosterFromMembers, onGoToRoster, isMatchStarted,
+    tournamentRoster,
   } = props;
+
+  // Tournament jersey lookup: by member id first, then by normalized name.
+  const tournamentNumber = (memberId: string, fullName: string): number | null => {
+    if (!tournamentRoster || tournamentRoster.length === 0) return null;
+    const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+    const byId = tournamentRoster.find(r => r.id === memberId);
+    if (byId?.number != null) return byId.number;
+    const byName = tournamentRoster.find(r => norm(r.name) === norm(fullName));
+    return byName?.number ?? null;
+  };
   const { user } = useAuth();
 
   const [teams, setTeams] = useState<TeamRow[]>([]);
@@ -323,7 +336,12 @@ export function MatchDetailsTab(props: Props) {
     const selectedPlayers = players
       .filter(p => selSet.has(p.id))
       .sort((a, b) => a.full_name.localeCompare(b.full_name, "it"))
-      .map(p => ({ id: p.id, name: p.full_name, number: p.jersey_number }));
+      .map(p => ({
+        id: p.id,
+        name: p.full_name,
+        // Fixed tournament number wins over the anagrafica default; manual edits stay possible in Rose.
+        number: tournamentNumber(p.id, p.full_name) ?? p.jersey_number,
+      }));
     onSetHomeRosterFromMembers(selectedPlayers);
     onSaveNow();
     toast.success("Distinta salvata — rosa pre-compilata");
