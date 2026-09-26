@@ -72,7 +72,7 @@ const MatchApp = () => {
   } = useMatch();
 
   // Tournament-scoped jersey persistence (only active when tournamentId is present)
-  const { jerseys: tournamentJerseys, loaded: jerseysLoaded, upsertJersey } =
+  const { jerseys: tournamentJerseys, roster: tournamentRoster, loaded: jerseysLoaded, upsertJersey } =
     useTournamentJerseys(tournamentId);
   const jerseysAppliedRef = useRef(false);
   const preloadAppliedRef = useRef(false);
@@ -97,8 +97,9 @@ const MatchApp = () => {
 
     let didApply = false;
     for (const p of state.homeTeam.players) {
-      if (p.number == null && tournamentJerseys.has(p.id)) {
-        updatePlayerNumber(p.id, tournamentJerseys.get(p.id)!);
+      const n = tournamentJerseys.get(p.id);
+      if (p.number == null && n != null) {
+        updatePlayerNumber(p.id, n);
         didApply = true;
       }
     }
@@ -240,6 +241,7 @@ const MatchApp = () => {
               onSetHomeRosterFromMembers={setHomeRosterFromMembers}
               onGoToRoster={() => setActiveTab('roster')}
               isMatchStarted={state.isMatchStarted}
+              tournamentRoster={tournamentId ? tournamentRoster : undefined}
             />
           </TabsContent>
 
