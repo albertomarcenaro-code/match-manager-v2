@@ -390,7 +390,11 @@ export function MatchDetailsTab(props: Props) {
                       <p className="truncate font-medium">{p.full_name}</p>
                       <p className="text-xs text-muted-foreground">
                         {p.birth_date ? new Date(p.birth_date).toLocaleDateString("it-IT") : "—"} · Matr. {p.figc_number || "—"}
-                        {p.jersey_number != null ? ` · N.${p.jersey_number}` : ""}
+                        {(() => {
+                          const tn = tournamentNumber(p.id, p.full_name);
+                          if (tn != null) return ` · N.${tn} (torneo)`;
+                          return p.jersey_number != null ? ` · N.${p.jersey_number}` : "";
+                        })()}
                       </p>
                     </div>
                     {isSel && (
