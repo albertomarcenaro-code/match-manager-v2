@@ -300,9 +300,9 @@ export default function TournamentRoster() {
           <div className="flex items-start gap-2">
             <Users className="h-4 w-4 mt-0.5 text-primary shrink-0" />
             <p className="text-xs text-muted-foreground leading-relaxed">
-              <strong>Spunta</strong> i giocatori convocati per il torneo e assegna loro il numero di maglia
-              (facoltativo in questa fase). I numeri inseriti qui diventano <strong>fissi per l'intero torneo</strong> e
-              verranno riproposti automaticamente nella distinta di ogni partita, con possibilità di modifica puntuale.
+              <strong>Spunta</strong> i giocatori convocati per il torneo. I numeri di maglia sono facoltativi in questa
+              fase, ma diventano <strong>obbligatori alla prima partita</strong>: da quel momento restano
+              <strong> fissi per l'intero torneo</strong> e vengono riproposti automaticamente in ogni partita successiva.
             </p>
           </div>
         </Card>

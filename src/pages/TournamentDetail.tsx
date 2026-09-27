@@ -6,8 +6,10 @@ import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
-  Trophy, Plus, Trash2, ChevronLeft, Loader2, BarChart3, Eye, Download, ChevronsRight, ChevronsLeft, Users, FileText,
+  Trophy, Plus, Trash2, ChevronLeft, Loader2, BarChart3, Eye, Download, ChevronsRight, ChevronsLeft, Users, FileText, MessageCircle,
 } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { GenerateLineupSheet } from "@/components/match/GenerateLineupSheet";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -104,6 +106,19 @@ export default function TournamentDetail() {
       navigate(`/tournament/${tournamentId}/roster`);
       return;
     }
+    const isFirstMatch = matches.length === 0;
+    // Prima partita del torneo: i numeri di maglia sono OBBLIGATORI per tutti i convocati
+    // (diventano fissi per l'intero torneo).
+    if (isFirstMatch) {
+      const missing = tournamentRoster.filter(r => r.number == null);
+      if (missing.length > 0) {
+        toast.error(
+          `Prima della prima partita assegna il numero di maglia a tutti i convocati (${missing.length} senza numero).`
+        );
+        navigate(`/tournament/${tournamentId}/roster`);
+        return;
+      }
+    }
     // Must be a valid UUID — DB column matches.id is uuid
     const matchId = crypto.randomUUID();
     navigate(`/match/${matchId}?tournamentId=${tournamentId}`, {
@@ -113,6 +128,8 @@ export default function TournamentDetail() {
           name: r.name,
           number: r.number,
         })),
+        // Partite successive: salta la distinta e vai diretto alle rose (numeri già fissati)
+        skipToRoster: !isFirstMatch,
       },
     });
   };
