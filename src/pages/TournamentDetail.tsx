@@ -201,6 +201,124 @@ export default function TournamentDetail() {
     toast.success("Report Excel scaricato!");
   };
 
+  // ---- PDF report: riepilogo partite + rendimento giocatori ----
+  const exportPdf = () => {
+    const stats = computeGlobalStats();
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 10;
+    let y = 14;
+
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text(tournament?.name || "Torneo", margin, y);
+    y += 7;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    doc.text(
+      `Squadra: ${tournament?.team_name || ""} · ${orderedMatches.length} partite · V${stats.wins} P${stats.draws} S${stats.losses}`,
+      margin, y,
+    );
+    doc.setTextColor(0, 0, 0);
+
+    autoTable(doc, {
+      startY: y + 3,
+      head: [["#", "Data", "Partita", "Risultato"]],
+      body: orderedMatches.map((m, i) => [
+        `P${i + 1}`,
+        formatDate(m.match_date),
+        `${m.home_team_name} vs ${m.away_team_name}`,
+        `${m.home_score} - ${m.away_score}`,
+      ]),
+      theme: "striped",
+      headStyles: { fillColor: [39, 70, 63], fontSize: 8 },
+      bodyStyles: { fontSize: 8 },
+      margin: { left: margin, right: margin },
+    });
+
+    y = ((doc as any).lastAutoTable?.finalY ?? y) + 8;
+
+    if (stats.players.length > 0) {
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text("Rendimento Giocatori", margin, y);
+      autoTable(doc, {
+        startY: y + 2,
+        head: [["#", "Giocatore", "Pres.", "Min", "Gol", "Amm.", "Esp."]],
+        body: stats.players.map(p => [
+          p.number != null ? String(p.number) : "",
+          p.name,
+          String(p.matchesPlayed),
+          String(p.minutes),
+          p.goals ? String(p.goals) : "-",
+          p.yellowCards ? String(p.yellowCards) : "-",
+          p.redCards ? String(p.redCards) : "-",
+        ]),
+        theme: "striped",
+        headStyles: { fillColor: [39, 70, 63], fontSize: 8 },
+        bodyStyles: { fontSize: 8 },
+        margin: { left: margin, right: margin },
+      });
+    }
+
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setFontSize(7);
+    doc.setTextColor(120, 120, 120);
+    doc.text(
+      "Match Manager Live · https://matchmanager-live.lovable.app",
+      pageWidth / 2, pageHeight - 8, { align: "center" },
+    );
+
+    doc.save(`${(tournament?.name || "torneo").replace(/\s+/g, "_")}_report.pdf`);
+    toast.success("Report PDF scaricato!");
+  };
+
+  // ---- WhatsApp: elenco partite con risultato e SOLI marcatori della nostra squadra ----
+  const shareWhatsApp = async () => {
+    const lines: string[] = [];
+    lines.push(`TORNEO: ${tournament?.name || ""}`);
+    if (tournament?.team_name) lines.push(`Squadra: ${tournament.team_name}`);
+    lines.push("");
+    orderedMatches.forEach((m, i) => {
+      lines.push(`P${i + 1}) ${m.home_team_name} ${m.home_score} - ${m.away_score} ${m.away_team_name}`);
+      const md = (m.match_data && typeof m.match_data === "object") ? m.match_data : {};
+      const events: any[] = md.events || [];
+      const scorers: string[] = [];
+      for (const e of events) {
+        // Solo la NOSTRA squadra (home): gol diretti + autogol avversari a nostro favore
+        if (e.type === "goal" && e.team === "home") {
+          scorers.push(e.playerName?.split("(")[0].trim() || "N/D");
+        } else if (e.type === "own_goal" && e.team === "away") {
+          scorers.push(`AG ${e.playerName?.split("(")[0].trim() || ""}`.trim());
+        }
+      }
+      if (scorers.length > 0) {
+        const counts: Record<string, number> = {};
+        scorers.forEach(s => { counts[s] = (counts[s] || 0) + 1; });
+        const formatted = Object.entries(counts)
+          .map(([n, c]) => (c > 1 ? `${n} (x${c})` : n))
+          .join(", ");
+        lines.push(`   Marcatori: ${formatted}`);
+      }
+    });
+    lines.push("");
+    lines.push("https://matchmanager-live.lovable.app");
+    const message = lines.join("\n");
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: tournament?.name || "Torneo", text: message });
+        toast.success("Condiviso!");
+        return;
+      } catch (error) {
+        if ((error as Error).name === "AbortError") return;
+      }
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
+    toast.success("Aperto WhatsApp");
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
@@ -321,6 +439,29 @@ export default function TournamentDetail() {
               </Card>
             ))}
           </div>
+        )}
+
+        {/* Report e Condivisione */}
+        {matches.length > 0 && (
+          <Card className="p-4 mt-6 space-y-3">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Download className="h-5 w-5" /> Report Torneo
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <Button variant="outline" onClick={exportExcel} className="gap-2">
+                <Download className="h-4 w-4" /> Excel
+              </Button>
+              <Button variant="outline" onClick={exportPdf} className="gap-2">
+                <FileText className="h-4 w-4" /> PDF
+              </Button>
+              <Button variant="outline" onClick={shareWhatsApp} className="gap-2">
+                <MessageCircle className="h-4 w-4 text-[#25D366]" /> WhatsApp
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Il report WhatsApp elenca tutte le partite con il risultato finale e i soli marcatori della tua squadra.
+            </p>
+          </Card>
         )}
       </main>
       <Footer />
