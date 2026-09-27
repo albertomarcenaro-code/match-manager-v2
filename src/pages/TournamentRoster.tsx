@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Users, Plus, Trash2, ChevronLeft, Loader2, Save, Trophy, Download,
+  Users, Plus, Trash2, ChevronLeft, Loader2, Save, Trophy, Download, CheckSquare, Square,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -104,12 +104,12 @@ export default function TournamentRoster() {
         id: crypto.randomUUID(),
         name: (tp.name || "").toUpperCase(),
         number: n,
-        selected: true,
+        selected: false, // spunte inizialmente DESELEZIONATE all'importazione
         existed: false,
       };
     });
     setPlayers(imported);
-    toast.success(`Squadra "${team.name}" caricata. Tutti i giocatori sono convocati: verifica i numeri di maglia.`);
+    toast.success(`Squadra "${team.name}" caricata. Spunta i giocatori da convocare per il torneo.`);
   };
 
   const confirmReplace = () => {
@@ -173,6 +173,9 @@ export default function TournamentRoster() {
   const toggleSelected = (id: string) => {
     setPlayers(prev => prev.map(p => p.id === id ? { ...p, selected: !p.selected } : p));
   };
+
+  const selectAll = () => setPlayers(prev => prev.map(p => ({ ...p, selected: true })));
+  const deselectAll = () => setPlayers(prev => prev.map(p => ({ ...p, selected: false })));
 
   const requestDelete = (p: DraftPlayer) => setDeleteTarget(p);
 
@@ -304,6 +307,17 @@ export default function TournamentRoster() {
           </div>
         </Card>
 
+        {players.length > 0 && (
+          <div className="flex gap-2 mb-3">
+            <Button variant="outline" size="sm" className="flex-1 gap-1.5" onClick={selectAll}>
+              <CheckSquare className="h-4 w-4" /> Seleziona Tutti
+            </Button>
+            <Button variant="outline" size="sm" className="flex-1 gap-1.5" onClick={deselectAll}>
+              <Square className="h-4 w-4" /> Deseleziona Tutti
+            </Button>
+          </div>
+        )}
+
         <div className="space-y-2 mb-4">
           {players.length === 0 ? (
             <Card className="p-8 text-center">
@@ -396,7 +410,7 @@ export default function TournamentRoster() {
           <DialogHeader>
             <DialogTitle>Le mie squadre salvate</DialogTitle>
             <DialogDescription>
-              Scegli una squadra da importare nella rosa del torneo. Tutti i giocatori verranno convocati con i loro numeri di maglia.
+              Scegli una squadra da importare nella rosa del torneo. I giocatori verranno caricati con le spunte deselezionate: spunta chi vuoi convocare.
             </DialogDescription>
           </DialogHeader>
           {loadingSavedTeams ? (
