@@ -29,6 +29,8 @@ const MatchApp = () => {
   const { user, isGuest } = useAuth();
   const tournamentId = searchParams.get('tournamentId');
   const preloadedHomePlayers = ((location.state as any)?.preloadedHomePlayers ?? []) as Array<{ id: string; name: string; number: number | null }>;
+  // Partite successive di un torneo: salta la distinta e apri direttamente le rose
+  const skipToRoster = Boolean((location.state as any)?.skipToRoster);
 
   const {
     state,
@@ -113,6 +115,7 @@ const MatchApp = () => {
     if (state.isMatchStarted && !state.needsStarterSelection) return 'live';
     if (state.isMatchStarted && state.needsStarterSelection) return 'starters';
     if (state.metadata?.detailsConfirmed) return 'roster';
+    if (skipToRoster) return 'roster';
     return 'distinta';
   });
 
