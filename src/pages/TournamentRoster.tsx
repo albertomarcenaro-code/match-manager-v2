@@ -239,7 +239,7 @@ export default function TournamentRoster() {
                 fiscal_code: null,
                 jersey_number: null,
               } as unknown as TeamMember);
-          return { ...base, jersey_number: p.number ?? base.jersey_number ?? null };
+          return { ...base, id: p.id, jersey_number: p.number ?? base.jersey_number ?? null };
         }),
         ...dbMembers.filter(m => (m.role || "").toLowerCase() !== "giocatore"),
       ];
