@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { Helmet } from "react-helmet";
 import { useNavigate, useParams } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
@@ -8,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Users, Plus, Trash2, ChevronLeft, Loader2, Save, Trophy, Download, CheckSquare, Square,
+  Users, Plus, Trash2, ChevronLeft, Loader2, Save, Trophy, Download, CheckSquare, Square, FileText,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
