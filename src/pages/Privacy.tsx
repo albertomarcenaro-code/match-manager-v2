@@ -9,6 +9,11 @@ const Privacy = () => (
     <Helmet>
       <title>Privacy Policy | Match Manager Live</title>
       <meta name="description" content="Informativa sulla Privacy di Match Manager Live. Scopri come trattiamo i tuoi dati." />
+      <meta property="og:title" content="Privacy Policy | Match Manager Live" />
+      <meta property="og:description" content="Informativa sulla Privacy di Match Manager Live. Scopri come trattiamo i tuoi dati." />
+      <meta property="og:url" content="https://matchmanager-live.lovable.app/privacy" />
+      <meta name="twitter:title" content="Privacy Policy | Match Manager Live" />
+      <meta name="twitter:description" content="Informativa sulla Privacy di Match Manager Live. Scopri come trattiamo i tuoi dati." />
     </Helmet>
     <Header />
     <main className="flex-1 py-12 md:py-16">

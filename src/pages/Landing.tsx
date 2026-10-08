@@ -38,6 +38,11 @@ const Landing = () => {
       <Helmet>
         <title>Match Manager Live | Il tuo assistente di campo</title>
         <meta name="description" content="Gestione professionale di partite di calcio e tornei in tempo reale con cronometro e statistiche." />
+        <meta property="og:title" content="Match Manager Live | Il tuo assistente di campo" />
+        <meta property="og:description" content="Gestione professionale di partite di calcio e tornei in tempo reale con cronometro e statistiche." />
+        <meta property="og:url" content="https://matchmanager-live.lovable.app/" />
+        <meta name="twitter:title" content="Match Manager Live | Il tuo assistente di campo" />
+        <meta name="twitter:description" content="Gestione professionale di partite di calcio e tornei in tempo reale con cronometro e statistiche." />
         <script type="application/ld+json">{`
           {
             "@context": "https://schema.org",

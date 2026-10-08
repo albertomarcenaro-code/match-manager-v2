@@ -9,6 +9,11 @@ const About = () => (
     <Helmet>
       <title>Chi Siamo | Match Manager Live</title>
       <meta name="description" content="Scopri la visione di Match Manager Live e contattaci per supporto o feedback." />
+      <meta property="og:title" content="Chi Siamo | Match Manager Live" />
+      <meta property="og:description" content="Scopri la visione di Match Manager Live e contattaci per supporto o feedback." />
+      <meta property="og:url" content="https://matchmanager-live.lovable.app/about" />
+      <meta name="twitter:title" content="Chi Siamo | Match Manager Live" />
+      <meta name="twitter:description" content="Scopri la visione di Match Manager Live e contattaci per supporto o feedback." />
     </Helmet>
     <Header />
     <main className="flex-1 py-12 md:py-16">
