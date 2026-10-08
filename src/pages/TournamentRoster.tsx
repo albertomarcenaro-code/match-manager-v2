@@ -1,6 +1,4 @@
 import React, { useEffect, useState } from "react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { Helmet } from "react-helmet";
 import { useNavigate, useParams } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
@@ -23,6 +21,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { useTournamentJerseys, RosterEntry } from "@/hooks/useTournamentJerseys";
+import { buildLineupPdf } from "@/lib/lineupPdf";
+import { fetchTeamProfile, getLogoDataUrl } from "@/lib/teamProfile";
+import type { TeamMember } from "@/pages/TeamMembers";
+import type { MatchMetadata } from "@/types/match";
 
 interface SavedTeam {
   id: string;
