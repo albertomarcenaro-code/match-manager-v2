@@ -194,6 +194,62 @@ export default function TournamentRoster() {
     }
   };
 
+  const printDistinta = () => {
+    const selected = players
+      .filter(p => p.selected && p.name.trim().length > 0)
+      .sort((a, b) => {
+        if (a.number != null && b.number != null) return a.number - b.number;
+        if (a.number != null) return -1;
+        if (b.number != null) return 1;
+        return a.name.localeCompare(b.name, "it");
+      });
+    if (selected.length === 0) {
+      toast.error("Seleziona almeno un giocatore da stampare");
+      return;
+    }
+
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const pageW = doc.internal.pageSize.getWidth();
+    const margin = 12;
+    let y = margin;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.text("DISTINTA GIOCATORI", pageW / 2, y, { align: "center" });
+    y += 6;
+    doc.setFontSize(11);
+    doc.text((tournamentName || "Torneo").toUpperCase(), pageW / 2, y, { align: "center" });
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text(
+      `Stampata il ${new Date().toLocaleDateString("it-IT")} · ${selected.length} convocati`,
+      pageW / 2, y, { align: "center" }
+    );
+    y += 4;
+    doc.setDrawColor(0);
+    doc.line(margin, y, pageW - margin, y);
+    y += 4;
+
+    autoTable(doc, {
+      startY: y,
+      head: [["N° Maglia", "Cognome e Nome"]],
+      body: selected.map(p => [p.number != null ? String(p.number) : "", p.name.toUpperCase()]),
+      styles: { fontSize: 10, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.1 },
+      headStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: "bold", halign: "center" },
+      columnStyles: {
+        0: { halign: "center", cellWidth: 25 },
+        1: { cellWidth: "auto" },
+      },
+      theme: "grid",
+      margin: { left: margin, right: margin },
+    });
+
+    const filename = `distinta_${(tournamentName || "torneo").replace(/[^a-z0-9]+/gi, "_")}.pdf`.toLowerCase();
+    doc.save(filename);
+    toast.success("Distinta generata");
+  };
+
   const handleSave = async () => {
     // Validate
     const cleaned = players
@@ -378,6 +434,14 @@ export default function TournamentRoster() {
 
 
         <div className="sticky bottom-4 flex flex-col gap-2">
+          <Button
+            variant="outline"
+            className="w-full gap-2"
+            onClick={printDistinta}
+            disabled={selectedCount === 0}
+          >
+            <FileText className="h-4 w-4" /> Stampa Distinta ({selectedCount} convocati)
+          </Button>
           <Button
             className="w-full gap-2"
             onClick={handleSave}
