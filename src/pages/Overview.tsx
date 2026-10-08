@@ -123,6 +123,11 @@ export default function Overview() {
       <Helmet>
         <title>Come funziona | Match Manager Live</title>
         <meta name="description" content="Scopri come Match Manager Live ti aiuta a gestire le partite dal campo al report finale." />
+        <meta property="og:title" content="Come funziona | Match Manager Live" />
+        <meta property="og:description" content="Scopri come Match Manager Live ti aiuta a gestire le partite dal campo al report finale." />
+        <meta property="og:url" content="https://matchmanager-live.lovable.app/overview" />
+        <meta name="twitter:title" content="Come funziona | Match Manager Live" />
+        <meta name="twitter:description" content="Scopri come Match Manager Live ti aiuta a gestire le partite dal campo al report finale." />
       </Helmet>
 
       {/* Header */}

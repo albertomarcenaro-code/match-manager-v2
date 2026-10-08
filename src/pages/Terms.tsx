@@ -9,6 +9,11 @@ const Terms = () => (
     <Helmet>
       <title>Termini e Condizioni | Match Manager Live</title>
       <meta name="description" content="Termini e Condizioni Generali di Utilizzo di Match Manager Live." />
+      <meta property="og:title" content="Termini e Condizioni | Match Manager Live" />
+      <meta property="og:description" content="Termini e Condizioni Generali di Utilizzo di Match Manager Live." />
+      <meta property="og:url" content="https://matchmanager-live.lovable.app/terms" />
+      <meta name="twitter:title" content="Termini e Condizioni | Match Manager Live" />
+      <meta name="twitter:description" content="Termini e Condizioni Generali di Utilizzo di Match Manager Live." />
     </Helmet>
     <Header />
     <main className="flex-1 py-12 md:py-16">

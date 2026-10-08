@@ -213,6 +213,11 @@ export default function Auth() {
       <Helmet>
         <title>Match Manager Live - Gestione Partite Calcio</title>
         <meta name="description" content="Accedi o registrati a Match Manager Live per gestire partite e tornei di calcio." />
+        <meta property="og:title" content="Match Manager Live - Gestione Partite Calcio" />
+        <meta property="og:description" content="Accedi o registrati a Match Manager Live per gestire partite e tornei di calcio." />
+        <meta property="og:url" content="https://matchmanager-live.lovable.app/auth" />
+        <meta name="twitter:title" content="Match Manager Live - Gestione Partite Calcio" />
+        <meta name="twitter:description" content="Accedi o registrati a Match Manager Live per gestire partite e tornei di calcio." />
       </Helmet>
       <Header />
       <main className="flex-1 flex items-center justify-center p-4">
