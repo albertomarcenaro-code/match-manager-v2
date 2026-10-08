@@ -196,60 +196,85 @@ export default function TournamentRoster() {
     }
   };
 
-  const printDistinta = () => {
-    const selected = players
-      .filter(p => p.selected && p.name.trim().length > 0)
-      .sort((a, b) => {
-        if (a.number != null && b.number != null) return a.number - b.number;
-        if (a.number != null) return -1;
-        if (b.number != null) return 1;
-        return a.name.localeCompare(b.name, "it");
-      });
+  const printDistinta = async () => {
+    const selected = players.filter(p => p.selected && p.name.trim().length > 0);
     if (selected.length === 0) {
       toast.error("Seleziona almeno un giocatore da stampare");
       return;
     }
+    if (!user) return;
 
-    const doc = new jsPDF({ unit: "mm", format: "a4" });
-    const pageW = doc.internal.pageSize.getWidth();
-    const margin = 12;
-    let y = margin;
+    try {
+      // Anagrafica societaria: squadra salvata più recente (logo, dati fiscali, ecc.)
+      const { data: teams } = await supabase
+        .from("saved_teams")
+        .select("id")
+        .order("updated_at", { ascending: false })
+        .limit(1);
+      const teamId = teams?.[0]?.id ?? null;
+      const teamProfile = teamId ? await fetchTeamProfile(teamId) : null;
+      const logoDataUrl = teamProfile?.logo_url ? await getLogoDataUrl(teamProfile.logo_url) : null;
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(13);
-    doc.text("DISTINTA GIOCATORI", pageW / 2, y, { align: "center" });
-    y += 6;
-    doc.setFontSize(11);
-    doc.text((tournamentName || "Torneo").toUpperCase(), pageW / 2, y, { align: "center" });
-    y += 5;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.text(
-      `Stampata il ${new Date().toLocaleDateString("it-IT")} · ${selected.length} convocati`,
-      pageW / 2, y, { align: "center" }
-    );
-    y += 4;
-    doc.setDrawColor(0);
-    doc.line(margin, y, pageW - margin, y);
-    y += 4;
+      // Anagrafica membri per arricchire la distinta (nascita, matricola, staff)
+      const { data: memberRows } = await supabase
+        .from("team_members")
+        .select("id, full_name, birth_date, figc_number, fiscal_code, role, jersey_number")
+        .eq("user_id", user.id);
+      const dbMembers = (memberRows || []) as TeamMember[];
+      const byName = new Map(dbMembers.map(m => [m.full_name.trim().toLowerCase(), m]));
 
-    autoTable(doc, {
-      startY: y,
-      head: [["N° Maglia", "Cognome e Nome"]],
-      body: selected.map(p => [p.number != null ? String(p.number) : "", p.name.toUpperCase()]),
-      styles: { fontSize: 10, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.1 },
-      headStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: "bold", halign: "center" },
-      columnStyles: {
-        0: { halign: "center", cellWidth: 25 },
-        1: { cellWidth: "auto" },
-      },
-      theme: "grid",
-      margin: { left: margin, right: margin },
-    });
+      // Ogni convocato diventa un membro: quello dell'anagrafica se esiste,
+      // altrimenti sintetico. Il numero di maglia è quello del torneo.
+      const members: TeamMember[] = [
+        ...selected.map(p => {
+          const found = byName.get(p.name.trim().toLowerCase());
+          const base: TeamMember = found
+            ? { ...found }
+            : ({
+                id: p.id,
+                full_name: p.name,
+                role: "giocatore",
+                birth_date: null,
+                figc_number: null,
+                fiscal_code: null,
+                jersey_number: null,
+              } as unknown as TeamMember);
+          return { ...base, jersey_number: p.number ?? base.jersey_number ?? null };
+        }),
+        ...dbMembers.filter(m => (m.role || "").toLowerCase() !== "giocatore"),
+      ];
 
-    const filename = `distinta_${(tournamentName || "torneo").replace(/[^a-z0-9]+/gi, "_")}.pdf`.toLowerCase();
-    doc.save(filename);
-    toast.success("Distinta generata");
+      const metadata: MatchMetadata = {
+        tournamentLabel: tournamentName,
+        groupName: "",
+        leva: "",
+        category: "",
+        matchDate: "",
+        matchTime: "",
+        venue: "",
+        isHomeTeam: true,
+        teamId,
+        lineupSelection: null,
+        detailsConfirmed: true,
+      };
+
+      const doc = buildLineupPdf({
+        members,
+        selection: { playerIds: selected.map(p => p.id), captains: {}, staffRoles: {} },
+        metadata,
+        homeTeamName: teamProfile?.name || "",
+        awayTeamName: "",
+        teamProfile,
+        logoDataUrl,
+      });
+
+      const filename = `distinta_${(tournamentName || "torneo").replace(/[^a-z0-9]+/gi, "_")}.pdf`.toLowerCase();
+      doc.save(filename);
+      toast.success("Distinta generata");
+    } catch (e) {
+      console.error("[tournament-roster] printDistinta", e);
+      toast.error("Errore nella generazione della distinta");
+    }
   };
 
   const handleSave = async () => {
