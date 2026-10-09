@@ -381,6 +381,48 @@ export default function TournamentRoster() {
         await removePlayer(p.id);
       }
 
+      // ---- Persist staff (allenatori/dirigenti) nel database ----
+      const staffCleaned = staff
+        .map(s => ({ ...s, name: s.name.trim().toUpperCase(), role: s.role.trim(), figc: s.figc.trim() }))
+        .filter(s => s.name.length > 0);
+      const staffNames = new Set<string>();
+      for (const s of staffCleaned) {
+        const k = s.name.toLowerCase();
+        if (staffNames.has(k)) {
+          toast.error(`Nome duplicato nello staff: ${s.name}`);
+          setSaving(false);
+          return;
+        }
+        staffNames.add(k);
+      }
+      if (staffCleaned.length > 0) {
+        const { error: staffErr } = await supabase
+          .from("tournament_staff")
+          .upsert(
+            staffCleaned.map(s => ({
+              id: s.id,
+              tournament_id: tournamentId,
+              user_id: user.id,
+              name: s.name,
+              role: s.role,
+              figc: s.figc,
+              selected: s.selected,
+            })),
+            { onConflict: "id" },
+          );
+        if (staffErr) throw staffErr;
+      }
+      const staffKeptIds = new Set(staffCleaned.map(s => s.id));
+      const staffToRemove = staff.filter(s => s.existed && !staffKeptIds.has(s.id));
+      if (staffToRemove.length > 0) {
+        const { error: delErr } = await supabase
+          .from("tournament_staff")
+          .delete()
+          .in("id", staffToRemove.map(s => s.id));
+        if (delErr) throw delErr;
+      }
+      setStaff(staffCleaned.map(s => ({ ...s, existed: true })));
+
       // Refresh local draft state so existed flags update
       setPlayers(cleaned.map(p => ({
         id: p.id,
