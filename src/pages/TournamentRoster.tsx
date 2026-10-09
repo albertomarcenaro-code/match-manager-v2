@@ -47,6 +47,7 @@ interface StaffDraft {
   role: string;
   figc: string;
   selected: boolean;
+  existed: boolean; // già salvato nel database per questo torneo
 }
 
 export default function TournamentRoster() {
@@ -167,7 +168,8 @@ export default function TournamentRoster() {
   }, [loaded, roster]);
 
   // ---- Staff (allenatori/dirigenti) per la distinta del torneo ----
-  const staffKey = `tournament-staff:${tournamentId}`;
+  // Persistito nel database (tabella tournament_staff), così le scelte
+  // sono disponibili su ogni dispositivo dell'account.
   const [staff, setStaff] = useState<StaffDraft[]>([]);
   const [staffReady, setStaffReady] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState<StaffDraft | null>(null);
@@ -176,37 +178,44 @@ export default function TournamentRoster() {
     if (!user || !tournamentId) return;
     let cancelled = false;
     (async () => {
-      let saved: StaffDraft[] | null = null;
-      try { const raw = localStorage.getItem(staffKey); if (raw) saved = JSON.parse(raw); } catch { /* ignore */ }
-      const { data } = await supabase
-        .from("team_members")
-        .select("id, full_name, role, figc_number")
-        .eq("user_id", user.id);
+      const [{ data: savedRows }, { data: memberRows }] = await Promise.all([
+        supabase
+          .from("tournament_staff")
+          .select("id, name, role, figc, selected")
+          .eq("tournament_id", tournamentId)
+          .eq("user_id", user.id),
+        supabase
+          .from("team_members")
+          .select("id, full_name, role, figc_number")
+          .eq("user_id", user.id),
+      ]);
       if (cancelled) return;
-      const list: StaffDraft[] = saved ? [...saved] : [];
+      const list: StaffDraft[] = (savedRows || []).map(r => ({
+        id: r.id,
+        name: r.name,
+        role: r.role || "",
+        figc: r.figc || "",
+        selected: r.selected,
+        existed: true,
+      }));
       const known = new Set(list.map(s => s.name.trim().toLowerCase()));
-      for (const m of data || []) {
+      for (const m of memberRows || []) {
         if ((m.role || "").toLowerCase() === "giocatore") continue;
         const k = m.full_name.trim().toLowerCase();
         if (known.has(k)) continue;
         known.add(k);
-        list.push({ id: m.id, name: m.full_name, role: m.role || "", figc: m.figc_number || "", selected: false });
+        list.push({ id: crypto.randomUUID(), name: m.full_name, role: m.role || "", figc: m.figc_number || "", selected: false, existed: false });
       }
       setStaff(list);
       setStaffReady(true);
     })();
     return () => { cancelled = true; };
-  }, [user, tournamentId, staffKey]);
-
-  useEffect(() => {
-    if (!staffReady) return;
-    try { localStorage.setItem(staffKey, JSON.stringify(staff)); } catch { /* ignore */ }
-  }, [staff, staffReady, staffKey]);
+  }, [user, tournamentId]);
 
   const updateStaff = (id: string, patch: Partial<StaffDraft>) =>
     setStaff(prev => prev.map(s => (s.id === id ? { ...s, ...patch } : s)));
   const addStaff = () =>
-    setStaff(prev => [...prev, { id: crypto.randomUUID(), name: "", role: "Allenatore", figc: "", selected: true }]);
+    setStaff(prev => [...prev, { id: crypto.randomUUID(), name: "", role: "Allenatore", figc: "", selected: true, existed: false }]);
 
 
   const addPlayer = () => {
