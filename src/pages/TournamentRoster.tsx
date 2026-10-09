@@ -41,6 +41,14 @@ interface DraftPlayer {
   existed: boolean; // was loaded from DB
 }
 
+interface StaffDraft {
+  id: string;
+  name: string;
+  role: string;
+  figc: string;
+  selected: boolean;
+}
+
 export default function TournamentRoster() {
   const { id: tournamentId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -158,6 +166,49 @@ export default function TournamentRoster() {
     });
   }, [loaded, roster]);
 
+  // ---- Staff (allenatori/dirigenti) per la distinta del torneo ----
+  const staffKey = `tournament-staff:${tournamentId}`;
+  const [staff, setStaff] = useState<StaffDraft[]>([]);
+  const [staffReady, setStaffReady] = useState(false);
+  const [staffToDelete, setStaffToDelete] = useState<StaffDraft | null>(null);
+
+  useEffect(() => {
+    if (!user || !tournamentId) return;
+    let cancelled = false;
+    (async () => {
+      let saved: StaffDraft[] | null = null;
+      try { const raw = localStorage.getItem(staffKey); if (raw) saved = JSON.parse(raw); } catch { /* ignore */ }
+      const { data } = await supabase
+        .from("team_members")
+        .select("id, full_name, role, figc_number")
+        .eq("user_id", user.id);
+      if (cancelled) return;
+      const list: StaffDraft[] = saved ? [...saved] : [];
+      const known = new Set(list.map(s => s.name.trim().toLowerCase()));
+      for (const m of data || []) {
+        if ((m.role || "").toLowerCase() === "giocatore") continue;
+        const k = m.full_name.trim().toLowerCase();
+        if (known.has(k)) continue;
+        known.add(k);
+        list.push({ id: m.id, name: m.full_name, role: m.role || "", figc: m.figc_number || "", selected: false });
+      }
+      setStaff(list);
+      setStaffReady(true);
+    })();
+    return () => { cancelled = true; };
+  }, [user, tournamentId, staffKey]);
+
+  useEffect(() => {
+    if (!staffReady) return;
+    try { localStorage.setItem(staffKey, JSON.stringify(staff)); } catch { /* ignore */ }
+  }, [staff, staffReady, staffKey]);
+
+  const updateStaff = (id: string, patch: Partial<StaffDraft>) =>
+    setStaff(prev => prev.map(s => (s.id === id ? { ...s, ...patch } : s)));
+  const addStaff = () =>
+    setStaff(prev => [...prev, { id: crypto.randomUUID(), name: "", role: "Allenatore", figc: "", selected: true }]);
+
+
   const addPlayer = () => {
     setPlayers(prev => [
       ...prev,
@@ -241,7 +292,6 @@ export default function TournamentRoster() {
               } as unknown as TeamMember);
           return { ...base, id: p.id, jersey_number: p.number ?? base.jersey_number ?? null };
         }),
-        ...dbMembers.filter(m => (m.role || "").toLowerCase() !== "giocatore"),
       ];
 
       const metadata: MatchMetadata = {
@@ -266,6 +316,9 @@ export default function TournamentRoster() {
         awayTeamName: "",
         teamProfile,
         logoDataUrl,
+        staffList: staff
+          .filter(s => s.selected && s.name.trim())
+          .map(s => ({ role: s.role.trim(), name: s.name.trim(), figc: s.figc.trim() })),
       });
 
       const filename = `distinta_${(tournamentName || "torneo").replace(/[^a-z0-9]+/gi, "_")}.pdf`.toLowerCase();
@@ -411,7 +464,13 @@ export default function TournamentRoster() {
               </p>
             </Card>
           ) : (
-            players.map((p) => (
+            [...players].sort((a, b) => {
+              const an = a.name.trim(), bn = b.name.trim();
+              if (!an && !bn) return 0;
+              if (!an) return 1;
+              if (!bn) return -1;
+              return an.localeCompare(bn, "it");
+            }).map((p) => (
               <Card key={p.id} className={`p-3 flex items-center gap-2 ${p.selected ? "" : "opacity-60"}`}>
                 <Checkbox
                   checked={p.selected}
@@ -458,6 +517,43 @@ export default function TournamentRoster() {
             <Download className="h-4 w-4" /> Importa da Mia Squadra
           </Button>
         </div>
+
+        <h2 className="text-lg font-bold mb-2">Allenatori e Dirigenti</h2>
+        <div className="space-y-2 mb-3">
+          {staff.length === 0 ? (
+            <Card className="p-4 text-center">
+              <p className="text-muted-foreground text-sm">Nessun membro dello staff. Aggiungili qui o nell'anagrafica squadra.</p>
+            </Card>
+          ) : (
+            staff.map(s => (
+              <Card key={s.id} className={`p-3 flex flex-wrap items-center gap-2 ${s.selected ? "" : "opacity-60"}`}>
+                <Checkbox checked={s.selected} onCheckedChange={() => updateStaff(s.id, { selected: !s.selected })} aria-label={`Seleziona ${s.name || "staff"}`} />
+                <Input placeholder="RUOLO" value={s.role} onChange={e => updateStaff(s.id, { role: e.target.value })} className="w-40" maxLength={50} />
+                <Input placeholder="COGNOME NOME" value={s.name} onChange={e => updateStaff(s.id, { name: e.target.value })} className="flex-1 min-w-[140px] uppercase" maxLength={100} />
+                <Input placeholder="Tessera" value={s.figc} onChange={e => updateStaff(s.id, { figc: e.target.value })} className="w-28" maxLength={30} />
+                <Button size="icon" variant="ghost" className="h-9 w-9 text-muted-foreground hover:text-destructive" onClick={() => setStaffToDelete(s)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </Card>
+            ))
+          )}
+        </div>
+        <Button variant="outline" className="w-full gap-2 mb-6" onClick={addStaff}>
+          <Plus className="h-4 w-4" /> Aggiungi allenatore / dirigente
+        </Button>
+
+        <AlertDialog open={!!staffToDelete} onOpenChange={o => !o && setStaffToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Rimuovere {staffToDelete?.name || "questo membro"}?</AlertDialogTitle>
+              <AlertDialogDescription>Verrà tolto solo dalla distinta di questo torneo.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annulla</AlertDialogCancel>
+              <AlertDialogAction onClick={() => { if (staffToDelete) setStaff(prev => prev.filter(x => x.id !== staffToDelete.id)); setStaffToDelete(null); }}>Rimuovi</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
 
         <div className="sticky bottom-4 flex flex-col gap-2">

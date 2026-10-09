@@ -16,6 +16,8 @@ interface BuildOpts {
   teamProfile?: TeamProfile | null;
   /** Logo squadra come data URL (base64). */
   logoDataUrl?: string | null;
+  /** Elenco staff dinamico (righe illimitate). Se assente usa gli slot fissi. */
+  staffList?: Array<{ role: string; name: string; figc?: string | null }>;
 }
 
 const staffSlots: Array<{ label: string }> = [
@@ -172,10 +174,12 @@ export function buildLineupPdf(opts: BuildOpts): jsPDF {
     const m = staff.find(s => s.id === mid);
     if (m) assigned.set(slot, m);
   }
-  const staffRows = staffSlots.map(slot => {
-    const m = assigned.get(slot.label);
-    return [slot.label + ":", m ? m.full_name.toUpperCase() : "", "Tessera N°:", m?.figc_number || ""];
-  });
+  const staffRows = opts.staffList && opts.staffList.length > 0
+    ? opts.staffList.map(s => [(s.role || "Staff") + ":", s.name.toUpperCase(), "Tessera N°:", s.figc || ""])
+    : staffSlots.map(slot => {
+        const m = assigned.get(slot.label);
+        return [slot.label + ":", m ? m.full_name.toUpperCase() : "", "Tessera N°:", m?.figc_number || ""];
+      });
   autoTable(doc, {
     startY: y,
     body: staffRows,
