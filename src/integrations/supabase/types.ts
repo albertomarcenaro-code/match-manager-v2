@@ -379,6 +379,50 @@ export type Database = {
           },
         ]
       }
+      tournament_staff: {
+        Row: {
+          created_at: string
+          figc: string
+          id: string
+          name: string
+          role: string
+          selected: boolean
+          tournament_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          figc?: string
+          id?: string
+          name: string
+          role?: string
+          selected?: boolean
+          tournament_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          figc?: string
+          id?: string
+          name?: string
+          role?: string
+          selected?: boolean
+          tournament_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_staff_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tournaments: {
         Row: {
           created_at: string
