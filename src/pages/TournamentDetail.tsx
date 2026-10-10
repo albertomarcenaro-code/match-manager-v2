@@ -128,8 +128,8 @@ export default function TournamentDetail() {
           name: r.name,
           number: r.number,
         })),
-        // Partite successive: salta la distinta e vai diretto alle rose (numeri già fissati)
-        skipToRoster: !isFirstMatch,
+        // La distinta del torneo è già preparata nella rosa: vai diretto alle rose (avversari)
+        skipToRoster: true,
       },
     });
   };
