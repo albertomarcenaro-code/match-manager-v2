@@ -481,7 +481,7 @@ export default function TournamentRoster() {
               <Trophy className="h-6 w-6 text-yellow-500 shrink-0" />
               {tournamentName}
             </h1>
-            <p className="text-sm text-muted-foreground">Rosa del Torneo</p>
+            <p className="text-sm text-muted-foreground">Distinta ufficiale · Rosa del Torneo</p>
           </div>
         </div>
 
