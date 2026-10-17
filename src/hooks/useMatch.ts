@@ -5,12 +5,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-
-// Per-match storage key for persistence across reloads (local cache only)
-const STORAGE_KEY_PREFIX = 'match_state_';
-
-const getStorageKey = (matchId: string | undefined) =>
-  matchId ? `${STORAGE_KEY_PREFIX}${matchId}` : 'match_manager_state';
+import { getMatchCacheKey } from '@/lib/matchCache';
 
 const createEmptyPlayer = (): Player => ({
   id: '',
@@ -73,14 +68,14 @@ export const useMatch = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const tournamentId = searchParams.get('tournamentId');
-  const storageKey = getStorageKey(id);
   const { user, isGuest } = useAuth();
+  const storageKey = getMatchCacheKey(id, user?.id ?? null, isGuest);
   const dbMatchIdRef = useRef<string | null>(null);
   const savingRef = useRef(false);
 
   // Try to restore from localStorage (used as local cache for in-progress matches)
   const [state, setState] = useState<MatchState>(() => {
-    const saved = localStorage.getItem(storageKey);
+    const saved = storageKey ? localStorage.getItem(storageKey) : null;
     if (saved) {
       try {
         return { ...initialState, ...JSON.parse(saved) };
@@ -93,7 +88,7 @@ export const useMatch = () => {
 
   // Local cache: save to localStorage on every state change (for crash recovery / tab reload)
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(state));
+    if (storageKey) localStorage.setItem(storageKey, JSON.stringify(state));
   }, [state, storageKey]);
 
   // On mount: if logged in, try to load match from DB (for resume across devices)
@@ -128,7 +123,7 @@ export const useMatch = () => {
             lineupSelection: (row.lineup_selection as LineupSelection) ?? null,
             detailsConfirmed: !!(row.tournament_label || row.venue || row.match_time || row.team_id || row.lineup_selection),
           };
-          const localSaved = localStorage.getItem(storageKey);
+          const localSaved = storageKey ? localStorage.getItem(storageKey) : null;
           if (!localSaved && md.fullState) {
             const restored: MatchState = { ...initialState, ...md.fullState };
             restored.metadata = { ...emptyMetadata(), ...(md.fullState.metadata || {}), ...dbMeta };
@@ -142,7 +137,7 @@ export const useMatch = () => {
 
         // No DB match yet. If this is a tournament match and we have no local cache,
         // try to pre-populate roster + jersey numbers from the latest match in same tournament.
-        const localSaved = localStorage.getItem(storageKey);
+        const localSaved = storageKey ? localStorage.getItem(storageKey) : null;
         if (!localSaved && tournamentId) {
           const { data: prev } = await supabase
             .from('matches')
@@ -1122,13 +1117,13 @@ export const useMatch = () => {
       }));
     } else {
       setState(initialState);
-      if (id) {
-        localStorage.removeItem(getStorageKey(id));
+      if (storageKey) {
+        localStorage.removeItem(storageKey);
       }
     }
     // Reset DB reference so a new match record is created
     dbMatchIdRef.current = null;
-  }, [id]);
+  }, [id, storageKey]);
 
   // Quick correction of initial starter error - moves player on/off field WITHOUT counting as a tactical substitution.
   // The player entering is treated as if they entered at the start of the current period (timestamp 0),

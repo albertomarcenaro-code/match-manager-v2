@@ -110,12 +110,9 @@ export function RosterSetup({
   // Priorità: se esiste una rosa già salvata localmente (es. chiusura app / reload), NON sovrascrivere con dati dal backend.
   const hasLocalRoster = useMemo(() => {
     try {
-      const saved = localStorage.getItem('match-manager-state');
-      if (!saved) return false;
-      const parsed = JSON.parse(saved) as any;
       return (
-        (parsed?.homeTeam?.players?.length ?? 0) > 0 ||
-        (parsed?.awayTeam?.players?.length ?? 0) > 0
+        state.homeTeam.players.length > 0 ||
+        state.awayTeam.players.length > 0
       );
     } catch {
       return false;

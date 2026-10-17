@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { getMatchCacheKey } from "@/lib/matchCache";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -118,6 +119,8 @@ export default function SingleMatches() {
       
       // Also clean up any localStorage remnant
       localStorage.removeItem(`match_state_${deleteTarget}`);
+      const cacheKey = getMatchCacheKey(deleteTarget, user?.id ?? null, isGuest);
+      if (cacheKey) localStorage.removeItem(cacheKey);
       
       setMatchHistory((prev) => prev.filter((m) => m.id !== deleteTarget));
       toast.success("Partita eliminata");
