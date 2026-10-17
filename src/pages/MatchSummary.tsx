@@ -15,6 +15,7 @@ import { ExportButton } from "@/components/match/ExportButton";
 import { PDFExportButton } from "@/components/match/PDFExportButton";
 import { WhatsAppShareButton } from "@/components/match/WhatsAppShareButton";
 import { MatchState } from "@/types/match";
+import { getMatchCacheKey } from "@/lib/matchCache";
 
 interface PlayerSummary {
   name: string;
@@ -44,8 +45,8 @@ export default function MatchSummary() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
-  const source = searchParams.get("source") || (user ? "db" : "local");
+  const { user, isGuest } = useAuth();
+  const source = searchParams.get("source") || (user && !isGuest ? "db" : "local");
   const backTo = searchParams.get("backTo") || "/dashboard";
 
   const [data, setData] = useState<MatchSummaryData | null>(null);
@@ -53,20 +54,22 @@ export default function MatchSummary() {
 
   useEffect(() => {
     if (!id) return;
-    if (source === "db" || user) {
+    if (!isGuest && user) {
       loadFromDb();
     } else {
       loadFromLocal();
     }
-  }, [id, source, user]);
+  }, [id, source, user, isGuest]);
 
   const loadFromDb = async () => {
+    if (!id || !user || isGuest) return;
     setLoading(true);
     try {
       const { data: m, error } = await supabase
         .from("matches")
         .select("*")
-        .eq("id", id!)
+        .eq("id", id)
+        .eq("user_id", user.id)
         .single();
       if (error) throw error;
       const md = (m.match_data as any) || {};
@@ -93,7 +96,8 @@ export default function MatchSummary() {
   const loadFromLocal = () => {
     setLoading(true);
     try {
-      const raw = localStorage.getItem(`match_state_${id}`);
+      const key = getMatchCacheKey(id, user?.id ?? null, isGuest);
+      const raw = key ? localStorage.getItem(key) : null;
       if (!raw) { setData(null); setLoading(false); return; }
       const s = JSON.parse(raw);
       setData({
