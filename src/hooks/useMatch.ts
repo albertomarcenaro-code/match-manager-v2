@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { getMatchCacheKey } from '@/lib/matchCache';
+import { getMatchCacheKey, resolveMatchRecovery } from '@/lib/matchCache';
 
 const createEmptyPlayer = (): Player => ({
   id: '',
@@ -72,10 +72,16 @@ export const useMatch = () => {
   const storageKey = getMatchCacheKey(id, user?.id ?? null, isGuest);
   const dbMatchIdRef = useRef<string | null>(null);
   const savingRef = useRef(false);
+  const [readyKey, setReadyKey] = useState<string | null>(null);
+  const readyKeyRef = useRef<string | null>(null);
+  const restoredStateRef = useRef<MatchState | null>(null);
+  const [recoveryError, setRecoveryError] = useState(false);
+  const [recoveryAttempt, setRecoveryAttempt] = useState(0);
+  const isReady = !!storageKey && readyKey === storageKey;
 
-  // Try to restore from localStorage (used as local cache for in-progress matches)
+  // Only guests restore synchronously. Account matches wait for the cloud.
   const [state, setState] = useState<MatchState>(() => {
-    const saved = storageKey ? localStorage.getItem(storageKey) : null;
+    const saved = isGuest && storageKey ? localStorage.getItem(storageKey) : null;
     if (saved) {
       try {
         return { ...initialState, ...JSON.parse(saved) };
@@ -88,15 +94,30 @@ export const useMatch = () => {
 
   // Local cache: save to localStorage on every state change (for crash recovery / tab reload)
   useEffect(() => {
-    if (storageKey) localStorage.setItem(storageKey, JSON.stringify(state));
-  }, [state, storageKey]);
+    if (isReady && storageKey) localStorage.setItem(storageKey, JSON.stringify(state));
+  }, [state, storageKey, isReady]);
 
   // On mount: if logged in, try to load match from DB (for resume across devices)
   useEffect(() => {
-    if (!user || isGuest || !id) return;
+    let cancelled = false;
+    readyKeyRef.current = null;
+    setReadyKey(null);
+    setRecoveryError(false);
+    dbMatchIdRef.current = null;
+    if (isGuest) {
+      readyKeyRef.current = storageKey;
+      setReadyKey(storageKey);
+      return;
+    }
+    if (!user || !id || !storageKey) return;
     
     const loadFromDb = async () => {
       try {
+        let cachedState: MatchState | null = null;
+        try {
+          const raw = localStorage.getItem(storageKey);
+          if (raw) cachedState = { ...initialState, ...JSON.parse(raw) };
+        } catch { /* A damaged recovery copy must not prevent cloud loading. */ }
         const { data, error } = await supabase
           .from('matches')
           .select('*')
@@ -105,6 +126,7 @@ export const useMatch = () => {
           .maybeSingle();
 
         if (error) throw error;
+        if (cancelled) return;
         
         if (data) {
           dbMatchIdRef.current = data.id;
@@ -123,23 +145,30 @@ export const useMatch = () => {
             lineupSelection: (row.lineup_selection as LineupSelection) ?? null,
             detailsConfirmed: !!(row.tournament_label || row.venue || row.match_time || row.team_id || row.lineup_selection),
           };
-          const localSaved = storageKey ? localStorage.getItem(storageKey) : null;
-          if (!localSaved && md.fullState) {
-            const restored: MatchState = { ...initialState, ...md.fullState };
-            restored.metadata = { ...emptyMetadata(), ...(md.fullState.metadata || {}), ...dbMeta };
-            setState(restored);
-          } else if (!localSaved) {
-            setState(prev => ({ ...prev, metadata: { ...prev.metadata, ...dbMeta } }));
-          }
+          const cloudState: MatchState = {
+            ...initialState,
+            ...(md.fullState || {}),
+            homeTeam: md.fullState?.homeTeam || { name: data.home_team_name, score: data.home_score, players: md.homeTeam?.players || [] },
+            awayTeam: md.fullState?.awayTeam || { name: data.away_team_name, score: data.away_score, players: md.awayTeam?.players || [] },
+            events: md.fullState?.events || md.events || [],
+            periodScores: md.fullState?.periodScores || md.periodScores || [],
+            isMatchEnded: data.status === 'completed' || !!md.fullState?.isMatchEnded,
+            metadata: { ...emptyMetadata(), ...(md.fullState?.metadata || {}), ...dbMeta },
+          };
+          const restored = resolveMatchRecovery(cloudState, cachedState, initialState);
+          restoredStateRef.current = restored;
+          setState(restored);
           return;
         }
 
 
         // No DB match yet. If this is a tournament match and we have no local cache,
         // try to pre-populate roster + jersey numbers from the latest match in same tournament.
-        const localSaved = storageKey ? localStorage.getItem(storageKey) : null;
-        if (!localSaved && tournamentId) {
-          const { data: prev } = await supabase
+        const draft = resolveMatchRecovery(null, cachedState, initialState);
+        restoredStateRef.current = draft;
+        setState(draft);
+        if (!cachedState && tournamentId) {
+          const { data: prev, error: previousError } = await supabase
             .from('matches')
             .select('match_data, home_team_name, away_team_name')
             .eq('user_id', user.id)
@@ -147,6 +176,8 @@ export const useMatch = () => {
             .order('match_date', { ascending: false })
             .limit(1)
             .maybeSingle();
+          if (previousError) throw previousError;
+          if (cancelled) return;
 
           if (prev?.match_data) {
             const md = prev.match_data as any;
@@ -181,16 +212,26 @@ export const useMatch = () => {
           }
         }
       } catch (err) {
+        if (cancelled) return;
         console.error('Failed to load match from DB:', err);
+        setRecoveryError(true);
+        toast.error('Impossibile recuperare la partita dall’account. Riprova prima di modificarla.');
+        return;
+      } finally {
+        if (!cancelled && readyKeyRef.current !== 'failed') {
+          // The catch marks failures below via a separate success flag.
+        }
       }
+      return;
     };
     
     loadFromDb();
-  }, [user, isGuest, id, tournamentId, storageKey]);
+    return () => { cancelled = true; readyKeyRef.current = null; };
+  }, [user?.id, isGuest, id, tournamentId, storageKey, recoveryAttempt]);
 
   // Save match state to cloud DB (debounced, for logged-in users)
   const saveToDb = useCallback(async (currentState: MatchState) => {
-    if (!user || isGuest || !id || savingRef.current) return;
+    if (!user || isGuest || !id || !storageKey || readyKeyRef.current !== storageKey || savingRef.current) return;
     
     savingRef.current = true;
     try {
@@ -271,7 +312,7 @@ export const useMatch = () => {
     } finally {
       savingRef.current = false;
     }
-  }, [user, isGuest, id, tournamentId]);
+  }, [user, isGuest, id, tournamentId, storageKey]);
 
   // Auto-save to DB when match state changes significantly (started, score change, ended)
   const prevScoreRef = useRef({ home: 0, away: 0 });
@@ -280,7 +321,7 @@ export const useMatch = () => {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!user || isGuest || !id) return;
+    if (!user || isGuest || !id || !isReady || state === restoredStateRef.current) return;
     
     const scoreChanged = state.homeTeam.score !== prevScoreRef.current.home || 
                          state.awayTeam.score !== prevScoreRef.current.away;
@@ -308,7 +349,7 @@ export const useMatch = () => {
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [state, user, isGuest, id, saveToDb]);
+  }, [state, user, isGuest, id, saveToDb, isReady]);
 
   // ... keep existing code for all the match action callbacks ...
   
@@ -1228,6 +1269,9 @@ export const useMatch = () => {
 
   return {
     state,
+    isReady,
+    recoveryError,
+    retryRecovery: () => setRecoveryAttempt(attempt => attempt + 1),
     setHomeTeamName,
     setAwayTeamName,
     setMetadata,
