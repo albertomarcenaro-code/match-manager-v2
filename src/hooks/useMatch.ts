@@ -316,42 +316,57 @@ export const useMatch = () => {
     }
   }, [user, isGuest, id, tournamentId, storageKey]);
 
-  // Auto-save to DB when match state changes significantly (started, score change, ended)
+  // Auto-save to DB: always on for logged-in users. Timer ticks (elapsedTime only)
+  // must not reset the debounce, or cards/substitutions never get saved mid-match.
   const prevScoreRef = useRef({ home: 0, away: 0 });
   const prevEndedRef = useRef(false);
   const prevStartedRef = useRef(false);
+  const prevEventsLenRef = useRef(0);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingStateRef = useRef<MatchState | null>(null);
+  const latestStateRef = useRef<MatchState>(state);
+  latestStateRef.current = state;
 
   useEffect(() => {
     if (!user || isGuest || !id || !isReady || state === restoredStateRef.current) return;
-    
-    const scoreChanged = state.homeTeam.score !== prevScoreRef.current.home || 
+
+    const scoreChanged = state.homeTeam.score !== prevScoreRef.current.home ||
                          state.awayTeam.score !== prevScoreRef.current.away;
     const justEnded = state.isMatchEnded && !prevEndedRef.current;
     const justStarted = state.isMatchStarted && !prevStartedRef.current;
-    
+    const eventsChanged = state.events.length !== prevEventsLenRef.current;
+
     prevScoreRef.current = { home: state.homeTeam.score, away: state.awayTeam.score };
     prevEndedRef.current = state.isMatchEnded;
     prevStartedRef.current = state.isMatchStarted;
-    
-    // Immediate save on significant events
-    if (justEnded || justStarted || scoreChanged) {
+    prevEventsLenRef.current = state.events.length;
+
+    // Immediate save on significant events (score, start/end, cards, substitutions)
+    if (justEnded || justStarted || scoreChanged || eventsChanged) {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+      pendingStateRef.current = null;
       saveToDb(state);
       return;
     }
-    
-    // Debounced save for other changes (roster edits, metadata, lineup selection)
-    if (state.isMatchStarted || state.metadata.detailsConfirmed || dbMatchIdRef.current) {
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = setTimeout(() => saveToDb(state), 2000);
-    }
 
-    
-    return () => {
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    };
+    // Debounced save for everything else (roster edits, metadata, pre-match prep).
+    // If a save is already scheduled (e.g. timer ticks keep re-rendering), just
+    // refresh the pending snapshot instead of resetting the clock.
+    pendingStateRef.current = state;
+    if (!saveTimeoutRef.current) {
+      saveTimeoutRef.current = setTimeout(() => {
+        saveTimeoutRef.current = null;
+        const snapshot = pendingStateRef.current;
+        pendingStateRef.current = null;
+        if (snapshot) saveToDb(snapshot);
+      }, 2000);
+    }
   }, [state, user, isGuest, id, saveToDb, isReady]);
+
+  useEffect(() => () => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+  }, []);
 
   // ... keep existing code for all the match action callbacks ...
   
