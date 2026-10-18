@@ -14,7 +14,7 @@ import { ShareLiveButton } from '@/components/live/ShareLiveButton';
 import { RosterSetup } from '@/components/setup/RosterSetup';
 import { MatchDetailsTab } from '@/components/match/MatchDetailsTab';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { FileText, Users, UserCheck, Play, Home } from 'lucide-react';
+import { FileText, Users, UserCheck, Play, Home, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 import { Header } from '@/components/layout/Header';
@@ -34,6 +34,9 @@ const MatchApp = () => {
 
   const {
     state,
+    isReady,
+    recoveryError,
+    retryRecovery,
     setHomeTeamName,
     setAwayTeamName,
     setMetadata,
@@ -82,17 +85,19 @@ const MatchApp = () => {
   // Preload home roster from tournament players on a brand-new tournament match.
   // Preserves original player IDs so tournament_jersey_numbers lookups match.
   useEffect(() => {
+    if (!isReady) return;
     if (preloadAppliedRef.current) return;
     if (!tournamentId) return;
     if (preloadedHomePlayers.length === 0) return;
     if (state.homeTeam.players.length > 0) return;
     loadTournamentPlayers(preloadedHomePlayers);
     preloadAppliedRef.current = true;
-  }, [tournamentId, preloadedHomePlayers, state.homeTeam.players.length, loadTournamentPlayers]);
+  }, [isReady, tournamentId, preloadedHomePlayers, state.homeTeam.players.length, loadTournamentPlayers]);
 
   // Apply persisted tournament jerseys to the home roster ONCE per match load.
   // Only fills players that currently have no number; never overwrites a manual edit.
   useEffect(() => {
+    if (!isReady) return;
     if (!tournamentId || !jerseysLoaded) return;
     if (jerseysAppliedRef.current) return;
     if (state.homeTeam.players.length === 0) return;
@@ -108,7 +113,7 @@ const MatchApp = () => {
     jerseysAppliedRef.current = true;
     // didApply purely informational; effect runs once via ref guard
     void didApply;
-  }, [tournamentId, jerseysLoaded, tournamentJerseys, state.homeTeam.players, updatePlayerNumber]);
+  }, [isReady, tournamentId, jerseysLoaded, tournamentJerseys, state.homeTeam.players, updatePlayerNumber]);
 
   // Tab navigation: 'roster' | 'starters' | 'live'
   const [activeTab, setActiveTab] = useState<string>(() => {
@@ -119,15 +124,23 @@ const MatchApp = () => {
     return 'distinta';
   });
 
+  const initialTabAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!isReady || initialTabAppliedRef.current) return;
+    initialTabAppliedRef.current = true;
+    setActiveTab(state.isMatchStarted
+      ? state.needsStarterSelection ? 'starters' : 'live'
+      : state.metadata?.detailsConfirmed || skipToRoster ? 'roster' : 'distinta');
+  }, [isReady, state, skipToRoster]);
 
   // Timer tick interval (UI refresh only)
   useEffect(() => {
-    if (!state.isRunning || state.isPaused) return;
+    if (!isReady || !state.isRunning || state.isPaused) return;
     const interval = setInterval(() => {
       updateElapsedTime();
     }, 250);
     return () => clearInterval(interval);
-  }, [state.isRunning, state.isPaused, updateElapsedTime]);
+  }, [isReady, state.isRunning, state.isPaused, updateElapsedTime]);
 
   // Wrapped number update — persists to tournament_jersey_numbers when in tournament context
   const handleUpdatePlayerNumber = (playerId: string, number: number | null) => {
@@ -166,6 +179,22 @@ const MatchApp = () => {
 
   // Determine if each tab should be accessible
   const hasPlayers = state.homeTeam.players.some(p => p.number !== null) && state.awayTeam.players.length > 0;
+
+  if (!isReady) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="flex min-h-64 flex-col items-center justify-center gap-4 p-4" aria-busy={!recoveryError}>
+          {recoveryError ? (
+            <>
+              <p className="text-center text-muted-foreground">Impossibile recuperare la partita dall’account.</p>
+              <Button onClick={retryRecovery}>Riprova</Button>
+            </>
+          ) : <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-label="Recupero partita" />}
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

@@ -112,6 +112,7 @@ export const useMatch = () => {
     if (!user || !id || !storageKey) return;
     
     const loadFromDb = async () => {
+      let succeeded = true;
       try {
         let cachedState: MatchState | null = null;
         try {
@@ -212,17 +213,18 @@ export const useMatch = () => {
           }
         }
       } catch (err) {
+        succeeded = false;
         if (cancelled) return;
         console.error('Failed to load match from DB:', err);
         setRecoveryError(true);
         toast.error('Impossibile recuperare la partita dall’account. Riprova prima di modificarla.');
         return;
       } finally {
-        if (!cancelled && readyKeyRef.current !== 'failed') {
-          // The catch marks failures below via a separate success flag.
+        if (!cancelled && succeeded) {
+          readyKeyRef.current = storageKey;
+          setReadyKey(storageKey);
         }
       }
-      return;
     };
     
     loadFromDb();
