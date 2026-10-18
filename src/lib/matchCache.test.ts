@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { clearMatchCaches, getMatchCacheKey } from './matchCache';
+import { clearMatchCaches, getMatchCacheKey, resolveMatchRecovery } from './matchCache';
 
 function memoryStorage(entries: Record<string, string>): Storage {
   const map = new Map(Object.entries(entries));
@@ -46,4 +46,20 @@ test('startup discards unowned legacy data but preserves same-account recovery',
   clearMatchCaches(storage, true);
   assert.equal(storage.getItem('match_state_123'), null);
   assert.equal(storage.getItem('match-cache:v1:user:account-a:123'), 'owned');
+});
+
+test('saved account match wins over a stale local recovery copy', () => {
+  const cloud = { homeScore: 3, awayScore: 2, player: 'ACCOUNT PLAYER' };
+  const cached = { homeScore: 0, awayScore: 0, player: 'OLD PLAYER' };
+  assert.deepEqual(resolveMatchRecovery(cloud, cached, cached), cloud);
+});
+
+test('a match saved on another device restores even with no local copy', () => {
+  const cloud = { homeScore: 4, events: ['goal'] };
+  assert.deepEqual(resolveMatchRecovery(cloud, null, { homeScore: 0, events: [] }), cloud);
+});
+
+test('unsaved drafts and guest matches retain their recovery copy', () => {
+  const draft = { homeScore: 1, events: ['goal'] };
+  assert.deepEqual(resolveMatchRecovery(null, draft, { homeScore: 0, events: [] }), draft);
 });
