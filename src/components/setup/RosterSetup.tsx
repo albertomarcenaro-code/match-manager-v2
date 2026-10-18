@@ -111,8 +111,8 @@ export function RosterSetup({
   const hasLocalRoster = useMemo(() => {
     try {
       return (
-        state.homeTeam.players.length > 0 ||
-        state.awayTeam.players.length > 0
+        homePlayers.length > 0 ||
+        awayPlayers.length > 0
       );
     } catch {
       return false;
