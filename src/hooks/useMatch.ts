@@ -404,9 +404,16 @@ export const useMatch = () => {
     });
   }, []);
 
+  // Flush immediately with the latest state (not the render-time snapshot),
+  // so "Salva e prosegui" never sends the previous roster.
   const saveNow = useCallback(() => {
-    saveToDb(state);
-  }, [saveToDb, state]);
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    pendingStateRef.current = null;
+    saveToDb(latestStateRef.current);
+  }, [saveToDb]);
 
 
   const addPlayer = useCallback((name: string) => {
