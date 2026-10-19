@@ -99,7 +99,9 @@ export default function LiveMatch() {
     };
   }, [id]);
 
-  const md = match?.match_data;
+  // match_data stores the live state under `fullState` (plus events/teams copies);
+  // fall back to the root object for older rows saved without the wrapper.
+  const md = match?.match_data?.fullState ?? match?.match_data;
   useEffect(() => {
     if (!md?.isRunning || md?.isPaused) return;
     const i = setInterval(() => setTick((t) => t + 1), 1000);
