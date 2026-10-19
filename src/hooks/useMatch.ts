@@ -778,7 +778,6 @@ export const useMatch = () => {
 
   const endPeriod = useCallback(() => {
     setState(prev => {
-      const periodEndTimestamp = Date.now();
       const currentPeriod = prev.currentPeriod;
       
       const cumulativeHomeBefore = prev.periodScores.reduce((sum, ps) => sum + ps.homeScore, 0);
@@ -1011,7 +1010,6 @@ export const useMatch = () => {
 
   const recordSubstitution = useCallback((team: TeamType, playerOutId: string, playerInId: string) => {
     setState(prev => {
-      const substitutionTimestamp = Date.now();
       const currentPeriod = prev.currentPeriod;
       const teamKey = team === 'home' ? 'homeTeam' : 'awayTeam';
       const playerOut = prev[teamKey].players.find(p => p.id === playerOutId);
