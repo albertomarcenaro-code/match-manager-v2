@@ -83,7 +83,9 @@ export default function MatchSummary() {
         homePlayers: md.homeTeam?.players || md.homePlayers || [],
         awayPlayers: md.awayTeam?.players || md.awayPlayers || [],
         matchDate: m.match_date,
-        fullState: (md && md.homeTeam && md.awayTeam) ? (md as MatchState) : null,
+        fullState: (md.fullState && md.fullState.homeTeam && md.fullState.awayTeam)
+          ? (md.fullState as MatchState)
+          : (md && md.homeTeam && md.awayTeam) ? (md as MatchState) : null,
       });
     } catch (err: any) {
       console.error("Load match error:", err);
