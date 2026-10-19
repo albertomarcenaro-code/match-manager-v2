@@ -1200,7 +1200,6 @@ export const useMatch = () => {
       if (!player || player.isExpelled) return prev;
 
       const currentPeriod = prev.currentPeriod;
-      const periodStartTs = prev.periodStartTimestamp ?? Date.now();
       const wasOnField = player.isOnField;
 
       const updatedPlayers = prev[teamKey].players.map(p => {
@@ -1208,7 +1207,7 @@ export const useMatch = () => {
         if (wasOnField) {
           // Move OFF field: remove any playtime accrued in this period (was an error)
           const accruedThisPeriod = p.currentEntryTime !== null
-            ? Math.floor((Date.now() - p.currentEntryTime) / 1000)
+            ? Math.max(0, prev.elapsedTime - p.currentEntryTime)
             : 0;
           const updatedPerPeriod = { ...p.secondsPlayedPerPeriod };
           // Subtract any accidentally tracked seconds for this period
@@ -1228,7 +1227,7 @@ export const useMatch = () => {
             ...p,
             isOnField: true,
             isStarter: true,
-            currentEntryTime: periodStartTs,
+            currentEntryTime: 0,
           };
         }
       });

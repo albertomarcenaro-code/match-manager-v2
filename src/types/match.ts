@@ -11,7 +11,7 @@ export interface Player {
   goals: number;
   cards: { yellow: number; red: number };
   // Playtime tracking using timestamp/delta system
-  currentEntryTime: number | null; // timestamp when player entered field (null if not on field)
+  currentEntryTime: number | null; // match-timer seconds (per period) when player entered field — excludes pauses (null if not on field)
   totalSecondsPlayed: number; // accumulated playtime in seconds
   secondsPlayedPerPeriod: { [period: number]: number }; // playtime per period for accurate partials
 }
