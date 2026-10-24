@@ -1,0 +1,459 @@
+import { useState, useCallback, useEffect } from 'react';
+import { TournamentState, TournamentPlayer, TournamentMatch, TournamentPlayerMatchStats } from '@/types/tournament';
+import { MatchEvent, PeriodScore } from '@/types/match';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { Json } from '@/integrations/supabase/types';
+import { tournamentSchema, tournamentMatchSchema, tournamentPlayersArraySchema, validateOrThrow } from '@/lib/validations';
+
+const TOURNAMENT_STORAGE_KEY = 'tournament-state';
+
+const generateId = () => crypto.randomUUID();
+
+const createEmptyTournament = (): TournamentState => ({
+  id: generateId(),
+  name: '',
+  teamName: '',
+  players: [],
+  matches: [],
+  isActive: false,
+  createdAt: new Date().toISOString(),
+});
+
+// Force clear tournament state - used when entering single match mode
+const clearTournamentState = () => {
+  try {
+    localStorage.removeItem(TOURNAMENT_STORAGE_KEY);
+  } catch (e) {
+    console.error('Failed to clear tournament state:', e);
+  }
+};
+
+const loadFromLocalStorage = (): TournamentState | null => {
+  try {
+    const saved = localStorage.getItem(TOURNAMENT_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && typeof parsed === 'object' && 'isActive' in parsed) {
+        return parsed;
+      }
+    }
+    return null;
+  } catch (e) {
+    console.error('Failed to load tournament from localStorage:', e);
+    return null;
+  }
+};
+
+const saveToLocalStorage = (state: TournamentState) => {
+  try {
+    localStorage.setItem(TOURNAMENT_STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.error('Failed to save tournament to localStorage:', e);
+  }
+};
+
+export function useTournament() {
+  const { user, isGuest } = useAuth();
+  const [tournament, setTournament] = useState<TournamentState>(() => {
+    return loadFromLocalStorage() || createEmptyTournament();
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [dbTournamentId, setDbTournamentId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user && !isGuest) {
+      loadFromDatabase();
+    }
+  }, [user, isGuest]);
+
+  useEffect(() => {
+    if (tournament.id) {
+      saveToLocalStorage(tournament);
+    }
+  }, [tournament]);
+
+  const loadFromDatabase = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      const { data: tournamentData, error: tournamentError } = await supabase
+        .from('tournaments')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (tournamentError) throw tournamentError;
+
+      if (tournamentData) {
+        setDbTournamentId(tournamentData.id);
+        
+        const { data: matchesData, error: matchesError } = await supabase
+          .from('tournament_matches')
+          .select('*')
+          .eq('tournament_id', tournamentData.id)
+          .order('match_date', { ascending: true });
+
+        if (matchesError) throw matchesError;
+
+        const players = (tournamentData.players as unknown as TournamentPlayer[]) || [];
+        const matches: TournamentMatch[] = (matchesData || []).map(m => ({
+          id: m.id,
+          date: m.match_date,
+          homeTeamName: m.home_team_name,
+          awayTeamName: m.away_team_name,
+          homeScore: m.home_score,
+          awayScore: m.away_score,
+          playerStats: (m.player_stats as unknown as TournamentPlayerMatchStats[]) || [],
+          events: (m.events as unknown as MatchEvent[]) || [],
+          periodScores: (m.period_scores as unknown as PeriodScore[]) || [],
+        }));
+
+        const loadedTournament: TournamentState = {
+          id: tournamentData.id,
+          name: tournamentData.name,
+          teamName: tournamentData.team_name,
+          players,
+          matches,
+          isActive: tournamentData.is_active,
+          createdAt: tournamentData.created_at,
+        };
+
+        setTournament(loadedTournament);
+        saveToLocalStorage(loadedTournament);
+      }
+    } catch (error) {
+      console.error('Failed to load tournament from database:', error);
+      const local = loadFromLocalStorage();
+      if (local) setTournament(local);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load a specific tournament by ID
+  const loadTournamentById = useCallback(async (tournamentId: string) => {
+    if (!user) throw new Error('User not authenticated');
+    
+    setIsLoading(true);
+    try {
+      const { data: tournamentData, error: tournamentError } = await supabase
+        .from('tournaments')
+        .select('*')
+        .eq('id', tournamentId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (tournamentError) throw tournamentError;
+
+      // Mark this tournament as active (and deactivate others)
+      await supabase
+        .from('tournaments')
+        .update({ is_active: false })
+        .eq('user_id', user.id)
+        .neq('id', tournamentId);
+
+      await supabase
+        .from('tournaments')
+        .update({ is_active: true })
+        .eq('id', tournamentId);
+
+      setDbTournamentId(tournamentData.id);
+      
+      const { data: matchesData, error: matchesError } = await supabase
+        .from('tournament_matches')
+        .select('*')
+        .eq('tournament_id', tournamentData.id)
+        .order('match_date', { ascending: true });
+
+      if (matchesError) throw matchesError;
+
+      const players = (tournamentData.players as unknown as TournamentPlayer[]) || [];
+      const matches: TournamentMatch[] = (matchesData || []).map(m => ({
+        id: m.id,
+        date: m.match_date,
+        homeTeamName: m.home_team_name,
+        awayTeamName: m.away_team_name,
+        homeScore: m.home_score,
+        awayScore: m.away_score,
+        playerStats: (m.player_stats as unknown as TournamentPlayerMatchStats[]) || [],
+        events: (m.events as unknown as MatchEvent[]) || [],
+        periodScores: (m.period_scores as unknown as PeriodScore[]) || [],
+      }));
+
+      const loadedTournament: TournamentState = {
+        id: tournamentData.id,
+        name: tournamentData.name,
+        teamName: tournamentData.team_name,
+        players,
+        matches,
+        isActive: true,
+        createdAt: tournamentData.created_at,
+      };
+
+      setTournament(loadedTournament);
+      saveToLocalStorage(loadedTournament);
+    } catch (error) {
+      console.error('Failed to load tournament by ID:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  const startTournament = useCallback(async (name: string, teamName: string, players: { name: string; number: number | null }[]) => {
+    const tournamentPlayers: TournamentPlayer[] = players.map(p => ({
+      id: crypto.randomUUID(),
+      name: p.name,
+      number: p.number,
+      totalGoals: 0,
+      totalMinutes: 0,
+      totalYellowCards: 0,
+      totalRedCards: 0,
+      matchesPlayed: 0,
+    }));
+
+    if (user && !isGuest) {
+      // Cloud-first: save to DB first, use DB-generated ID
+      try {
+        const validatedTournament = validateOrThrow(tournamentSchema, { name, team_name: teamName });
+        const validatedPlayers = validateOrThrow(tournamentPlayersArraySchema, tournamentPlayers);
+
+        await supabase
+          .from('tournaments')
+          .update({ is_active: false })
+          .eq('user_id', user.id);
+
+        const { data, error } = await supabase
+          .from('tournaments')
+          .insert({
+            user_id: user.id,
+            name: validatedTournament.name,
+            team_name: validatedTournament.team_name,
+            players: JSON.parse(JSON.stringify(validatedPlayers)) as Json,
+            is_active: true,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        const dbId = data.id;
+        setDbTournamentId(dbId);
+
+        const newTournament: TournamentState = {
+          id: dbId,
+          name,
+          teamName,
+          players: tournamentPlayers,
+          matches: [],
+          isActive: true,
+          createdAt: data.created_at,
+        };
+
+        setTournament(newTournament);
+        saveToLocalStorage(newTournament);
+        toast.success('Torneo avviato!');
+      } catch (error: any) {
+        console.error('Failed to save tournament to database:', {
+          message: error?.message,
+          details: error?.details,
+          hint: error?.hint,
+          code: error?.code,
+          userId: user.id,
+        });
+        toast.error(`Errore creazione torneo: ${error?.message || 'errore sconosciuto'}`);
+      }
+    } else {
+      // Guest fallback: local only
+      const newTournament: TournamentState = {
+        id: crypto.randomUUID(),
+        name,
+        teamName,
+        players: tournamentPlayers,
+        matches: [],
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      };
+      setTournament(newTournament);
+      saveToLocalStorage(newTournament);
+      toast.success('Torneo avviato!');
+    }
+  }, [user, isGuest]);
+
+  const endTournament = useCallback(async () => {
+    if (user && !isGuest && dbTournamentId) {
+      try {
+        await supabase
+          .from('tournaments')
+          .update({ is_active: false })
+          .eq('id', dbTournamentId);
+      } catch (error) {
+        console.error('Failed to end tournament in database:', error);
+      }
+    }
+
+    const emptyTournament = createEmptyTournament();
+    setTournament(emptyTournament);
+    setDbTournamentId(null);
+    localStorage.removeItem(TOURNAMENT_STORAGE_KEY);
+    toast.success('Torneo terminato');
+  }, [user, isGuest, dbTournamentId]);
+
+  const addMatchToTournament = useCallback(async (
+    homeTeamName: string,
+    awayTeamName: string,
+    homeScore: number,
+    awayScore: number,
+    playerStats: TournamentPlayerMatchStats[],
+    events: MatchEvent[],
+    periodScores: PeriodScore[]
+  ) => {
+    // Calculate updated players first
+    const updatedPlayers = tournament.players.map(player => {
+      const stats = playerStats.find(ps => ps.playerName === player.name);
+      if (stats) {
+        return {
+          ...player,
+          totalGoals: player.totalGoals + stats.goals,
+          totalMinutes: player.totalMinutes + stats.minutes,
+          totalYellowCards: player.totalYellowCards + stats.yellowCards,
+          totalRedCards: player.totalRedCards + stats.redCards,
+          matchesPlayed: player.matchesPlayed + (stats.minutes > 0 ? 1 : 0),
+        };
+      }
+      return player;
+    });
+
+    if (user && !isGuest && dbTournamentId) {
+      // Cloud-first: save to DB, then update local state with DB ID
+      try {
+        const validatedMatch = validateOrThrow(tournamentMatchSchema, {
+          home_team_name: homeTeamName,
+          away_team_name: awayTeamName,
+          home_score: homeScore,
+          away_score: awayScore,
+        });
+
+        // 1. First save the match to tournament_matches
+        const { data, error } = await supabase
+          .from('tournament_matches')
+          .insert({
+            tournament_id: dbTournamentId,
+            user_id: user.id,
+            home_team_name: validatedMatch.home_team_name,
+            away_team_name: validatedMatch.away_team_name,
+            home_score: validatedMatch.home_score,
+            away_score: validatedMatch.away_score,
+            player_stats: JSON.parse(JSON.stringify(playerStats)) as Json,
+            events: JSON.parse(JSON.stringify(events)) as Json,
+            period_scores: JSON.parse(JSON.stringify(periodScores)) as Json,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // 2. Then update tournament players in DB
+        const { error: updateError } = await supabase
+          .from('tournaments')
+          .update({ players: JSON.parse(JSON.stringify(updatedPlayers)) as Json })
+          .eq('id', dbTournamentId);
+
+        if (updateError) console.error('Failed to update tournament players:', updateError);
+
+        // 3. Update local state with DB-generated ID
+        const match: TournamentMatch = {
+          id: data.id,
+          date: data.match_date,
+          homeTeamName,
+          awayTeamName,
+          homeScore,
+          awayScore,
+          playerStats,
+          events,
+          periodScores,
+        };
+
+        setTournament(prev => {
+          const newState = {
+            ...prev,
+            players: updatedPlayers,
+            matches: [...prev.matches, match],
+          };
+          saveToLocalStorage(newState);
+          return newState;
+        });
+
+        toast.success('Partita aggiunta al torneo');
+      } catch (error: any) {
+        console.error('Failed to save tournament match to database:', {
+          message: error?.message,
+          details: error?.details,
+          hint: error?.hint,
+          code: error?.code,
+          tournamentId: dbTournamentId,
+          userId: user.id,
+        });
+        toast.error(`Errore salvataggio partita torneo: ${error?.message || 'errore sconosciuto'}`);
+      }
+    } else {
+      // Guest fallback: local only
+      const match: TournamentMatch = {
+        id: crypto.randomUUID(),
+        date: new Date().toISOString(),
+        homeTeamName,
+        awayTeamName,
+        homeScore,
+        awayScore,
+        playerStats,
+        events,
+        periodScores,
+      };
+
+      setTournament(prev => {
+        const newState = {
+          ...prev,
+          players: updatedPlayers,
+          matches: [...prev.matches, match],
+        };
+        saveToLocalStorage(newState);
+        return newState;
+      });
+
+      toast.success('Partita aggiunta al torneo');
+    }
+  }, [user, isGuest, dbTournamentId, tournament.players]);
+
+  const getTournamentPlayers = useCallback(() => {
+    return tournament.players;
+  }, [tournament.players]);
+
+  const getMatchById = useCallback((matchId: string): TournamentMatch | undefined => {
+    return tournament.matches.find(m => m.id === matchId);
+  }, [tournament.matches]);
+
+  // HARD RESET: Force clear all tournament state for single match mode
+  const resetForSingleMatch = useCallback(() => {
+    const emptyTournament = createEmptyTournament();
+    setTournament(emptyTournament);
+    setDbTournamentId(null);
+    clearTournamentState();
+  }, []);
+
+  return {
+    tournament,
+    isLoading,
+    startTournament,
+    endTournament,
+    addMatchToTournament,
+    getTournamentPlayers,
+    getMatchById,
+    loadFromDatabase,
+    loadTournamentById,
+    resetForSingleMatch,
+  };
+}

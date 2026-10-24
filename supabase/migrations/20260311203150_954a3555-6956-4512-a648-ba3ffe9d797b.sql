@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_matches_user_id ON public.matches(user_id);

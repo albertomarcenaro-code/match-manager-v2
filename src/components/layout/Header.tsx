@@ -1,0 +1,252 @@
+import { useState, useEffect, forwardRef } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import logo from '@/assets/logo.webp';
+import { User, LogOut, KeyRound, Wifi, WifiOff, Users, UserCircle, IdCard } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+
+interface HeaderProps {
+  syncStatus?: 'connected' | 'disconnected' | 'checking';
+  isTournamentMode?: boolean;
+  onTournamentModeChange?: (enabled: boolean) => void;
+  onNewMatch?: () => void;
+  showNavButtons?: boolean;
+}
+
+export const Header = forwardRef<HTMLElement, HeaderProps>(({ 
+  syncStatus = 'checking', 
+  isTournamentMode = false, 
+  onTournamentModeChange,
+}, ref) => {
+  const { user, isGuest, signOut, exitGuest } = useAuth();
+  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+  const [displayName, setDisplayName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) { setDisplayName(null); return; }
+    supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('user_id', user.id)
+      .single()
+      .then(({ data }) => {
+        setDisplayName(data?.full_name || null);
+      });
+  }, [user]);
+
+  const handleLogout = async () => {
+    setIsLoading(true);
+    try {
+      if (isGuest) {
+        exitGuest();
+      } else {
+        await signOut();
+      }
+      toast.success('Disconnesso');
+      navigate('/');
+    } catch (error) {
+      toast.error('Errore durante la disconnessione');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!user?.email) {
+      toast.error('Email non disponibile');
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+        redirectTo: `${window.location.origin}/dashboard`,
+      });
+      
+      if (error) throw error;
+      toast.success('Email di reset password inviata!');
+    } catch (error) {
+      toast.error('Errore nell\'invio dell\'email');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const canToggleTournament = user && !isGuest;
+
+  return (
+    <header ref={ref} className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-14 max-w-6xl items-center justify-between gap-2 px-3 mx-auto">
+        
+        {/* Left: Logo + Text */}
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/dashboard')}>
+          <img src={logo} alt="Icona dell'app Match Manager Live" className="h-8 w-8 object-contain" />
+          <span className="font-bold text-sm sm:text-base tracking-tight leading-none whitespace-nowrap">
+            <span className="text-foreground">Match Manager</span>{' '}
+            <span className="text-secondary">Live</span>
+          </span>
+        </div>
+        
+        {/* Center: Toggle Switch */}
+        <div className="flex items-center gap-2">
+          {onTournamentModeChange && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className={cn(
+                    "flex items-center gap-2 px-2 py-1 rounded-full transition-colors",
+                    !canToggleTournament && "opacity-50"
+                  )}>
+                    <Label 
+                      htmlFor="tournament-toggle" 
+                      className={cn(
+                        "text-[10px] sm:text-xs cursor-pointer transition-colors",
+                        !isTournamentMode ? "text-foreground font-medium" : "text-muted-foreground"
+                      )}
+                    >
+                      Singola
+                    </Label>
+                    <Switch
+                      id="tournament-toggle"
+                      checked={isTournamentMode}
+                      onCheckedChange={onTournamentModeChange}
+                      disabled={!canToggleTournament}
+                      className="scale-75 sm:scale-90 data-[state=checked]:bg-secondary"
+                    />
+                    <Label 
+                      htmlFor="tournament-toggle" 
+                      className={cn(
+                        "text-[10px] sm:text-xs cursor-pointer transition-colors",
+                        isTournamentMode ? "text-secondary font-medium" : "text-muted-foreground"
+                      )}
+                    >
+                      Torneo
+                    </Label>
+                  </div>
+                </TooltipTrigger>
+                {!canToggleTournament && (
+                  <TooltipContent>
+                    <p>Accedi per usare la modalità torneo</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          
+          {/* Sync Status LED */}
+          {!isGuest && user && (
+            <div 
+              className={cn(
+                "hidden xs:flex items-center gap-1 px-1.5 py-0.5 rounded-full",
+                syncStatus === 'connected' && "bg-green-500/10",
+                syncStatus === 'disconnected' && "bg-red-500/10",
+                syncStatus === 'checking' && "bg-yellow-500/10"
+              )}
+              title={syncStatus === 'connected' ? 'Sincronizzato' : syncStatus === 'disconnected' ? 'Non sincronizzato' : 'Verifica...'}
+            >
+              {syncStatus === 'connected' ? (
+                <Wifi className="h-3 w-3 text-green-600" />
+              ) : syncStatus === 'disconnected' ? (
+                <WifiOff className="h-3 w-3 text-red-600" />
+              ) : (
+                <Wifi className="h-3 w-3 text-yellow-600 animate-pulse" />
+              )}
+            </div>
+          )}
+        </div>
+        
+        {/* Right: User Menu */}
+        <div className="flex items-center">
+          {isGuest ? (
+            <div className="flex items-center gap-1">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/auth')}
+                className="gap-1 h-8 px-2 border-primary/50 text-primary hover:text-primary hover:bg-primary/10"
+              >
+                <User className="h-3 w-3" />
+                <span className="text-[10px] font-bold">ACCEDI</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleLogout}
+                disabled={isLoading}
+                className="gap-1 h-8 px-2 border-destructive/50 text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <LogOut className="h-3 w-3" />
+                <span className="text-[10px] font-bold">ESCI</span>
+              </Button>
+            </div>
+          ) : user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Menu utente">
+                  <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+                    <User className="h-4 w-4 text-primary" />
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                {/* User identity */}
+                <div className="px-2 py-2 border-b border-border/50">
+                  <p className="text-sm font-bold truncate">{displayName || user?.email}</p>
+                  {displayName && <p className="text-xs text-muted-foreground truncate">{user?.email}</p>}
+                </div>
+                <DropdownMenuItem onClick={() => navigate('/profile')}>
+                  <UserCircle className="h-4 w-4 mr-2" />
+                  Il mio Profilo
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate('/my-teams')}>
+                  <Users className="h-4 w-4 mr-2" />
+                  Le Mie Squadre
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/team-members')}>
+                  <IdCard className="h-4 w-4 mr-2" />
+                  Anagrafica Squadra
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleResetPassword} disabled={isLoading}>
+                  <KeyRound className="h-4 w-4 mr-2" />
+                  Reset Password
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={handleLogout} 
+                  disabled={isLoading}
+                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Esci
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+        </div>
+      </div>
+    </header>
+  );
+});
+
+Header.displayName = 'Header';

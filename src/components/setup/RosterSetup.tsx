@@ -1,0 +1,1297 @@
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Player } from '@/types/match';
+import { Plus, Trash2, Users, Shield, Check, Hash, Upload, Save, ArrowLeftRight, Trophy, ChevronUp, ChevronRight, Home, FolderOpen, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { playerSchema, validateOrThrow } from '@/lib/validations';
+import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTournament } from '@/hooks/useTournament';
+import { supabase } from '@/integrations/supabase/client';
+import { useLocation, useNavigate } from 'react-router-dom';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+
+interface RosterSetupProps {
+  homeTeamName: string;
+  awayTeamName: string;
+  homePlayers: Player[];
+  awayPlayers: Player[];
+  onHomeTeamNameChange: (name: string) => void;
+  onAwayTeamNameChange: (name: string) => void;
+  onAddPlayer: (name: string) => void;
+  onUpdatePlayerNumber: (playerId: string, number: number | null) => void;
+  onUpdateHomePlayerName?: (playerId: string, name: string) => void;
+  onRemovePlayer: (playerId: string) => void;
+  onAddOpponentPlayer: (number: number) => void;
+  onRemoveOpponentPlayer: (playerId: string) => void;
+  onComplete: () => void;
+  onBulkAddPlayers?: (names: string[]) => void;
+  onSwapTeams?: () => void;
+  onCreatePlayersWithNumbers?: (count: number) => void;
+  pendingTournamentName?: string | null;
+  isTournamentMode?: boolean;
+  // New: full away player management
+  onAddAwayPlayerFull?: (name: string, number: number | null) => void;
+  onUpdateAwayPlayerName?: (playerId: string, name: string) => void;
+  onUpdateAwayPlayerNumber?: (playerId: string, number: number | null) => void;
+  onBulkAddAwayPlayers?: (players: { name: string; number: number | null }[]) => void;
+}
+
+export function RosterSetup({
+  homeTeamName,
+  awayTeamName,
+  homePlayers,
+  awayPlayers,
+  onHomeTeamNameChange,
+  onAwayTeamNameChange,
+  onAddPlayer,
+  onUpdatePlayerNumber,
+  onUpdateHomePlayerName,
+  onRemovePlayer,
+  onAddOpponentPlayer,
+  onRemoveOpponentPlayer,
+  onComplete,
+  onBulkAddPlayers,
+  onSwapTeams,
+  onCreatePlayersWithNumbers,
+  pendingTournamentName,
+  isTournamentMode = false,
+  onAddAwayPlayerFull,
+  onUpdateAwayPlayerName,
+  onUpdateAwayPlayerNumber,
+  onBulkAddAwayPlayers,
+}: RosterSetupProps) {
+  const { user, isGuest } = useAuth();
+  const { tournament, startTournament } = useTournament();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const navState = location.state as { mode?: string } | null;
+  const isSingleMatchMode = navState?.mode === 'single';
+   
+  const [newPlayerName, setNewPlayerName] = useState('');
+  const [newOpponentNumber, setNewOpponentNumber] = useState('');
+  const [autoNumberDialogOpen, setAutoNumberDialogOpen] = useState(false);
+  const [autoNumberCount, setAutoNumberCount] = useState('');
+  const [autoNumberTeam, setAutoNumberTeam] = useState<'home' | 'away'>('home');
+  const [bulkImportDialogOpen, setBulkImportDialogOpen] = useState(false);
+  const [bulkImportText, setBulkImportText] = useState('');
+  const [bulkImportTeam, setBulkImportTeam] = useState<'home' | 'away'>('home');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [tournamentMode, setTournamentMode] = useState(tournament.isActive && !isSingleMatchMode);
+  const [tournamentName, setTournamentName] = useState(tournament.name || '');
+  const [showTournamentDialog, setShowTournamentDialog] = useState(false);
+  // Saved teams import
+  const [savedTeamsDialogOpen, setSavedTeamsDialogOpen] = useState(false);
+  const [savedTeamsTarget, setSavedTeamsTarget] = useState<'home' | 'away'>('home');
+  const [savedTeams, setSavedTeams] = useState<{ id: string; name: string; category: string; players: { name: string; number: number | null }[] }[]>([]);
+  const [loadingSavedTeams, setLoadingSavedTeams] = useState(false);
+
+  // Priorità: se esiste una rosa già salvata localmente (es. chiusura app / reload), NON sovrascrivere con dati dal backend.
+  const hasLocalRoster = useMemo(() => {
+    try {
+      return (
+        homePlayers.length > 0 ||
+        awayPlayers.length > 0
+      );
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const [saveStatusByPlayerId, setSaveStatusByPlayerId] = useState<
+    Record<string, 'idle' | 'saving' | 'saved' | 'error'>
+  >({});
+  const [dbPlayerIdsByName, setDbPlayerIdsByName] = useState<Record<string, string>>({});
+  const [pendingDbNumbersByName, setPendingDbNumbersByName] = useState<Record<string, number | null> | null>(null);
+  const saveTimerRef = useRef<number | null>(null);
+  const saveQueueRef = useRef<Record<string, { id: string; name: string; number: number | null }>>({});
+
+  // Compute duplicate numbers for validation
+  const duplicateHomeNumbers = useMemo(() => {
+    const numberCounts: Record<number, number> = {};
+    homePlayers.forEach(p => {
+      if (p.number !== null) {
+        numberCounts[p.number] = (numberCounts[p.number] || 0) + 1;
+      }
+    });
+    return new Set(Object.entries(numberCounts).filter(([_, count]) => count > 1).map(([num]) => parseInt(num)));
+  }, [homePlayers]);
+
+  const duplicateAwayNumbers = useMemo(() => {
+    const numberCounts: Record<number, number> = {};
+    awayPlayers.forEach(p => {
+      if (p.number !== null) {
+        numberCounts[p.number] = (numberCounts[p.number] || 0) + 1;
+      }
+    });
+    return new Set(Object.entries(numberCounts).filter(([_, count]) => count > 1).map(([num]) => parseInt(num)));
+  }, [awayPlayers]);
+
+  const hasDuplicates = duplicateHomeNumbers.size > 0 || duplicateAwayNumbers.size > 0;
+
+  // PRIVACY: HARD RESET for guest mode - ensure NO data leaks from logged-in users
+  useEffect(() => {
+    if (isGuest) {
+      // Guest mode: ALWAYS start completely fresh - never load ANY data
+      // Clear any cached data that might have leaked
+      return;
+    }
+    
+    // LOGGED IN: Only load if no local roster exists
+    if (user && !hasLocalRoster) {
+      loadUserData();
+    }
+  }, [user, isGuest, hasLocalRoster]);
+
+  // Applica i numeri caricati dal backend quando l'array homePlayers è stato popolato
+  useEffect(() => {
+    if (!pendingDbNumbersByName) return;
+
+    // For single match mode (logged in): DON'T apply saved numbers, only names
+    // For tournament mode: apply numbers from first match
+    if (!isTournamentMode && !tournament.isActive) {
+      // Clear pending - numbers should stay null for single matches
+      setPendingDbNumbersByName(null);
+      return;
+    }
+
+    homePlayers.forEach(p => {
+      const n = pendingDbNumbersByName[p.name];
+      if (typeof n === 'number' && p.number !== n) {
+        onUpdatePlayerNumber(p.id, n);
+      }
+    });
+
+    setPendingDbNumbersByName(null);
+  }, [pendingDbNumbersByName, homePlayers, onUpdatePlayerNumber, isTournamentMode, tournament.isActive]);
+
+  const loadUserData = async () => {
+    if (!user) return;
+    setIsLoading(true);
+
+    try {
+      // Load profile (team name)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('team_name')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (profile?.team_name) {
+        onHomeTeamNameChange(profile.team_name);
+      }
+
+      // Load players (names only - numbers are empty for single match)
+      const { data: players } = await supabase
+        .from('players')
+        .select('id, name, number')
+        .eq('user_id', user.id)
+        .order('name');
+
+      if (players && players.length > 0) {
+        setDbPlayerIdsByName(
+          players.reduce<Record<string, string>>((acc, p) => {
+            if (p.name && p.id) acc[p.name] = p.id;
+            return acc;
+          }, {})
+        );
+      }
+
+      if (players && players.length > 0 && onBulkAddPlayers && homePlayers.length === 0) {
+        // Dedupe nomi (difesa frontend contro eventuali doppioni storici)
+        const seen = new Set<string>();
+        const playerNames = players
+          .map(p => p.name)
+          .filter(n => {
+            const k = (n || '').trim().toLowerCase();
+            if (!k || seen.has(k)) return false;
+            seen.add(k);
+            return true;
+          });
+        onBulkAddPlayers(playerNames);
+
+        // Tournament mode: eredita i numeri di maglia dalla PRIMA partita del torneo
+        // (cronologicamente più vecchia) per garantire continuità. Fallback a tournament.players.
+        if (isTournamentMode && tournament.isActive) {
+          const numbersByName: Record<string, number | null> = {};
+
+          // Base layer: tournament players (numeri iniziali del torneo)
+          tournament.players.forEach((p: any) => {
+            if (p?.name && typeof p.number === 'number') {
+              numbersByName[p.name] = p.number;
+            }
+          });
+
+          // Override con i numeri della PRIMA partita giocata (matches è ordinato asc)
+          if (tournament.matches.length > 0) {
+            const firstMatch = tournament.matches[0];
+            if (firstMatch?.playerStats) {
+              firstMatch.playerStats.forEach((stat: any) => {
+                if (stat.playerName && typeof stat.playerNumber === 'number') {
+                  numbersByName[stat.playerName] = stat.playerNumber;
+                }
+              });
+            }
+          }
+
+          if (Object.keys(numbersByName).length > 0) {
+            setPendingDbNumbersByName(numbersByName);
+          }
+        }
+        // For single match: numbers stay null (don't set pendingDbNumbersByName)
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const flushRosterNumberSaves = async () => {
+    const entries = Object.values(saveQueueRef.current);
+    if (entries.length === 0) return;
+
+    saveQueueRef.current = {};
+
+    if (!user || isGuest) {
+      setSaveStatusByPlayerId(prev => {
+        const next = { ...prev };
+        entries.forEach(e => (next[e.id] = 'saved'));
+        return next;
+      });
+      return;
+    }
+
+    try {
+      for (const e of entries) {
+        // Validate player data before database operation
+        const validatedPlayer = validateOrThrow(playerSchema, { name: e.name, number: e.number });
+        
+        const dbId = dbPlayerIdsByName[validatedPlayer.name];
+
+        if (dbId) {
+          const { error } = await supabase
+            .from('players')
+            .update({ number: validatedPlayer.number })
+            .eq('id', dbId);
+          if (error) throw error;
+        } else {
+          // UPSERT-safe: se un giocatore con lo stesso nome esiste già (vincolo unique),
+          // aggiorna il numero invece di duplicare la riga.
+          const { data: existing } = await supabase
+            .from('players')
+            .select('id')
+            .eq('user_id', user.id)
+            .ilike('name', validatedPlayer.name)
+            .maybeSingle();
+
+          if (existing?.id) {
+            const { error } = await supabase
+              .from('players')
+              .update({ number: validatedPlayer.number })
+              .eq('id', existing.id);
+            if (error) throw error;
+            setDbPlayerIdsByName(prev => ({ ...prev, [validatedPlayer.name]: existing.id }));
+          } else {
+            const { data, error } = await supabase
+              .from('players')
+              .insert({ user_id: user.id, name: validatedPlayer.name, number: validatedPlayer.number })
+              .select('id, name');
+
+            if (error) throw error;
+
+            const row = Array.isArray(data) ? data[0] : null;
+            if (row?.id && row?.name) {
+              setDbPlayerIdsByName(prev => ({ ...prev, [row.name]: row.id }));
+            }
+          }
+        }
+
+        setSaveStatusByPlayerId(prev => ({ ...prev, [e.id]: 'saved' }));
+      }
+    } catch (err) {
+      console.error('Autosave roster failed:', err);
+      setSaveStatusByPlayerId(prev => {
+        const next = { ...prev };
+        entries.forEach(e => (next[e.id] = 'error'));
+        return next;
+      });
+    }
+  };
+
+  const queueRosterNumberSave = (player: Player, number: number | null) => {
+    saveQueueRef.current[player.id] = { id: player.id, name: player.name, number };
+
+    setSaveStatusByPlayerId(prev => ({
+      ...prev,
+      [player.id]: user && !isGuest ? 'saving' : 'saved',
+    }));
+
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(() => {
+      flushRosterNumberSaves();
+    }, 350);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    };
+  }, []);
+
+  const handleAddPlayer = () => {
+    if (newPlayerName.trim()) {
+      onAddPlayer(newPlayerName.trim());
+      setNewPlayerName('');
+    }
+  };
+
+  const handleUpdateNumber = (playerId: string, value: string) => {
+    const numValue = value === '' ? null : parseInt(value, 10);
+    if (numValue !== null && isNaN(numValue)) return;
+
+    onUpdatePlayerNumber(playerId, numValue);
+
+    const player = homePlayers.find(p => p.id === playerId);
+    if (player) {
+      queueRosterNumberSave(player, numValue);
+    }
+  };
+
+  const handleQuickNumber = (playerId: string) => {
+    const usedNumbers = homePlayers
+      .filter(p => p.number !== null)
+      .map(p => p.number as number);
+     
+    const nextNumber = usedNumbers.length > 0 ? Math.max(...usedNumbers) + 1 : 1;
+     
+    onUpdatePlayerNumber(playerId, nextNumber);
+     
+    const player = homePlayers.find(p => p.id === playerId);
+    if (player) {
+      queueRosterNumberSave({ ...player, number: nextNumber }, nextNumber);
+    }
+     
+    toast.success(`Numero ${nextNumber} assegnato`);
+  };
+
+  const handleAddOpponent = () => {
+    const num = parseInt(newOpponentNumber, 10);
+    if (!isNaN(num) && num > 0) {
+      onAddOpponentPlayer(num);
+      setNewOpponentNumber('');
+    }
+  };
+
+  const handleBulkImport = () => {
+    const lines = bulkImportText.split('\n').filter(line => line.trim());
+    let importedCount = 0;
+     
+    if (bulkImportTeam === 'home') {
+      lines.forEach(line => {
+        const name = line.trim().toUpperCase();
+        if (name && !homePlayers.some(p => p.name === name)) {
+          onAddPlayer(name);
+          importedCount++;
+        }
+      });
+    } else {
+      lines.forEach((line, idx) => {
+        const name = line.trim().toUpperCase();
+        if (name && !awayPlayers.some(p => p.name === name)) {
+          if (onAddAwayPlayerFull) {
+            onAddAwayPlayerFull(name, null);
+          } else {
+            onAddOpponentPlayer(idx + 1);
+          }
+          importedCount++;
+        }
+      });
+    }
+
+    if (importedCount > 0) {
+      toast.success(`Importati ${importedCount} giocatori`);
+      setBulkImportText('');
+      setBulkImportDialogOpen(false);
+    } else {
+      toast.error('Nessun nuovo giocatore da importare');
+    }
+  };
+
+  const handleSaveRoster = async () => {
+    if (!user || isGuest) {
+      toast.error('Devi essere loggato per salvare la rosa');
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      // Flush eventuali autosave in coda per evitare race condition
+      if (saveTimerRef.current) {
+        window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      await flushRosterNumberSaves();
+
+      await supabase
+        .from('profiles')
+        .update({ team_name: homeTeamName })
+        .eq('user_id', user.id);
+
+      // Sync intelligente: UPDATE per esistenti, INSERT solo per nuovi, DELETE per rimossi.
+      // NIENTE delete+insert globale (faceva perdere gli ID e generava duplicati al successivo autosave).
+      const { data: existingRows, error: fetchErr } = await supabase
+        .from('players')
+        .select('id, name, number')
+        .eq('user_id', user.id);
+      if (fetchErr) throw fetchErr;
+
+      const existingByName = new Map<string, { id: string; number: number | null }>();
+      (existingRows || []).forEach(r => {
+        if (r.name) existingByName.set(r.name, { id: r.id, number: r.number });
+      });
+
+      const localNames = new Set(homePlayers.map(p => p.name));
+
+      // 1) DELETE giocatori non più presenti localmente
+      const idsToDelete = (existingRows || [])
+        .filter(r => !localNames.has(r.name))
+        .map(r => r.id);
+      if (idsToDelete.length > 0) {
+        const { error } = await supabase
+          .from('players')
+          .delete()
+          .in('id', idsToDelete);
+        if (error) throw error;
+      }
+
+      // 2) UPDATE per esistenti (se il numero è cambiato) e INSERT per nuovi
+      const newIdMap: Record<string, string> = {};
+      for (const p of homePlayers) {
+        // Validazione: nome obbligatorio, numero opzionale (null se vuoto)
+        const validated = validateOrThrow(playerSchema, { name: p.name, number: p.number ?? null });
+        const existing = existingByName.get(validated.name);
+
+        if (existing) {
+          newIdMap[validated.name] = existing.id;
+          if (existing.number !== validated.number) {
+            const { error } = await supabase
+              .from('players')
+              .update({ number: validated.number })
+              .eq('id', existing.id);
+            if (error) throw error;
+          }
+        } else {
+          const { data, error } = await supabase
+            .from('players')
+            .insert({ user_id: user.id, name: validated.name, number: validated.number })
+            .select('id, name')
+            .single();
+          if (error) throw error;
+          if (data?.id && data?.name) newIdMap[data.name] = data.id;
+        }
+      }
+
+      // Aggiorna la mappa locale degli ID DB così i futuri autosave fanno UPDATE (non INSERT)
+      setDbPlayerIdsByName(newIdMap);
+
+      toast.success('Rosa salvata!');
+    } catch (error: any) {
+      console.error('Error saving roster:', error);
+      toast.error('Errore nel salvataggio della rosa. Riprova.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleResetRoster = async () => {
+    if (user && !isGuest) {
+      setIsLoading(true);
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('team_name')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (profile?.team_name) {
+          onHomeTeamNameChange(profile.team_name);
+        }
+
+        const { data: players } = await supabase
+          .from('players')
+          .select('id, name, number')
+          .eq('user_id', user.id)
+          .order('name');
+
+        if (players && players.length > 0 && onBulkAddPlayers) {
+          const uniqueNames = [...new Set(players.map(p => p.name))];
+          onBulkAddPlayers(uniqueNames);
+
+          // For tournament mode: persist numbers from tournament + latest match
+          if (isTournamentMode && tournament.isActive) {
+            const numbersByName: Record<string, number | null> = {};
+            tournament.players.forEach((p: any) => {
+              if (p?.name && typeof p.number === 'number') {
+                numbersByName[p.name] = p.number;
+              }
+            });
+            if (tournament.matches.length > 0) {
+              const firstMatch = tournament.matches[0];
+              if (firstMatch?.playerStats) {
+                firstMatch.playerStats.forEach((stat: any) => {
+                  if (stat.playerName && typeof stat.playerNumber === 'number') {
+                    numbersByName[stat.playerName] = stat.playerNumber;
+                  }
+                });
+              }
+            }
+            setPendingDbNumbersByName(numbersByName);
+          }
+          // Single match mode: numbers stay null
+           
+          setDbPlayerIdsByName(
+            players.reduce<Record<string, string>>((acc, p) => {
+              if (p.name && p.id) acc[p.name] = p.id;
+              return acc;
+            }, {})
+          );
+        }
+
+        toast.success('Rosa ripristinata dal database');
+      } catch (error) {
+        console.error('Error resetting roster:', error);
+        toast.error('Errore nel ripristino');
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      homePlayers.forEach(p => {
+        if (p.number !== null) {
+          onUpdatePlayerNumber(p.id, null);
+        }
+      });
+      toast.success('Numeri di maglia azzerati');
+    }
+  };
+
+  const handleAutoNumber = () => {
+    const count = parseInt(autoNumberCount, 10);
+    if (isNaN(count) || count <= 0 || count > 99) {
+      toast.error('Inserisci un numero valido (1-99)');
+      return;
+    }
+     
+    if (autoNumberTeam === 'home') {
+      // Fix #2: Non-destructive auto-numbering for home team
+      const existing = homePlayers.length;
+      if (existing > 0) {
+        // Assign numbers 1..N to existing players (up to count)
+        homePlayers.slice(0, count).forEach((p, i) => {
+          onUpdatePlayerNumber(p.id, i + 1);
+        });
+        // If count > existing, create additional placeholder players
+        if (count > existing) {
+          for (let i = existing + 1; i <= count; i++) {
+            onAddPlayer(`Giocatore Casa ${i}`);
+          }
+          // Assign numbers to newly created players after state settles
+          setTimeout(() => {
+            if (onCreatePlayersWithNumbers) {
+              onCreatePlayersWithNumbers(count);
+            }
+          }, 50);
+        }
+      } else {
+        // No existing players: generate all from scratch
+        for (let i = 1; i <= count; i++) {
+          onAddPlayer(`Giocatore Casa ${i}`);
+        }
+        setTimeout(() => {
+          if (onCreatePlayersWithNumbers) {
+            onCreatePlayersWithNumbers(count);
+          }
+        }, 50);
+      }
+      toast.success(`${count} giocatori di casa pronti`);
+    } else {
+      // Fix #2: Non-destructive auto-numbering for away team
+      const existing = awayPlayers.length;
+      if (existing > 0) {
+        // Assign numbers 1..N to existing players
+        awayPlayers.slice(0, count).forEach((p, i) => {
+          if (onUpdateAwayPlayerNumber) {
+            onUpdateAwayPlayerNumber(p.id, i + 1);
+          }
+        });
+        // Create additional placeholder players if needed
+        if (count > existing && onAddAwayPlayerFull) {
+          for (let i = existing + 1; i <= count; i++) {
+            onAddAwayPlayerFull(`Giocatore Ospite ${i}`, i);
+          }
+        }
+      } else {
+        if (onAddAwayPlayerFull) {
+          for (let i = 1; i <= count; i++) {
+            onAddAwayPlayerFull(`Giocatore Ospite ${i}`, i);
+          }
+        } else {
+          for (let i = 1; i <= count; i++) {
+            onAddOpponentPlayer(i);
+          }
+        }
+      }
+      toast.success(`${count} giocatori ospiti pronti`);
+    }
+     
+    setAutoNumberDialogOpen(false);
+    setAutoNumberCount('');
+  };
+
+  const handleTournamentToggle = (enabled: boolean) => {
+    if (enabled && !tournament.isActive) {
+      setShowTournamentDialog(true);
+    } else if (!enabled) {
+      setTournamentMode(false);
+    }
+  };
+
+  const handleStartTournament = () => {
+    if (!tournamentName.trim()) {
+      toast.error('Inserisci un nome per il torneo (es. "Campionato 2025")');
+      return;
+    }
+     
+    const players = homePlayers.map(p => ({ name: p.name, number: p.number }));
+    startTournament(tournamentName, homeTeamName, players);
+    setTournamentMode(true);
+    setShowTournamentDialog(false);
+  };
+
+  // --- Saved Teams Import Logic ---
+  const handleOpenSavedTeams = async (target: 'home' | 'away') => {
+    if (!user || isGuest) {
+      toast.error('Devi essere loggato per usare le squadre salvate');
+      return;
+    }
+    setSavedTeamsTarget(target);
+    setLoadingSavedTeams(true);
+    setSavedTeamsDialogOpen(true);
+    try {
+      const { data, error } = await supabase
+        .from('saved_teams')
+        .select('id, name, category, players')
+        .order('updated_at', { ascending: false });
+      if (error) throw error;
+      setSavedTeams((data || []).map(t => ({
+        ...t,
+        category: t.category || '',
+        players: (t.players as unknown as { name: string; number: number | null }[]) || [],
+      })));
+    } catch (e) {
+      console.error(e);
+      toast.error('Errore nel caricamento delle squadre');
+    } finally {
+      setLoadingSavedTeams(false);
+    }
+  };
+
+  const handleLoadSavedTeam = (team: { name: string; players: { name: string; number: number | null }[] }) => {
+    if (savedTeamsTarget === 'home') {
+      onHomeTeamNameChange(team.name);
+      // Clear existing home players
+      homePlayers.forEach(p => onRemovePlayer(p.id));
+      // Add saved team players one by one
+      team.players.forEach(tp => {
+        onAddPlayer(tp.name);
+      });
+      // Assign numbers after state settles
+      if (team.players.some(p => p.number !== null) && onCreatePlayersWithNumbers) {
+        const maxNumber = Math.max(...team.players.filter(p => p.number !== null).map(p => p.number!), 0);
+        setTimeout(() => {
+          team.players.forEach((tp, i) => {
+            if (tp.number !== null) {
+              // Will be handled by user or auto-numbering
+            }
+          });
+        }, 100);
+      }
+      toast.info('Squadra caricata. Usa Auto-numerazione (#) per assegnare i numeri.');
+    } else {
+      onAwayTeamNameChange(team.name);
+      // Clear existing away players
+      awayPlayers.forEach(p => onRemoveOpponentPlayer(p.id));
+      // Add saved team players with numbers
+      team.players.forEach(tp => {
+        if (onAddAwayPlayerFull) {
+          onAddAwayPlayerFull(tp.name, tp.number);
+        }
+      });
+    }
+    setSavedTeamsDialogOpen(false);
+    toast.success(`Squadra "${team.name}" caricata`);
+  };
+
+  const eligiblePlayers = homePlayers.filter(p => p.number !== null);
+  const canProceed = eligiblePlayers.length >= 1 && awayPlayers.length >= 1 && !hasDuplicates;
+
+  // Determine page title - STRICT HIERARCHY:
+  // Show tournament name ONLY if: logged in AND tournament mode AND tournament name exists
+  // Otherwise ALWAYS show 'Configurazione Partita'
+  const shouldShowTournamentName = 
+    user && 
+    !isGuest && 
+    !isSingleMatchMode && 
+    isTournamentMode && 
+    tournament.isActive && 
+    tournament.name;
+   
+  const pageTitle = shouldShowTournamentName ? tournament.name : 'Configurazione Partita';
+
+  return (
+    <div className="bg-background p-4 pb-keyboard scroll-keyboard-safe overflow-y-auto">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Header - Home button removed (now in match nav bar) */}
+        <div className="text-center py-4">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/10 text-secondary mb-4">
+            {isTournamentMode ? <Trophy className="h-5 w-5" /> : <Shield className="h-5 w-5" />}
+            <span className="font-semibold">{pageTitle}</span>
+          </div>
+          <h1 className="text-2xl font-bold text-foreground">Inserisci le rose</h1>
+          <p className="text-muted-foreground mt-2">
+            Aggiungi i giocatori e assegna i numeri di maglia
+          </p>
+          {isLoading && (
+            <p className="text-sm text-primary mt-2">Caricamento dati salvati...</p>
+          )}
+          {/* Tournament match count - only show if in tournament mode */}
+          {isTournamentMode && tournament.isActive && (
+            <p className="text-sm text-secondary font-medium mt-2">
+              {tournament.matches.length} partite giocate
+            </p>
+          )}
+          {/* Duplicate warning */}
+          {hasDuplicates && (
+            <p className="text-sm text-destructive font-medium mt-2">
+              ⚠️ Numeri di maglia duplicati rilevati! Correggi prima di continuare.
+            </p>
+          )}
+        </div>
+
+        {/* Swap Teams Button */}
+        {onSwapTeams && (
+          <div className="flex justify-center">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <ArrowLeftRight className="h-4 w-4" />
+                  Scambia Squadre (Gioco in trasferta)
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Scambiare le squadre?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    I dati della squadra di casa e della squadra ospite verranno invertiti completamente. 
+                    La TUA SQUADRA diventerà ospite e la squadra avversaria diventerà casa.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => {
+                    onSwapTeams();
+                    toast.success('Squadre scambiate - la tua squadra è ora ospite');
+                  }}>
+                    Scambia
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        )}
+
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Home Team */}
+          <div className="bg-card rounded-xl shadow-card overflow-hidden">
+            <div className="p-4 gradient-home text-team-home-foreground">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  <span className="font-bold">Squadra di casa</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {user && !isGuest && (
+                    <Button 
+                      size="sm" 
+                      variant="secondary"
+                      onClick={handleSaveRoster}
+                      disabled={isSaving}
+                      className="gap-1 h-7 text-xs"
+                    >
+                      <Save className="h-3 w-3" />
+                      {isSaving ? 'Salvo...' : 'Salva'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <Input
+                value={homeTeamName}
+                onChange={(e) => onHomeTeamNameChange(e.target.value)}
+                placeholder="Nome squadra"
+                className="bg-team-home-foreground/10 border-team-home-foreground/20 text-team-home-foreground placeholder:text-team-home-foreground/50"
+              />
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Add Player */}
+              <div className="flex gap-2">
+                <Input
+                  value={newPlayerName}
+                  onChange={(e) => setNewPlayerName(e.target.value)}
+                  placeholder="Nome giocatore"
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()}
+                />
+                <Button onClick={handleAddPlayer} size="icon" className="flex-shrink-0">
+                  <Plus className="h-5 w-5" />
+                </Button>
+                <Button 
+                  onClick={() => {
+                    setBulkImportTeam('home');
+                    setBulkImportDialogOpen(true);
+                  }} 
+                  size="icon" 
+                  variant="outline"
+                  className="flex-shrink-0"
+                  title="Importa lista nomi"
+                >
+                  <Upload className="h-5 w-5" />
+                </Button>
+                <Button 
+                  onClick={() => {
+                    setAutoNumberTeam('home');
+                    setAutoNumberDialogOpen(true);
+                  }} 
+                  size="icon" 
+                  variant="outline"
+                  className="flex-shrink-0"
+                  title="Auto-numerazione"
+                >
+                  <Hash className="h-5 w-5" />
+                </Button>
+                {user && !isGuest && (
+                  <Button 
+                    onClick={() => handleOpenSavedTeams('home')} 
+                    size="icon" 
+                    variant="outline"
+                    className="flex-shrink-0"
+                    title="Carica squadra salvata"
+                  >
+                    <FolderOpen className="h-5 w-5" />
+                  </Button>
+                )}
+              </div>
+
+              {/* Players List */}
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {homePlayers.map((player) => {
+                  const status = saveStatusByPlayerId[player.id] ?? 'idle';
+                  const isDuplicate = player.number !== null && duplicateHomeNumbers.has(player.number);
+
+                  return (
+                    <div
+                      key={player.id}
+                      className={cn(
+                        "flex items-center gap-2 p-2 rounded-lg border",
+                        isDuplicate
+                          ? "bg-destructive/10 border-destructive"
+                          : player.number !== null
+                            ? "bg-on-field/5 border-on-field/30"
+                            : "bg-muted/50 border-border"
+                      )}
+                    >
+                      {/* FIX #2: Symmetric layout - same structure as away team */}
+                      <Input
+                        type="number"
+                        min="1"
+                        value={player.number ?? ''}
+                        onChange={(e) => handleUpdateNumber(player.id, e.target.value)}
+                        onBlur={() => queueRosterNumberSave(player, player.number ?? null)}
+                        placeholder="#"
+                        className={cn(
+                          "w-14 text-center",
+                          isDuplicate && "border-destructive focus-visible:ring-destructive"
+                        )}
+                      />
+                      <Input
+                        value={player.name}
+                        onChange={(e) => {
+                          if (onUpdateHomePlayerName) {
+                            onUpdateHomePlayerName(player.id, e.target.value);
+                          }
+                        }}
+                        placeholder="Nome"
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onRemovePlayer(player.id)}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
+                {homePlayers.length === 0 && (
+                  <p className="text-center text-sm text-muted-foreground py-4">
+                    Nessun giocatore inserito
+                  </p>
+                )}
+              </div>
+
+              <p className="text-xs text-muted-foreground text-center">
+                {eligiblePlayers.length} giocatori con numero assegnato
+              </p>
+            </div>
+          </div>
+
+          {/* Away Team */}
+          <div className="bg-card rounded-xl shadow-card overflow-hidden">
+            <div className="p-4 gradient-away text-team-away-foreground">
+              <div className="flex items-center gap-2 mb-3">
+                <Shield className="h-5 w-5" />
+                <span className="font-bold">Squadra ospite</span>
+              </div>
+              <Input
+                value={awayTeamName}
+                onChange={(e) => onAwayTeamNameChange(e.target.value)}
+                placeholder="Nome squadra avversaria"
+                className="bg-team-away-foreground/10 border-team-away-foreground/20 text-team-away-foreground placeholder:text-team-away-foreground/50"
+              />
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Add Opponent */}
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min="1"
+                  value={newOpponentNumber}
+                  onChange={(e) => setNewOpponentNumber(e.target.value)}
+                  placeholder="Numero maglia"
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddOpponent()}
+                />
+                <Button onClick={handleAddOpponent} size="icon" className="flex-shrink-0">
+                  <Plus className="h-5 w-5" />
+                </Button>
+                <Button 
+                  onClick={() => {
+                    setBulkImportTeam('away');
+                    setBulkImportDialogOpen(true);
+                  }} 
+                  size="icon" 
+                  variant="outline"
+                  className="flex-shrink-0"
+                  title="Importa lista nomi ospiti"
+                >
+                  <Upload className="h-5 w-5" />
+                </Button>
+                <Button 
+                  onClick={() => {
+                    setAutoNumberTeam('away');
+                    setAutoNumberDialogOpen(true);
+                  }} 
+                  size="icon" 
+                  variant="outline"
+                  className="flex-shrink-0"
+                  title="Auto-genera ospiti"
+                >
+                  <Hash className="h-5 w-5" />
+                </Button>
+                {user && !isGuest && (
+                  <Button 
+                    onClick={() => handleOpenSavedTeams('away')} 
+                    size="icon" 
+                    variant="outline"
+                    className="flex-shrink-0"
+                    title="Carica squadra salvata"
+                  >
+                    <FolderOpen className="h-5 w-5" />
+                  </Button>
+                )}
+              </div>
+
+              {/* Opponents List - Editable */}
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {awayPlayers.map((player) => {
+                  const isDuplicate = player.number !== null && duplicateAwayNumbers.has(player.number);
+                  
+                  return (
+                    <div
+                      key={player.id}
+                      className={cn(
+                        "flex items-center gap-2 p-2 rounded-lg border",
+                        isDuplicate
+                          ? "bg-destructive/10 border-destructive"
+                          : player.number !== null
+                            ? "bg-muted/80 border-border"
+                            : "bg-muted/50 border-border"
+                      )}
+                    >
+                      <Input
+                        type="number"
+                        min="1"
+                        value={player.number ?? ''}
+                        onChange={(e) => {
+                          const numVal = e.target.value === '' ? null : parseInt(e.target.value, 10);
+                          if (numVal !== null && isNaN(numVal)) return;
+                          if (onUpdateAwayPlayerNumber) {
+                            onUpdateAwayPlayerNumber(player.id, numVal);
+                          }
+                        }}
+                        placeholder="#"
+                        className={cn(
+                          "w-14 text-center",
+                          isDuplicate && "border-destructive focus-visible:ring-destructive"
+                        )}
+                      />
+                      <Input
+                        value={player.name}
+                        onChange={(e) => {
+                          if (onUpdateAwayPlayerName) {
+                            onUpdateAwayPlayerName(player.id, e.target.value);
+                          }
+                        }}
+                        placeholder="Nome"
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onRemoveOpponentPlayer(player.id)}
+                        className="text-muted-foreground hover:text-destructive flex-shrink-0"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
+                {awayPlayers.length === 0 && (
+                  <p className="text-center text-sm text-muted-foreground py-4">
+                    Nessun giocatore inserito
+                  </p>
+                )}
+              </div>
+
+              <p className="text-xs text-muted-foreground text-center">
+                {awayPlayers.length} giocatori inseriti
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Continue Button */}
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur border-t border-border">
+          <div className="max-w-4xl mx-auto space-y-2">
+            <Button
+              size="lg"
+              className="w-full gap-2 bg-secondary hover:bg-secondary/90 text-secondary-foreground"
+              onClick={onComplete}
+              disabled={!canProceed}
+            >
+              Inizia Partita <ChevronRight className="h-4 w-4" />
+            </Button>
+            
+            <div className="flex justify-center">
+              <Button 
+                variant="link" 
+                size="sm" 
+                className="text-muted-foreground h-auto p-0 hover:text-destructive"
+                onClick={handleResetRoster}
+              >
+                Reset Totale
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* DIALOGS */}
+        <Dialog open={autoNumberDialogOpen} onOpenChange={setAutoNumberDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {autoNumberTeam === 'home' ? 'Genera Squadra di Casa' : 'Genera Squadra Ospite'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              <div className="space-y-2">
+                <Label>Quanti giocatori vuoi inserire?</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="99"
+                  value={autoNumberCount}
+                  onChange={(e) => setAutoNumberCount(e.target.value)}
+                  placeholder="Es. 11"
+                  autoFocus
+                  onKeyDown={(e) => e.key === 'Enter' && handleAutoNumber()}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {autoNumberTeam === 'home' 
+                  ? 'Verranno generati giocatori "Giocatore Casa 1", "Giocatore Casa 2", ecc. con numeri progressivi. Potrai modificare nomi e numeri dopo la generazione.'
+                  : 'Verranno generati giocatori "Giocatore Ospite 1", "Giocatore Ospite 2", ecc. con numeri progressivi. Potrai modificare nomi e numeri dopo la generazione.'}
+              </p>
+              {(autoNumberTeam === 'home' ? homePlayers.length : awayPlayers.length) > 0 && (
+                <p className="text-sm text-primary font-medium">
+                  ℹ️ I nomi esistenti verranno mantenuti, i numeri assegnati da 1 a N.
+                </p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAutoNumberDialogOpen(false)}>
+                Annulla
+              </Button>
+              <Button onClick={handleAutoNumber}>
+                Genera
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={bulkImportDialogOpen} onOpenChange={setBulkImportDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>
+                Importa Giocatori - {bulkImportTeam === 'home' ? 'Squadra di Casa' : 'Squadra Ospite'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              <div className="space-y-2">
+                <Label>Incolla i nomi (uno per riga)</Label>
+                <Textarea
+                  value={bulkImportText}
+                  onChange={(e) => setBulkImportText(e.target.value)}
+                  placeholder={`ROSSI\nBIANCHI\nVERDI...`}
+                  className="min-h-[200px]"
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                I numeri di maglia potranno essere assegnati dopo l'importazione.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setBulkImportDialogOpen(false)}>
+                Annulla
+              </Button>
+              <Button onClick={handleBulkImport}>
+                Importa
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showTournamentDialog} onOpenChange={setShowTournamentDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Avvia Torneo</DialogTitle>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              <div className="space-y-2">
+                <Label>Nome del Torneo</Label>
+                <Input
+                  value={tournamentName}
+                  onChange={(e) => setTournamentName(e.target.value)}
+                  placeholder="Es. Campionato Invernale 2025"
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                La modalità torneo salverà statistiche aggregate per ogni giocatore attraverso più partite.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setShowTournamentDialog(false);
+                setTournamentMode(false);
+              }}>
+                Annulla
+              </Button>
+              <Button onClick={handleStartTournament}>
+                Avvia Torneo
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Saved Teams Import Dialog */}
+        <Dialog open={savedTeamsDialogOpen} onOpenChange={setSavedTeamsDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>
+                Carica Squadra Salvata - {savedTeamsTarget === 'home' ? 'Casa' : 'Ospite'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-2 space-y-2 max-h-[400px] overflow-y-auto">
+              {loadingSavedTeams ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+                  Caricamento...
+                </div>
+              ) : savedTeams.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p className="text-sm">Nessuna squadra salvata.</p>
+                  <Button variant="link" size="sm" onClick={() => { setSavedTeamsDialogOpen(false); navigate('/my-teams'); }}>
+                    Vai a "Le Mie Squadre" per crearne una
+                  </Button>
+                </div>
+              ) : (
+                savedTeams.map(team => (
+                  <Button
+                    key={team.id}
+                    variant="outline"
+                    className="w-full justify-start text-left h-auto py-3 px-4"
+                    onClick={() => handleLoadSavedTeam(team)}
+                  >
+                    <div>
+                      <p className="font-semibold text-sm">{team.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {team.category ? `${team.category} · ` : ''}{team.players.length} giocatori
+                      </p>
+                    </div>
+                  </Button>
+                ))
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSavedTeamsDialogOpen(false)}>Chiudi</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,234 @@
+import { useNavigate } from "react-router-dom";
+import { Helmet } from 'react-helmet';
+import { Button } from "@/components/ui/button";
+import { ArrowRight, Trophy, Zap, Users, Share2, CheckCircle2, Smartphone, Download } from "lucide-react";
+import { Header } from "@/components/layout/Header";
+import { useState, useEffect } from "react";
+
+const Landing = () => {
+  const navigate = useNavigate();
+  const brandGreen = "#2ea35f";
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isIos, setIsIos] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    const ua = window.navigator.userAgent.toLowerCase();
+    setIsIos(/iphone|ipad|ipod/.test(ua));
+    setIsInstalled(window.matchMedia('(display-mode: standalone)').matches);
+
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      setDeferredPrompt(null);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col font-sans bg-background selection:bg-green-100">
+      <Helmet>
+        <title>Match Manager Live | Il tuo assistente di campo</title>
+        <meta name="description" content="Gestione professionale di partite di calcio e tornei in tempo reale con cronometro e statistiche." />
+        <meta property="og:title" content="Match Manager Live | Il tuo assistente di campo" />
+        <meta property="og:description" content="Gestione professionale di partite di calcio e tornei in tempo reale con cronometro e statistiche." />
+        <meta property="og:url" content="https://matchmanager-live.lovable.app/" />
+        <meta name="twitter:title" content="Match Manager Live | Il tuo assistente di campo" />
+        <meta name="twitter:description" content="Gestione professionale di partite di calcio e tornei in tempo reale con cronometro e statistiche." />
+        <script type="application/ld+json">{`
+          {
+            "@context": "https://schema.org",
+            "@graph": [
+              {
+                "@type": "Organization",
+                "name": "Match Manager Live",
+                "url": "https://matchmanager-live.lovable.app",
+                "logo": "https://matchmanager-live.lovable.app/favicon.png"
+              },
+              {
+                "@type": "WebSite",
+                "name": "Match Manager Live",
+                "url": "https://matchmanager-live.lovable.app"
+              }
+            ]
+          }
+        `}</script>
+      </Helmet>
+
+      <Header />
+
+      <main className="flex-1">
+        {/* --- HERO SECTION --- */}
+        <section className="relative pt-12 pb-20 lg:pt-20">
+          <div className="container mx-auto px-4 text-center lg:text-left grid lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-50 text-green-700 text-sm font-medium mb-8 border border-green-100">
+                 <Zap className="w-4 h-4 fill-current" />
+                 <span>Gestione sportiva semplificata</span>
+              </div>
+              <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6">
+                Il campo, <br />
+                <span className="text-[#2ea35f]">in tempo reale.</span>
+              </h1>
+              <p className="text-xl text-muted-foreground mb-10 max-w-xl leading-relaxed">
+                Gestisci rose, eventi live e condividi i risultati su WhatsApp con un tap. 
+                La soluzione definitiva per dirigenti e mister.
+              </p>
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <Button 
+                  onClick={() => navigate("/auth")}
+                  className="h-14 px-10 text-lg rounded-full bg-[#2ea35f] hover:bg-[#268c50] shadow-lg transition-all text-white border-0"
+                >
+                  Inizia Gratuitamente
+                  <ArrowRight className="ml-2 w-5 h-5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate("/overview")}
+                  className="h-14 px-8 text-lg rounded-full border-secondary/40 text-secondary hover:bg-secondary/10 hover:text-secondary transition-all"
+                >
+                  Scopri come funziona
+                </Button>
+              </div>
+              <span className="text-sm text-muted-foreground flex items-center gap-2 mt-2">
+                <CheckCircle2 className="w-4 h-4 text-green-600" /> Nessun setup complicato
+              </span>
+            </div>
+            
+            <div className="hidden lg:block">
+              <img 
+                src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&q=60&w=860" 
+                loading="lazy"
+                decoding="async"
+                alt="Campo da calcio" 
+                className="rounded-3xl shadow-2xl object-cover h-[500px] w-full"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* --- FEATURES SECTION --- */}
+        <section className="py-20 bg-muted/30">
+          <div className="container mx-auto px-4">
+            <div className="grid md:grid-cols-3 gap-8">
+              <FeatureCard 
+                icon={<Users />}
+                title="Gestione Rose"
+                description="Crea le tue squadre e sposta i giocatori tra titolari e panchina in un istante."
+                color={brandGreen}
+              />
+              <FeatureCard 
+                icon={<Trophy />}
+                title="Live Match"
+                description="Registra gol, assist e cartellini con un'interfaccia pensata per il bordo campo."
+                color={brandGreen}
+              />
+              <FeatureCard 
+                icon={<Share2 />}
+                title="Condivisione"
+                description="Genera report pronti per i gruppi WhatsApp non appena fischia la fine."
+                color={brandGreen}
+              />
+            </div>
+          </div>
+        </section>
+        {/* --- PWA INSTALL SECTION --- */}
+        <section className="py-20 bg-gradient-to-b from-background to-muted/40">
+          <div className="container mx-auto px-4 text-center max-w-2xl">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-secondary/10 mb-6">
+              <Smartphone className="w-8 h-8 text-secondary" />
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">
+              Porta Match Manager sempre con te
+            </h2>
+            <p className="text-lg text-muted-foreground mb-10 leading-relaxed">
+              Installa l'app sul tuo telefono per un accesso istantaneo, anche offline. Nessun app store necessario.
+            </p>
+
+            {isInstalled ? (
+              <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-secondary/10 text-secondary font-medium">
+                <CheckCircle2 className="w-5 h-5" />
+                App già installata!
+              </div>
+            ) : deferredPrompt ? (
+              <Button
+                onClick={handleInstall}
+                className="h-14 px-10 text-lg rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/90 shadow-lg"
+              >
+                <Download className="w-5 h-5 mr-2" />
+                Installa ora
+              </Button>
+            ) : (
+              <div className="grid sm:grid-cols-2 gap-6 text-left max-w-lg mx-auto">
+                <div className="p-6 rounded-2xl bg-card border border-border">
+                  <p className="font-bold mb-2"> iPhone / iPad</p>
+                  <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>Apri in <strong>Safari</strong></li>
+                    <li>Tocca <strong>Condividi</strong> (⬆️)</li>
+                    <li>Seleziona <strong>"Aggiungi a Home"</strong></li>
+                  </ol>
+                </div>
+                <div className="p-6 rounded-2xl bg-card border border-border">
+                  <p className="font-bold mb-2"> Android</p>
+                  <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>Apri in <strong>Chrome</strong></li>
+                    <li>Tocca il menu <strong>⋮</strong></li>
+                    <li>Seleziona <strong>"Installa app"</strong></li>
+                  </ol>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      </main>
+
+      {/* --- FOOTER SEMPLIFICATO --- */}
+      <footer className="bg-gradient-to-b from-background to-green-50/50 pt-20 pb-12 border-t border-border">
+        <div className="container mx-auto px-4 text-center">
+           <h3 className="text-3xl md:text-4xl font-bold mb-8 tracking-tight">
+             Pronto per la prossima partita?
+           </h3>
+           
+           <Button 
+              onClick={() => navigate("/auth")}
+              className="h-12 px-8 bg-[#2ea35f] text-white hover:bg-[#268c50] rounded-full shadow-md mb-16"
+           >
+             Crea il tuo primo match
+           </Button>
+           
+          <div className="border-t border-border pt-8 flex flex-col md:flex-row justify-between items-center text-sm text-muted-foreground">
+            <p>© 2026 Match Manager Live. Tutti i diritti riservati.</p>
+            <div className="flex gap-6 mt-4 md:mt-0">
+              <a href="/privacy" className="hover:text-green-600 transition-colors">Privacy</a>
+               <a href="/terms" className="hover:text-green-600 transition-colors">Terms</a>
+               <a href="/about" className="hover:text-green-600 transition-colors">About</a>
+               <a href="/overview" className="hover:text-green-600 transition-colors">Overview</a>
+             </div>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+// Componente FeatureCard (Versione rifinita)
+const FeatureCard = ({ icon, title, description, color }: { icon: React.ReactNode, title: string, description: string, color: string }) => (
+  <div className="group p-8 bg-card rounded-2xl border border-border/60 hover:border-green-500/30 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden h-full flex flex-col">
+    <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
+    <div className="mb-6 w-12 h-12 rounded-xl flex items-center justify-center bg-green-50" style={{ color: color }}>
+      {icon}
+    </div>
+    <h3 className="text-xl font-bold mb-3">{title}</h3>
+    <p className="text-muted-foreground leading-relaxed">{description}</p>
+  </div>
+);
+
+export default Landing;

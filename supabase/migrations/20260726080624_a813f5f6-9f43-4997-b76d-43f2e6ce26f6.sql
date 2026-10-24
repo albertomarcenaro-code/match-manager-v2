@@ -1,0 +1,1 @@
+ALTER TABLE public.saved_teams ADD COLUMN IF NOT EXISTS season text;

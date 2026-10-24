@@ -1,0 +1,1 @@
+ALTER TABLE public.matches ADD COLUMN tournament_id uuid REFERENCES public.tournaments(id) ON DELETE SET NULL DEFAULT NULL;

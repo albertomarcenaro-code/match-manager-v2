@@ -1,0 +1,422 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { Helmet } from "react-helmet";
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { useMatch } from '@/hooks/useMatch';
+import { MatchHeader } from '@/components/match/MatchHeader';
+import { TeamPanel } from '@/components/match/TeamPanel';
+import { TimerControls } from '@/components/match/TimerControls';
+import { EventTimeline } from '@/components/match/EventTimeline';
+import { StarterSelection } from '@/components/match/StarterSelection';
+import { ExportButton } from '@/components/match/ExportButton';
+import { PDFExportButton } from '@/components/match/PDFExportButton';
+import { WhatsAppShareButton } from '@/components/match/WhatsAppShareButton';
+import { ShareLiveButton } from '@/components/live/ShareLiveButton';
+import { RosterSetup } from '@/components/setup/RosterSetup';
+import { MatchDetailsTab } from '@/components/match/MatchDetailsTab';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { FileText, Users, UserCheck, Play, Home, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+import { Header } from '@/components/layout/Header';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTournamentJerseys } from '@/hooks/useTournamentJerseys';
+
+const MatchApp = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const { user, isGuest } = useAuth();
+  const tournamentId = searchParams.get('tournamentId');
+  const preloadedHomePlayers = ((location.state as any)?.preloadedHomePlayers ?? []) as Array<{ id: string; name: string; number: number | null }>;
+  // Partite successive di un torneo: salta la distinta e apri direttamente le rose
+  const skipToRoster = Boolean((location.state as any)?.skipToRoster);
+
+  const {
+    state,
+    isReady,
+    recoveryError,
+    retryRecovery,
+    setHomeTeamName,
+    setAwayTeamName,
+    setMetadata,
+    setHomeRosterFromMembers,
+    saveNow,
+    addPlayer,
+
+    setStarters,
+    confirmStarters,
+    startPeriod,
+    pauseTimer,
+    resumeTimer,
+    endPeriod,
+    endMatch,
+    recordGoal,
+    recordOwnGoal,
+    recordCard,
+    recordSubstitution,
+    resetMatch,
+    updatePlayerNumber,
+    removePlayer,
+    addOpponentPlayer,
+    removeOpponentPlayer,
+    undoLastEvent,
+    deleteEvent,
+    addPlayerToMatch,
+    updateElapsedTime,
+    bulkAddPlayers,
+    swapTeams,
+    createPlayersWithNumbers,
+    updateHomePlayerName,
+    addAwayPlayerFull,
+    updateAwayPlayerName,
+    updateAwayPlayerNumber,
+    bulkAddAwayPlayers,
+    fixStarterError,
+    loadTournamentPlayers,
+  } = useMatch();
+
+  // Tournament-scoped jersey persistence (only active when tournamentId is present)
+  const { jerseys: tournamentJerseys, roster: tournamentRoster, loaded: jerseysLoaded, upsertJersey } =
+    useTournamentJerseys(tournamentId);
+  const jerseysAppliedRef = useRef(false);
+  const preloadAppliedRef = useRef(false);
+
+  // Preload home roster from tournament players on a brand-new tournament match.
+  // Preserves original player IDs so tournament_jersey_numbers lookups match.
+  useEffect(() => {
+    if (!isReady) return;
+    if (preloadAppliedRef.current) return;
+    if (!tournamentId) return;
+    if (preloadedHomePlayers.length === 0) return;
+    if (state.homeTeam.players.length > 0) return;
+    loadTournamentPlayers(preloadedHomePlayers);
+    preloadAppliedRef.current = true;
+  }, [isReady, tournamentId, preloadedHomePlayers, state.homeTeam.players.length, loadTournamentPlayers]);
+
+  // Apply persisted tournament jerseys to the home roster ONCE per match load.
+  // Only fills players that currently have no number; never overwrites a manual edit.
+  useEffect(() => {
+    if (!isReady) return;
+    if (!tournamentId || !jerseysLoaded) return;
+    if (jerseysAppliedRef.current) return;
+    if (state.homeTeam.players.length === 0) return;
+
+    let didApply = false;
+    for (const p of state.homeTeam.players) {
+      const n = tournamentJerseys.get(p.id);
+      if (p.number == null && n != null) {
+        updatePlayerNumber(p.id, n);
+        didApply = true;
+      }
+    }
+    jerseysAppliedRef.current = true;
+    // didApply purely informational; effect runs once via ref guard
+    void didApply;
+  }, [isReady, tournamentId, jerseysLoaded, tournamentJerseys, state.homeTeam.players, updatePlayerNumber]);
+
+  // Tab navigation: 'roster' | 'starters' | 'live'
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (state.isMatchStarted && !state.needsStarterSelection) return 'live';
+    if (state.isMatchStarted && state.needsStarterSelection) return 'starters';
+    if (state.metadata?.detailsConfirmed) return 'roster';
+    if (skipToRoster) return 'roster';
+    return 'distinta';
+  });
+
+  const initialTabAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!isReady || initialTabAppliedRef.current) return;
+    initialTabAppliedRef.current = true;
+    setActiveTab(state.isMatchStarted
+      ? state.needsStarterSelection ? 'starters' : 'live'
+      : state.metadata?.detailsConfirmed || skipToRoster ? 'roster' : 'distinta');
+  }, [isReady, state, skipToRoster]);
+
+  // Timer tick interval (UI refresh only)
+  useEffect(() => {
+    if (!isReady || !state.isRunning || state.isPaused) return;
+    const interval = setInterval(() => {
+      updateElapsedTime();
+    }, 250);
+    return () => clearInterval(interval);
+  }, [isReady, state.isRunning, state.isPaused, updateElapsedTime]);
+
+  // Wrapped number update — persists to tournament_jersey_numbers when in tournament context
+  const handleUpdatePlayerNumber = (playerId: string, number: number | null) => {
+    updatePlayerNumber(playerId, number);
+    if (tournamentId) {
+      const player = state.homeTeam.players.find(p => p.id === playerId);
+      if (player) {
+        upsertJersey({ id: playerId, name: player.name, number });
+      }
+    }
+  };
+
+  // Wrapped name update — keeps player_name in sync with the persisted jersey
+  const handleUpdateHomePlayerName = (playerId: string, name: string) => {
+    updateHomePlayerName(playerId, name);
+    if (tournamentId) {
+      const player = state.homeTeam.players.find(p => p.id === playerId);
+      if (player && player.number != null) {
+        upsertJersey({ id: playerId, name, number: player.number });
+      }
+    }
+  };
+
+  // Handle starter confirmation
+  const handleConfirmStarters = (homeStarters: string[], awayStarters: string[]) => {
+    setStarters(homeStarters, true);
+    setStarters(awayStarters, false);
+    confirmStarters();
+    setActiveTab('live');
+  };
+
+  // When roster is complete, go to starters tab
+  const handleRosterComplete = () => {
+    setActiveTab('starters');
+  };
+
+  // Determine if each tab should be accessible
+  const hasPlayers = state.homeTeam.players.some(p => p.number !== null) && state.awayTeam.players.length > 0;
+
+  if (!isReady) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="flex min-h-64 flex-col items-center justify-center gap-4 p-4" aria-busy={!recoveryError}>
+          {recoveryError ? (
+            <>
+              <p className="text-center text-muted-foreground">Impossibile recuperare la partita dall’account.</p>
+              <Button onClick={retryRecovery}>Riprova</Button>
+            </>
+          ) : <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-label="Recupero partita" />}
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>{state.homeTeam.name} vs {state.awayTeam.name} | Match Manager Live</title>
+        <meta name="description" content="Gestisci rose, titolari, cronometro ed eventi live della partita in tempo reale." />
+      </Helmet>
+      {/* Global Header */}
+      <Header />
+
+      {/* Unified top navigation bar with Home + Tabs */}
+      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/40">
+        <div className="max-w-6xl mx-auto px-3">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <div className="flex items-center gap-1 h-12">
+              {/* Home button - single point of navigation back to dashboard */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 flex-shrink-0"
+                onClick={() => navigate('/dashboard')}
+                title="Torna alla Dashboard"
+              >
+                <Home className="h-4 w-4" />
+              </Button>
+
+              {/* Tab navigation */}
+              <TabsList className="flex-1 grid grid-cols-4 h-9">
+                <TabsTrigger value="distinta" className="gap-1 text-xs sm:text-sm h-8">
+                  <FileText className="h-3.5 w-3.5" />
+                  Distinta
+                </TabsTrigger>
+                <TabsTrigger value="roster" className="gap-1 text-xs sm:text-sm h-8">
+                  <Users className="h-3.5 w-3.5" />
+                  Rose
+                </TabsTrigger>
+                <TabsTrigger value="starters" className="gap-1 text-xs sm:text-sm h-8" disabled={!hasPlayers}>
+                  <UserCheck className="h-3.5 w-3.5" />
+                  Titolari
+                </TabsTrigger>
+                <TabsTrigger value="live" className="gap-1 text-xs sm:text-sm h-8" disabled={!hasPlayers}>
+                  <Play className="h-3.5 w-3.5" />
+                  Live
+                </TabsTrigger>
+              </TabsList>
+
+            </div>
+          </Tabs>
+        </div>
+      </div>
+
+      <main className="p-3 max-w-6xl mx-auto space-y-3">
+        {/* Match Header / Scoreboard - below nav bar */}
+        {state.isMatchStarted && <MatchHeader state={state} />}
+
+        {/* Tab Content (rendered outside Tabs component since TabsList is in the header) */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          {/* Hidden TabsList to keep Tabs context working */}
+          <TabsList className="hidden">
+            <TabsTrigger value="distinta">Distinta</TabsTrigger>
+            <TabsTrigger value="roster">Rose</TabsTrigger>
+            <TabsTrigger value="starters">Titolari</TabsTrigger>
+            <TabsTrigger value="live">Live</TabsTrigger>
+          </TabsList>
+
+          {/* Distinta Tab */}
+          <TabsContent value="distinta" className="mt-0">
+            <MatchDetailsTab
+              metadata={state.metadata}
+              homeTeamName={state.homeTeam.name}
+              awayTeamName={state.awayTeam.name}
+              onMetadataChange={setMetadata}
+              onHomeTeamNameChange={setHomeTeamName}
+              onAwayTeamNameChange={setAwayTeamName}
+              onSaveNow={saveNow}
+              onSetHomeRosterFromMembers={setHomeRosterFromMembers}
+              onGoToRoster={() => setActiveTab('roster')}
+              isMatchStarted={state.isMatchStarted}
+              tournamentRoster={tournamentId ? tournamentRoster : undefined}
+            />
+          </TabsContent>
+
+          {/* Rose Tab */}
+          <TabsContent value="roster" className="mt-0">
+
+            <RosterSetup
+              homeTeamName={state.homeTeam.name}
+              awayTeamName={state.awayTeam.name}
+              homePlayers={state.homeTeam.players}
+              awayPlayers={state.awayTeam.players}
+              onHomeTeamNameChange={setHomeTeamName}
+              onAwayTeamNameChange={setAwayTeamName}
+              onAddPlayer={(name) => addPlayer(name)}
+              onUpdatePlayerNumber={handleUpdatePlayerNumber}
+              onUpdateHomePlayerName={handleUpdateHomePlayerName}
+              onRemovePlayer={removePlayer}
+              onAddOpponentPlayer={addOpponentPlayer}
+              onRemoveOpponentPlayer={removeOpponentPlayer}
+              onComplete={handleRosterComplete}
+              onBulkAddPlayers={bulkAddPlayers}
+              onSwapTeams={swapTeams}
+              onCreatePlayersWithNumbers={createPlayersWithNumbers}
+              onAddAwayPlayerFull={addAwayPlayerFull}
+              onUpdateAwayPlayerName={updateAwayPlayerName}
+              onUpdateAwayPlayerNumber={updateAwayPlayerNumber}
+              onBulkAddAwayPlayers={bulkAddAwayPlayers}
+            />
+          </TabsContent>
+
+          {/* Titolari Tab */}
+          <TabsContent value="starters" className="mt-0">
+            <StarterSelection
+              homePlayers={state.homeTeam.players}
+              awayPlayers={state.awayTeam.players}
+              period={state.currentPeriod}
+              onConfirm={handleConfirmStarters}
+            />
+          </TabsContent>
+
+          {/* Live Tab */}
+          <TabsContent value="live" className="mt-0 space-y-4">
+            {!state.isMatchStarted && state.needsStarterSelection ? (
+              <div className="text-center p-8 bg-card rounded-xl shadow-card">
+                <p className="text-muted-foreground">
+                  Seleziona prima i titolari nella tab "Titolari" per iniziare la partita.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Share Live link */}
+                {id && (
+                  <div className="flex justify-end">
+                    <ShareLiveButton type="match" id={id} />
+                  </div>
+                )}
+                 {/* Timer Controls */}
+                <TimerControls
+                  state={state}
+                  onStartPeriod={startPeriod}
+                  onPause={pauseTimer}
+                  onResume={resumeTimer}
+                  onEndPeriod={() => {
+                    endPeriod();
+                    // Auto-navigate to Starters tab for next period setup
+                    if (!state.isMatchEnded) {
+                      setActiveTab('starters');
+                    }
+                  }}
+                  onEndMatch={() => {
+                    if (state.isRunning) endPeriod();
+                    endMatch();
+                    setActiveTab('live');
+                    // DB save is now handled automatically by useMatch hook
+                  }}
+                  onUndo={undoLastEvent}
+                />
+
+                {/* Team Panels - always side by side */}
+                <div className="grid grid-cols-2 gap-2">
+                  <TeamPanel
+                    teamName={state.homeTeam.name}
+                    players={state.homeTeam.players}
+                    isHome={true}
+                    isRunning={state.isRunning && !state.isPaused}
+                    events={state.events}
+                    isMatchEnded={state.isMatchEnded}
+                    onGoal={(pid) => recordGoal('home', pid)}
+                    onOwnGoal={(pid) => recordOwnGoal('home', pid)}
+                    onSubstitution={(outId, inId) => recordSubstitution('home', outId, inId)}
+                    onYellowCard={(pid) => recordCard('home', pid, 'yellow')}
+                    onRedCard={(pid) => recordCard('home', pid, 'red')}
+                    onAddPlayer={(name, num) => addPlayerToMatch('home', name, num)}
+                    onFixStarterError={(pid) => fixStarterError('home', pid)}
+                  />
+                  <TeamPanel
+                    teamName={state.awayTeam.name}
+                    players={state.awayTeam.players}
+                    isHome={false}
+                    isRunning={state.isRunning && !state.isPaused}
+                    events={state.events}
+                    isMatchEnded={state.isMatchEnded}
+                    onGoal={(pid) => recordGoal('away', pid)}
+                    onOwnGoal={(pid) => recordOwnGoal('away', pid)}
+                    onSubstitution={(outId, inId) => recordSubstitution('away', outId, inId)}
+                    onYellowCard={(pid) => recordCard('away', pid, 'yellow')}
+                    onRedCard={(pid) => recordCard('away', pid, 'red')}
+                    onAddPlayer={(name, num) => addPlayerToMatch('away', name, num)}
+                    onFixStarterError={(pid) => fixStarterError('away', pid)}
+                  />
+                </div>
+
+                {/* Event Timeline */}
+                <EventTimeline
+                  events={state.events}
+                  homeTeamName={state.homeTeam.name}
+                  awayTeamName={state.awayTeam.name}
+                  onDeleteEvent={deleteEvent}
+                />
+
+                {/* Final Report section when match ended */}
+                {state.isMatchEnded && (
+                  <div className="space-y-4">
+                    <div className="text-center">
+                      <h2 className="text-lg font-bold text-foreground">Riepilogo Finale</h2>
+                      <p className="text-sm text-muted-foreground">
+                        {state.homeTeam.name} {state.homeTeam.score} - {state.awayTeam.score} {state.awayTeam.name}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap justify-center gap-4 p-4 bg-card rounded-xl shadow-card">
+                      <ExportButton state={state} />
+                      <PDFExportButton state={state} />
+                      <WhatsAppShareButton state={state} />
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
+      </main>
+    </div>
+  );
+};
+
+export default MatchApp;

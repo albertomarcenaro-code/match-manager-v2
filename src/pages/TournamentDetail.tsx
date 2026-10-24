@@ -1,0 +1,612 @@
+import React, { useState, useEffect } from "react";
+import { Helmet } from "react-helmet";
+import { useParams, useNavigate } from "react-router-dom";
+import { Header } from "@/components/layout/Header";
+import { Footer } from "@/components/layout/Footer";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Trophy, Plus, Trash2, ChevronLeft, Loader2, BarChart3, Eye, Download, ChevronsRight, ChevronsLeft, Users, FileText, MessageCircle,
+} from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { GenerateLineupSheet } from "@/components/match/GenerateLineupSheet";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import ExcelJS from "exceljs";
+import { ShareLiveButton } from "@/components/live/ShareLiveButton";
+import { aggregateTournamentStats } from "@/lib/tournamentStats";
+import { useTournamentJerseys } from "@/hooks/useTournamentJerseys";
+
+interface TournamentData {
+  id: string;
+  name: string;
+  team_name: string;
+  players: any[];
+}
+
+interface TournamentMatchRow {
+  id: string;
+  home_team_name: string;
+  away_team_name: string;
+  home_score: number;
+  away_score: number;
+  match_date: string;
+  match_data: any;
+  tournament_id: string;
+}
+
+export default function TournamentDetail() {
+  const { id: tournamentId } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const [tournament, setTournament] = useState<TournamentData | null>(null);
+  const [matches, setMatches] = useState<TournamentMatchRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [showStats, setShowStats] = useState(false);
+  const [showMatchDetail, setShowMatchDetail] = useState(false);
+  const [lineupMatch, setLineupMatch] = useState<TournamentMatchRow | null>(null);
+
+  // Hook always called at top level (order stability)
+  const { jerseys: tournamentJerseys, roster: tournamentRoster } =
+    useTournamentJerseys(tournamentId ?? null);
+
+  useEffect(() => {
+    if (user && tournamentId) loadTournament();
+    else setLoading(false);
+  }, [user, tournamentId]);
+
+  const loadTournament = async () => {
+    if (!user || !tournamentId) return;
+    setLoading(true);
+    try {
+      const { data: tData, error: tError } = await supabase
+        .from("tournaments")
+        .select("id, name, team_name, players")
+        .eq("id", tournamentId)
+        .eq("user_id", user.id)
+        .single();
+      if (tError) throw tError;
+      setTournament(tData as TournamentData);
+
+      const { data: mData, error: mError } = await supabase
+        .from("matches")
+        .select("id, home_team_name, away_team_name, home_score, away_score, match_date, match_data, tournament_id")
+        .eq("tournament_id", tournamentId)
+        .eq("user_id", user.id)
+        .order("match_date", { ascending: false });
+      if (mError) throw mError;
+      setMatches((mData || []) as TournamentMatchRow[]);
+    } catch (error: any) {
+      console.error("Load tournament error:", error);
+      toast.error("Errore nel caricamento del torneo");
+      navigate("/tournaments");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNewMatch = () => {
+    if (!tournamentId) return;
+    if (tournamentRoster.length === 0) {
+      toast.error("Configura prima la rosa del torneo");
+      navigate(`/tournament/${tournamentId}/roster`);
+      return;
+    }
+    const isFirstMatch = matches.length === 0;
+    // Prima partita del torneo: i numeri di maglia sono OBBLIGATORI per tutti i convocati
+    // (diventano fissi per l'intero torneo).
+    if (isFirstMatch) {
+      const missing = tournamentRoster.filter(r => r.number == null);
+      if (missing.length > 0) {
+        toast.error(
+          `Prima della prima partita assegna il numero di maglia a tutti i convocati (${missing.length} senza numero).`
+        );
+        navigate(`/tournament/${tournamentId}/roster`);
+        return;
+      }
+    }
+    // Must be a valid UUID — DB column matches.id is uuid
+    const matchId = crypto.randomUUID();
+    navigate(`/match/${matchId}?tournamentId=${tournamentId}`, {
+      state: {
+        preloadedHomePlayers: tournamentRoster.map(r => ({
+          id: r.id,
+          name: r.name,
+          number: r.number,
+        })),
+        // La distinta del torneo è già preparata nella rosa: vai diretto alle rose (avversari)
+        skipToRoster: true,
+      },
+    });
+  };
+
+  const confirmDeleteMatch = async () => {
+    if (!deleteTarget || !user) return;
+    try {
+      const { error } = await supabase
+        .from("matches")
+        .delete()
+        .eq("id", deleteTarget)
+        .eq("user_id", user.id);
+      if (error) throw error;
+      setMatches((prev) => prev.filter((m) => m.id !== deleteTarget));
+      toast.success("Partita eliminata dal torneo");
+    } catch (error: any) {
+      console.error('[tournament-detail] delete match', error);
+      toast.error('Errore durante l\'eliminazione. Riprova.');
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    try {
+      return new Date(dateStr).toLocaleDateString("it-IT", {
+        day: "2-digit", month: "2-digit", year: "2-digit",
+        hour: "2-digit", minute: "2-digit",
+      });
+    } catch { return ""; }
+  };
+
+  // Matches in chronological order (oldest first) for P1, P2, P3...
+  const orderedMatches = [...matches].sort(
+    (a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime()
+  );
+
+  const computeGlobalStats = () => aggregateTournamentStats(orderedMatches, tournamentJerseys);
+
+  const exportExcel = async () => {
+    const stats = computeGlobalStats();
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Statistiche Torneo");
+
+    ws.columns = [
+      { header: "Giocatore", key: "name", width: 25 },
+      { header: "Presenze", key: "matchesPlayed", width: 12 },
+      { header: "Minuti", key: "minutes", width: 12 },
+      { header: "Gol", key: "goals", width: 10 },
+      { header: "Ammonizioni", key: "yellowCards", width: 14 },
+      { header: "Espulsioni", key: "redCards", width: 12 },
+    ];
+
+    // Style header
+    ws.getRow(1).font = { bold: true };
+
+    for (const p of stats.players) {
+      ws.addRow(p);
+    }
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${tournament?.name || "torneo"}_statistiche.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Report Excel scaricato!");
+  };
+
+  // ---- PDF report: riepilogo partite + rendimento giocatori ----
+  const exportPdf = () => {
+    const stats = computeGlobalStats();
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 10;
+    let y = 14;
+
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text(tournament?.name || "Torneo", margin, y);
+    y += 7;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    doc.text(
+      `Squadra: ${tournament?.team_name || ""} · ${orderedMatches.length} partite · V${stats.wins} P${stats.draws} S${stats.losses}`,
+      margin, y,
+    );
+    doc.setTextColor(0, 0, 0);
+
+    autoTable(doc, {
+      startY: y + 3,
+      head: [["#", "Data", "Partita", "Risultato"]],
+      body: orderedMatches.map((m, i) => [
+        `P${i + 1}`,
+        formatDate(m.match_date),
+        `${m.home_team_name} vs ${m.away_team_name}`,
+        `${m.home_score} - ${m.away_score}`,
+      ]),
+      theme: "striped",
+      headStyles: { fillColor: [39, 70, 63], fontSize: 8 },
+      bodyStyles: { fontSize: 8 },
+      margin: { left: margin, right: margin },
+    });
+
+    y = ((doc as any).lastAutoTable?.finalY ?? y) + 8;
+
+    if (stats.players.length > 0) {
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text("Rendimento Giocatori", margin, y);
+      autoTable(doc, {
+        startY: y + 2,
+        head: [["#", "Giocatore", "Pres.", "Min", "Gol", "Amm.", "Esp."]],
+        body: stats.players.map(p => [
+          p.number != null ? String(p.number) : "",
+          p.name,
+          String(p.matchesPlayed),
+          String(p.minutes),
+          p.goals ? String(p.goals) : "-",
+          p.yellowCards ? String(p.yellowCards) : "-",
+          p.redCards ? String(p.redCards) : "-",
+        ]),
+        theme: "striped",
+        headStyles: { fillColor: [39, 70, 63], fontSize: 8 },
+        bodyStyles: { fontSize: 8 },
+        margin: { left: margin, right: margin },
+      });
+    }
+
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setFontSize(7);
+    doc.setTextColor(120, 120, 120);
+    doc.text(
+      "Match Manager Live · https://matchmanager-live.lovable.app",
+      pageWidth / 2, pageHeight - 8, { align: "center" },
+    );
+
+    doc.save(`${(tournament?.name || "torneo").replace(/\s+/g, "_")}_report.pdf`);
+    toast.success("Report PDF scaricato!");
+  };
+
+  // ---- WhatsApp: elenco partite con risultato e SOLI marcatori della nostra squadra ----
+  const shareWhatsApp = async () => {
+    const lines: string[] = [];
+    lines.push(`TORNEO: ${tournament?.name || ""}`);
+    if (tournament?.team_name) lines.push(`Squadra: ${tournament.team_name}`);
+    lines.push("");
+    orderedMatches.forEach((m, i) => {
+      lines.push(`P${i + 1}) ${m.home_team_name} ${m.home_score} - ${m.away_score} ${m.away_team_name}`);
+      const md = (m.match_data && typeof m.match_data === "object") ? m.match_data : {};
+      const events: any[] = md.events || [];
+      const scorers: string[] = [];
+      for (const e of events) {
+        // Solo la NOSTRA squadra (home): gol diretti + autogol avversari a nostro favore
+        if (e.type === "goal" && e.team === "home") {
+          scorers.push(e.playerName?.split("(")[0].trim() || "N/D");
+        } else if (e.type === "own_goal" && e.team === "away") {
+          scorers.push(`AG ${e.playerName?.split("(")[0].trim() || ""}`.trim());
+        }
+      }
+      if (scorers.length > 0) {
+        const counts: Record<string, number> = {};
+        scorers.forEach(s => { counts[s] = (counts[s] || 0) + 1; });
+        const formatted = Object.entries(counts)
+          .map(([n, c]) => (c > 1 ? `${n} (x${c})` : n))
+          .join(", ");
+        lines.push(`   Marcatori: ${formatted}`);
+      }
+    });
+    lines.push("");
+    lines.push("https://matchmanager-live.lovable.app");
+    const message = lines.join("\n");
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: tournament?.name || "Torneo", text: message });
+        toast.success("Condiviso!");
+        return;
+      } catch (error) {
+        if ((error as Error).name === "AbortError") return;
+      }
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
+    toast.success("Aperto WhatsApp");
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <Loader2 className="animate-spin h-8 w-8 text-muted-foreground" />
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!tournament) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <main className="flex-1 p-4 max-w-2xl mx-auto w-full pt-6 text-center">
+          <p className="text-muted-foreground">Torneo non trovato.</p>
+          <Button variant="outline" className="mt-4" onClick={() => navigate("/tournaments")}>
+            Torna ai Tornei
+          </Button>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  const stats = computeGlobalStats();
+
+  return (
+    <div className="min-h-screen flex flex-col bg-background">
+      <Helmet>
+        <title>{tournament.name} | Torneo | Match Manager Live</title>
+        <meta name="description" content="Visualizza le partite, le statistiche globali e gestisci il calendario del torneo." />
+      </Helmet>
+      <Header />
+      <main className="flex-1 p-4 max-w-2xl mx-auto w-full pt-6">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/tournaments")}>
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl font-bold flex items-center gap-2 truncate">
+              <Trophy className="h-6 w-6 text-yellow-500 shrink-0" />
+              {tournament.name}
+            </h1>
+          </div>
+          <Button variant="outline" size="sm" className="gap-1 shrink-0" onClick={() => setShowStats(true)}>
+            <BarChart3 className="h-4 w-4" /> Statistiche
+          </Button>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex flex-col sm:flex-row gap-2 mb-3">
+          <Button onClick={handleNewMatch} className="flex-1 gap-2">
+            <Plus className="h-4 w-4" /> Nuova Partita nel Torneo
+          </Button>
+          {tournamentId && (
+            <ShareLiveButton type="tournament" id={tournamentId} variant="outline" size="default" />
+          )}
+        </div>
+        <div className="mb-6">
+          <Button
+            variant="outline"
+            className="w-full gap-2"
+            onClick={() => navigate(`/tournament/${tournamentId}/roster`)}
+          >
+            <Users className="h-4 w-4" />
+            Gestisci Rosa del Torneo ({tournamentRoster.length})
+          </Button>
+        </div>
+
+        {/* Match list */}
+        <h2 className="text-lg font-semibold mb-3">Partite Disputate ({matches.length})</h2>
+
+        {matches.length === 0 ? (
+          <Card className="p-8 text-center">
+            <p className="text-muted-foreground text-sm">
+              Nessuna partita disputata in questo torneo.
+            </p>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {matches.map((m) => (
+              <Card key={m.id} className="p-4 space-y-2">
+                <div className="space-y-1">
+                  {/* Home team row */}
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold truncate">{m.home_team_name}</span>
+                    <span className="text-lg font-bold text-primary tabular-nums shrink-0">{m.home_score}</span>
+                  </div>
+                  {/* Away team row */}
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold truncate">{m.away_team_name}</span>
+                    <span className="text-lg font-bold text-primary tabular-nums shrink-0">{m.away_score}</span>
+                  </div>
+                  {/* Info row */}
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-xs text-muted-foreground">{formatDate(m.match_date)}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button size="sm" variant="outline" className="h-8 gap-1 px-2 text-xs"
+                        onClick={() => setLineupMatch(m)} title="Genera Distinta Gara">
+                        <FileText className="h-3.5 w-3.5" /> Distinta
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-8 w-8 p-0"
+                        onClick={() => navigate(`/match-summary/${m.id}?source=db&backTo=/tournament/${tournamentId}`)}>
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="sm" variant="ghost"
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => setDeleteTarget(m.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Report e Condivisione */}
+        {matches.length > 0 && (
+          <Card className="p-4 mt-6 space-y-3">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Download className="h-5 w-5" /> Report Torneo
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <Button variant="outline" onClick={exportExcel} className="gap-2">
+                <Download className="h-4 w-4" /> Excel
+              </Button>
+              <Button variant="outline" onClick={exportPdf} className="gap-2">
+                <FileText className="h-4 w-4" /> PDF
+              </Button>
+              <Button variant="outline" onClick={shareWhatsApp} className="gap-2">
+                <MessageCircle className="h-4 w-4 text-[#25D366]" /> WhatsApp
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Il report WhatsApp elenca tutte le partite con il risultato finale e i soli marcatori della tua squadra.
+            </p>
+          </Card>
+        )}
+      </main>
+      <Footer />
+
+      {/* Delete match confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vuoi eliminare questa partita dal torneo? L'azione è irreversibile.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteMatch}>Elimina</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Global Stats Dialog */}
+      <Dialog open={showStats} onOpenChange={(o) => { setShowStats(o); if (!o) setShowMatchDetail(false); }}>
+        <DialogContent className={`${showMatchDetail ? "max-w-3xl" : "max-w-lg"} max-h-[85vh] overflow-y-auto`}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" /> Statistiche Globali
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Record */}
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <Card className="p-3">
+                <p className="text-2xl font-bold text-green-600">{stats.wins}</p>
+                <p className="text-xs text-muted-foreground">Vittorie</p>
+              </Card>
+              <Card className="p-3">
+                <p className="text-2xl font-bold text-yellow-500">{stats.draws}</p>
+                <p className="text-xs text-muted-foreground">Pareggi</p>
+              </Card>
+              <Card className="p-3">
+                <p className="text-2xl font-bold text-destructive">{stats.losses}</p>
+                <p className="text-xs text-muted-foreground">Sconfitte</p>
+              </Card>
+            </div>
+
+            {/* Player stats table */}
+            {stats.players.length > 0 ? (
+              <>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <h3 className="font-semibold text-sm">Rendimento Giocatori</h3>
+                  {orderedMatches.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1 h-8 text-xs"
+                      onClick={() => setShowMatchDetail((v) => !v)}
+                    >
+                      {showMatchDetail ? (
+                        <><ChevronsLeft className="h-3.5 w-3.5" /> Nascondi Dettaglio</>
+                      ) : (
+                        <><ChevronsRight className="h-3.5 w-3.5" /> Mostra Dettaglio Partite</>
+                      )}
+                    </Button>
+                  )}
+                </div>
+                <div className="rounded-md border overflow-x-auto relative">
+                  <Table className="text-xs">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs sticky left-0 bg-card z-10 min-w-[120px] shadow-[1px_0_0_0_hsl(var(--border))]">Giocatore</TableHead>
+                        <TableHead className="text-xs text-center px-2">Pres.</TableHead>
+                        <TableHead className="text-xs text-center px-2">Min</TableHead>
+                        <TableHead className="text-xs text-center px-2">Media</TableHead>
+                        <TableHead className="text-xs text-center px-2">⚽</TableHead>
+                        <TableHead className="text-xs text-center px-2">🟨</TableHead>
+                        <TableHead className="text-xs text-center px-2">🟥</TableHead>
+                        {showMatchDetail && orderedMatches.map((m, i) => (
+                          <TableHead
+                            key={m.id}
+                            className="text-[10px] text-center px-1.5 whitespace-nowrap text-muted-foreground"
+                            title={`${m.home_team_name} vs ${m.away_team_name}`}
+                          >
+                            P{i + 1}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stats.players.map((p) => {
+                        const avg = p.matchesPlayed > 0 ? Math.round(p.minutes / p.matchesPlayed) : 0;
+                        return (
+                          <TableRow key={p.key}>
+                            <TableCell className="text-xs font-medium py-2 sticky left-0 bg-card z-10 min-w-[120px] shadow-[1px_0_0_0_hsl(var(--border))]">
+                              {p.name}
+                            </TableCell>
+                            <TableCell className="text-xs text-center py-2 px-2 tabular-nums">{p.matchesPlayed}</TableCell>
+                            <TableCell className="text-xs text-center py-2 px-2 tabular-nums">{p.minutes}'</TableCell>
+                            <TableCell className="text-xs text-center py-2 px-2 tabular-nums">{avg ? `${avg}'` : "-"}</TableCell>
+                            <TableCell className="text-xs text-center py-2 px-2 tabular-nums">{p.goals || "-"}</TableCell>
+                            <TableCell className="text-xs text-center py-2 px-2 tabular-nums">{p.yellowCards || "-"}</TableCell>
+                            <TableCell className="text-xs text-center py-2 px-2 tabular-nums">{p.redCards || "-"}</TableCell>
+                            {showMatchDetail && orderedMatches.map((m) => {
+                              const v = p.perMatchMinutes[m.id];
+                              return (
+                                <TableCell key={m.id} className="text-[11px] text-center py-2 px-1.5 tabular-nums text-muted-foreground">
+                                  {v == null ? "-" : `${v}'`}
+                                </TableCell>
+                              );
+                            })}
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <Button onClick={exportExcel} variant="outline" className="w-full gap-2">
+                  <Download className="h-4 w-4" /> Scarica Report Excel
+                </Button>
+              </>
+            ) : (
+              <p className="text-center text-muted-foreground text-sm">
+                Nessun dato disponibile per le statistiche.
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Genera Distinta Gara */}
+      <GenerateLineupSheet
+        open={!!lineupMatch}
+        onOpenChange={(o) => !o && setLineupMatch(null)}
+        tournamentName={tournament.name}
+        homeTeamName={lineupMatch?.home_team_name}
+        awayTeamName={lineupMatch?.away_team_name}
+        matchDate={lineupMatch?.match_date}
+        rosterNumbers={(() => {
+          const map = new Map<string, number>();
+          for (const r of tournamentRoster) {
+            if (r.number != null) map.set(r.name.trim().toLowerCase(), r.number);
+          }
+          return map;
+        })()}
+      />
+    </div>
+  );
+}
