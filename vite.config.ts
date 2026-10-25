@@ -34,6 +34,12 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    // Host allowlist for preview environments (comma separated), no host is
+    // allowed beyond localhost unless it is explicitly listed here.
+    allowedHosts: (process.env.VITE_ALLOWED_HOSTS ?? "")
+      .split(",")
+      .map((host) => host.trim())
+      .filter(Boolean),
   },
   plugins: [
     buildCounter(),

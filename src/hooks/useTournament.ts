@@ -7,8 +7,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Json } from '@/integrations/supabase/types';
 import { tournamentSchema, tournamentMatchSchema, tournamentPlayersArraySchema, validateOrThrow } from '@/lib/validations';
 
-const TOURNAMENT_STORAGE_KEY = 'tournament-state';
-
 const generateId = () => crypto.randomUUID();
 
 const createEmptyTournament = (): TournamentState => ({
@@ -21,18 +19,28 @@ const createEmptyTournament = (): TournamentState => ({
   createdAt: new Date().toISOString(),
 });
 
+// The recovery copy is account-scoped: a fallback must never be readable from
+// another session. The legacy shared key ('tournament-state') is only ever
+// deleted (see clearMatchCaches), never read back.
+const getTournamentCacheKey = (userId: string | null, isGuest: boolean): string | null => {
+  const scope = isGuest ? 'guest' : userId ? `user:${userId}` : null;
+  return scope ? `tournament-cache:v1:${scope}` : null;
+};
+
 // Force clear tournament state - used when entering single match mode
-const clearTournamentState = () => {
+const clearTournamentState = (key: string | null) => {
+  if (!key) return;
   try {
-    localStorage.removeItem(TOURNAMENT_STORAGE_KEY);
+    localStorage.removeItem(key);
   } catch (e) {
     console.error('Failed to clear tournament state:', e);
   }
 };
 
-const loadFromLocalStorage = (): TournamentState | null => {
+const loadFromLocalStorage = (key: string | null): TournamentState | null => {
+  if (!key) return null;
   try {
-    const saved = localStorage.getItem(TOURNAMENT_STORAGE_KEY);
+    const saved = localStorage.getItem(key);
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed && typeof parsed === 'object' && 'isActive' in parsed) {
@@ -46,9 +54,10 @@ const loadFromLocalStorage = (): TournamentState | null => {
   }
 };
 
-const saveToLocalStorage = (state: TournamentState) => {
+const saveToLocalStorage = (key: string | null, state: TournamentState) => {
+  if (!key) return;
   try {
-    localStorage.setItem(TOURNAMENT_STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(key, JSON.stringify(state));
   } catch (e) {
     console.error('Failed to save tournament to localStorage:', e);
   }
@@ -56,8 +65,11 @@ const saveToLocalStorage = (state: TournamentState) => {
 
 export function useTournament() {
   const { user, isGuest } = useAuth();
+  const cacheKey = getTournamentCacheKey(user?.id ?? null, isGuest);
   const [tournament, setTournament] = useState<TournamentState>(() => {
-    return loadFromLocalStorage() || createEmptyTournament();
+    // Owned tournaments are restored from the cloud; only guests hydrate from
+    // the local recovery copy.
+    return (isGuest ? loadFromLocalStorage(cacheKey) : null) || createEmptyTournament();
   });
   const [isLoading, setIsLoading] = useState(false);
   const [dbTournamentId, setDbTournamentId] = useState<string | null>(null);
@@ -66,13 +78,13 @@ export function useTournament() {
     if (user && !isGuest) {
       loadFromDatabase();
     }
-  }, [user, isGuest]);
+  }, [user, isGuest, cacheKey]);
 
   useEffect(() => {
-    if (tournament.id) {
-      saveToLocalStorage(tournament);
+    if (cacheKey && tournament.id) {
+      saveToLocalStorage(cacheKey, tournament);
     }
-  }, [tournament]);
+  }, [cacheKey, tournament]);
 
   const loadFromDatabase = async () => {
     if (!user) return;
@@ -123,12 +135,16 @@ export function useTournament() {
         };
 
         setTournament(loadedTournament);
-        saveToLocalStorage(loadedTournament);
+        saveToLocalStorage(cacheKey, loadedTournament);
       }
     } catch (error) {
       console.error('Failed to load tournament from database:', error);
-      const local = loadFromLocalStorage();
-      if (local) setTournament(local);
+      // The cloud is authoritative for an owned tournament: an unversioned local
+      // copy cannot prove it is fresher, so it is never applied as a fallback
+      // (it could even be another account's data).
+      toast.error('Impossibile caricare il torneo dal cloud', {
+        description: 'Controlla la connessione e riprova.',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -195,14 +211,14 @@ export function useTournament() {
       };
 
       setTournament(loadedTournament);
-      saveToLocalStorage(loadedTournament);
+      saveToLocalStorage(cacheKey, loadedTournament);
     } catch (error) {
       console.error('Failed to load tournament by ID:', error);
       throw error;
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, cacheKey]);
 
   const startTournament = useCallback(async (name: string, teamName: string, players: { name: string; number: number | null }[]) => {
     const tournamentPlayers: TournamentPlayer[] = players.map(p => ({
@@ -255,7 +271,7 @@ export function useTournament() {
         };
 
         setTournament(newTournament);
-        saveToLocalStorage(newTournament);
+        saveToLocalStorage(cacheKey, newTournament);
         toast.success('Torneo avviato!');
       } catch (error: any) {
         console.error('Failed to save tournament to database:', {
@@ -279,10 +295,10 @@ export function useTournament() {
         createdAt: new Date().toISOString(),
       };
       setTournament(newTournament);
-      saveToLocalStorage(newTournament);
+      saveToLocalStorage(cacheKey, newTournament);
       toast.success('Torneo avviato!');
     }
-  }, [user, isGuest]);
+  }, [user, isGuest, cacheKey]);
 
   const endTournament = useCallback(async () => {
     if (user && !isGuest && dbTournamentId) {
@@ -299,9 +315,9 @@ export function useTournament() {
     const emptyTournament = createEmptyTournament();
     setTournament(emptyTournament);
     setDbTournamentId(null);
-    localStorage.removeItem(TOURNAMENT_STORAGE_KEY);
+    clearTournamentState(cacheKey);
     toast.success('Torneo terminato');
-  }, [user, isGuest, dbTournamentId]);
+  }, [user, isGuest, dbTournamentId, cacheKey]);
 
   const addMatchToTournament = useCallback(async (
     homeTeamName: string,
@@ -384,7 +400,7 @@ export function useTournament() {
             players: updatedPlayers,
             matches: [...prev.matches, match],
           };
-          saveToLocalStorage(newState);
+          saveToLocalStorage(cacheKey, newState);
           return newState;
         });
 
@@ -420,13 +436,13 @@ export function useTournament() {
           players: updatedPlayers,
           matches: [...prev.matches, match],
         };
-        saveToLocalStorage(newState);
+        saveToLocalStorage(cacheKey, newState);
         return newState;
       });
 
       toast.success('Partita aggiunta al torneo');
     }
-  }, [user, isGuest, dbTournamentId, tournament.players]);
+  }, [user, isGuest, dbTournamentId, cacheKey, tournament.players]);
 
   const getTournamentPlayers = useCallback(() => {
     return tournament.players;
@@ -441,8 +457,8 @@ export function useTournament() {
     const emptyTournament = createEmptyTournament();
     setTournament(emptyTournament);
     setDbTournamentId(null);
-    clearTournamentState();
-  }, []);
+    clearTournamentState(cacheKey);
+  }, [cacheKey]);
 
   return {
     tournament,

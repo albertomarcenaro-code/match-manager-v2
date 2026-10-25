@@ -64,6 +64,153 @@ const initialState: MatchState = {
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
+// Events are stored newest first: everything that happened after `entryEvent`
+// sits at a lower index.
+// Returns when the on-field spell started by `entryEvent` ended (match-timer
+// seconds of that same period) and whether the player came back afterwards.
+// exitTs is null while the player never left the field again — in that case the
+// seconds accrued since the entry are still pending in `currentEntryTime` and
+// have never been credited to any total.
+const findExitInfo = (events: MatchEvent[], entryEvent: MatchEvent, playerId: string) => {
+  const entryIndex = events.findIndex(e => e.id === entryEvent.id);
+  if (entryIndex < 0) return { exitTs: null, reentered: false };
+
+  const inPeriod = (e: MatchEvent) => e.period === entryEvent.period;
+  // Yellows picked up before this entry still count for the two-yellow rule.
+  let yellows = events
+    .slice(entryIndex + 1)
+    .filter(e => inPeriod(e) && e.type === 'yellow_card' && e.playerId === playerId).length;
+
+  for (let i = entryIndex - 1; i >= 0; i--) {
+    const e = events[i];
+    if (!inPeriod(e)) continue;
+
+    let isExit = false;
+    if (e.type === 'period_end') isExit = true;
+    else if (e.type === 'player_out' && e.playerId === playerId) isExit = true;
+    else if (e.type === 'substitution' && e.playerOutId === playerId) isExit = true;
+    else if (e.type === 'red_card' && e.playerId === playerId) isExit = true;
+    else if (e.type === 'yellow_card' && e.playerId === playerId) {
+      yellows += 1;
+      isExit = yellows >= 2;
+    }
+
+    if (isExit) {
+      const after = events.slice(0, i);
+      const reentered = after.some(ev => inPeriod(ev) && ev.playerId === playerId && ev.type === 'player_in') ||
+        after.some(ev => inPeriod(ev) && ev.type === 'substitution' && ev.playerInId === playerId);
+      return { exitTs: e.timestamp, reentered };
+    }
+  }
+  return { exitTs: null, reentered: false };
+};
+
+// Reverses everything `ev` changed (score, cards, roster, clock, parziali) and
+// removes it from the timeline. Shared by deleteEvent and undoLastEvent so the
+// two can never drift apart.
+const reverseEvent = (prev: MatchState, ev: MatchEvent): MatchState => {
+  const next: MatchState = { ...prev, events: prev.events.filter(e => e.id !== ev.id) };
+
+  if (ev.type === 'goal' && ev.playerId) {
+    const teamKey = ev.team === 'home' ? 'homeTeam' : 'awayTeam';
+    return {
+      ...next,
+      [teamKey]: {
+        ...next[teamKey],
+        score: Math.max(0, next[teamKey].score - 1),
+        players: next[teamKey].players.map(p =>
+          p.id === ev.playerId ? { ...p, goals: Math.max(0, p.goals - 1) } : p
+        ),
+      },
+    };
+  }
+
+  if (ev.type === 'own_goal') {
+    // The goal was counted for the OPPOSITE team.
+    const scoringTeamKey = ev.team === 'home' ? 'awayTeam' : 'homeTeam';
+    return {
+      ...next,
+      [scoringTeamKey]: {
+        ...next[scoringTeamKey],
+        score: Math.max(0, next[scoringTeamKey].score - 1),
+      },
+    };
+  }
+
+  if ((ev.type === 'yellow_card' || ev.type === 'red_card') && ev.playerId) {
+    const teamKey = ev.team === 'home' ? 'homeTeam' : 'awayTeam';
+    const cardKey: 'yellow' | 'red' = ev.type === 'yellow_card' ? 'yellow' : 'red';
+    return {
+      ...next,
+      [teamKey]: {
+        ...next[teamKey],
+        players: next[teamKey].players.map(p => {
+          if (p.id !== ev.playerId) return p;
+          const newCards = { ...p.cards, [cardKey]: Math.max(0, p.cards[cardKey] - 1) };
+          const stillExpelled = newCards.red > 0 || newCards.yellow >= 2;
+          // Field position is deliberately left alone: the card may have been
+          // given to a player already on the bench, so the coach decides with a
+          // substitution whether they come back on. The seconds already credited
+          // for the time actually played stay.
+          return { ...p, cards: newCards, isExpelled: stillExpelled };
+        }),
+      },
+    };
+  }
+
+  if (ev.type === 'substitution' && ev.playerOutId && ev.playerInId) {
+    const teamKey = ev.team === 'home' ? 'homeTeam' : 'awayTeam';
+    const team = next[teamKey];
+    return {
+      ...next,
+      [teamKey]: {
+        ...team,
+        players: team.players.map(p => {
+          if (p.id === ev.playerOutId) {
+            // Never left: put them back on the clock. If they are already back
+            // on the pitch (a later re-entry), that entry owns the clock.
+            if (p.isOnField || p.currentEntryTime !== null) return p;
+            return {
+              ...p,
+              isOnField: true,
+              currentEntryTime: ev.period === prev.currentPeriod ? ev.timestamp : 0,
+            };
+          }
+          if (p.id === ev.playerInId) {
+            // Never came on: drop the seconds this entry had already credited,
+            // i.e. everything from the entry until they left again. Seconds still
+            // pending in currentEntryTime were never credited, so removing them
+            // is just a matter of taking the player off.
+            const { exitTs, reentered } = findExitInfo(prev.events, ev, p.id);
+            const credited = exitTs !== null ? Math.max(0, exitTs - ev.timestamp) : 0;
+            let updated: Player = { ...p, totalSecondsPlayed: Math.max(0, p.totalSecondsPlayed - credited) };
+            if (credited > 0) {
+              const perPeriod = { ...p.secondsPlayedPerPeriod };
+              perPeriod[ev.period] = Math.max(0, (perPeriod[ev.period] || 0) - credited);
+              updated = { ...updated, secondsPlayedPerPeriod: perPeriod };
+            }
+            if (reentered) return updated;
+            return { ...updated, isOnField: false, currentEntryTime: null };
+          }
+          return p;
+        }),
+      },
+    };
+  }
+
+  if (ev.type === 'period_end') {
+    // Keep the parziali in sync with the events: without this the standings, the
+    // cronaca and the exported PDF would report a period that no longer exists.
+    // The clock is intentionally untouched — deleting the marker does not
+    // restart the period.
+    return { ...next, periodScores: next.periodScores.filter(ps => ps.period !== ev.period) };
+  }
+
+  // period_start / player_in / player_out carry no derived state to reverse.
+  return next;
+};
+
+
 export const useMatch = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
@@ -231,11 +378,31 @@ export const useMatch = () => {
     return () => { cancelled = true; readyKeyRef.current = null; };
   }, [user?.id, isGuest, id, tournamentId, storageKey, recoveryAttempt]);
 
+  // Cloud save lifecycle. Failures are surfaced (status + toast + retry) so a
+  // lost write can never look like a successful one to the coach.
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'error'>('idle');
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryAttemptRef = useRef(0);
+  const saveErrorToastRef = useRef(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingStateRef = useRef<MatchState | null>(null);
+  const latestStateRef = useRef<MatchState>(state);
+  latestStateRef.current = state;
+  const saveToDbRef = useRef<(next: MatchState) => void>(() => {});
+
   // Save match state to cloud DB (debounced, for logged-in users)
   const saveToDb = useCallback(async (currentState: MatchState) => {
-    if (!user || isGuest || !id || !storageKey || readyKeyRef.current !== storageKey || savingRef.current) return;
-    
+    if (!user || isGuest || !id || !storageKey || readyKeyRef.current !== storageKey) return;
+    if (savingRef.current) {
+      // An attempt is already in flight: remember the newest snapshot instead of
+      // dropping it, the in-flight save picks it up when it settles.
+      pendingStateRef.current = currentState;
+      return;
+    }
+
     savingRef.current = true;
+    setSaveStatus('saving');
+    let succeeded = false;
     try {
       const matchData = {
         events: currentState.events,
@@ -301,6 +468,18 @@ export const useMatch = () => {
         }
       }
 
+      // Success: reset the backoff and clear any scheduled retry.
+      succeeded = true;
+      retryAttemptRef.current = 0;
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+      if (saveErrorToastRef.current) {
+        saveErrorToastRef.current = false;
+        toast.success('Salvataggio sul cloud ripristinato', { id: 'match-save-error' });
+      }
+      setSaveStatus('idle');
     } catch (err: any) {
       console.error('Failed to save match to DB:', {
         message: err?.message,
@@ -311,10 +490,52 @@ export const useMatch = () => {
         dbMatchId: dbMatchIdRef.current,
         userId: user?.id,
       });
+      setSaveStatus('error');
+      // The local recovery copy is still written, so nothing is lost yet:
+      // say that once, then keep retrying quietly in the background.
+      if (!saveErrorToastRef.current) {
+        saveErrorToastRef.current = true;
+        toast.error('Salvataggio sul cloud non riuscito', {
+          id: 'match-save-error',
+          description: 'La partita è al sicuro su questo dispositivo. Riprovo automaticamente…',
+          duration: 8000,
+        });
+      }
+      const delay = Math.min(30000, 1500 * 2 ** Math.min(retryAttemptRef.current, 4)); // 1.5s → 30s
+      retryAttemptRef.current += 1;
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = setTimeout(() => {
+        retryTimerRef.current = null;
+        // Always retry the newest state: a later edit supersedes the failed one.
+        saveToDbRef.current(latestStateRef.current);
+      }, delay);
     } finally {
       savingRef.current = false;
+      if (succeeded) {
+        // A newer snapshot arrived while this attempt was in flight: save it now.
+        pendingStateRef.current = null;
+        const newer = latestStateRef.current;
+        if (newer !== currentState) {
+          void saveToDbRef.current(newer);
+        }
+      }
     }
   }, [user, isGuest, id, tournamentId, storageKey]);
+  saveToDbRef.current = saveToDb;
+
+  // Manual escape hatch for the error banner (and for a coach who wants certainty).
+  const retrySave = useCallback(() => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    retryAttemptRef.current = 0;
+    void saveToDbRef.current(latestStateRef.current);
+  }, []);
 
   // Auto-save to DB: always on for logged-in users. Timer ticks (elapsedTime only)
   // must not reset the debounce, or cards/substitutions never get saved mid-match.
@@ -322,10 +543,6 @@ export const useMatch = () => {
   const prevEndedRef = useRef(false);
   const prevStartedRef = useRef(false);
   const prevEventsLenRef = useRef(0);
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingStateRef = useRef<MatchState | null>(null);
-  const latestStateRef = useRef<MatchState>(state);
-  latestStateRef.current = state;
 
   useEffect(() => {
     if (!user || isGuest || !id || !isReady || state === restoredStateRef.current) return;
@@ -366,6 +583,7 @@ export const useMatch = () => {
 
   useEffect(() => () => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
   }, []);
 
   // ... keep existing code for all the match action callbacks ...
@@ -1072,102 +1290,30 @@ export const useMatch = () => {
     });
   }, []);
 
+  // Undo the most recent event: identical reversal to deleteEvent, so the two
+  // paths can never drift apart (it used to handle goals only).
   const undoLastEvent = useCallback(() => {
+    const outcome: { undone: MatchEvent | null } = { undone: null };
     setState(prev => {
-      if (prev.events.length === 0) return prev;
       const lastEvent = prev.events[0];
-      const remainingEvents = prev.events.slice(1);
-      
-      let newState = { ...prev, events: remainingEvents };
-      
-      if (lastEvent.type === 'goal' && lastEvent.playerId) {
-        const teamKey = lastEvent.team === 'home' ? 'homeTeam' : 'awayTeam';
-        newState = {
-          ...newState,
-          [teamKey]: {
-            ...newState[teamKey],
-            score: newState[teamKey].score - 1,
-            players: newState[teamKey].players.map(p => 
-              p.id === lastEvent.playerId ? { ...p, goals: p.goals - 1 } : p
-            )
-          }
-        };
-      }
-      
-      return newState;
+      if (!lastEvent) return prev;
+      outcome.undone = lastEvent;
+      return reverseEvent(prev, lastEvent);
     });
-    toast.success("Ultimo evento annullato");
+    if (outcome.undone) toast.success('Ultimo evento annullato');
   }, []);
 
-  // Delete a single event from the timeline and reverse its side-effects on score/stats/roster
+  // Delete a single event from the timeline and reverse its side-effects on
+  // score, stats, roster, clock and parziali.
   const deleteEvent = useCallback((eventId: string) => {
+    const outcome: { found: MatchEvent | null } = { found: null };
     setState(prev => {
       const ev = prev.events.find(e => e.id === eventId);
       if (!ev) return prev;
-      const remaining = prev.events.filter(e => e.id !== eventId);
-      let next: MatchState = { ...prev, events: remaining };
-
-      if (ev.type === 'goal' && ev.playerId) {
-        const teamKey = ev.team === 'home' ? 'homeTeam' : 'awayTeam';
-        next = {
-          ...next,
-          [teamKey]: {
-            ...next[teamKey],
-            score: Math.max(0, next[teamKey].score - 1),
-            players: next[teamKey].players.map(p =>
-              p.id === ev.playerId ? { ...p, goals: Math.max(0, p.goals - 1) } : p
-            ),
-          },
-        };
-      } else if (ev.type === 'own_goal') {
-        // Goal counted for the OPPOSITE team
-        const scoringTeamKey = ev.team === 'home' ? 'awayTeam' : 'homeTeam';
-        next = {
-          ...next,
-          [scoringTeamKey]: {
-            ...next[scoringTeamKey],
-            score: Math.max(0, next[scoringTeamKey].score - 1),
-          },
-        };
-      } else if ((ev.type === 'yellow_card' || ev.type === 'red_card') && ev.playerId) {
-        const teamKey = ev.team === 'home' ? 'homeTeam' : 'awayTeam';
-        const cardKey: 'yellow' | 'red' = ev.type === 'yellow_card' ? 'yellow' : 'red';
-        next = {
-          ...next,
-          [teamKey]: {
-            ...next[teamKey],
-            players: next[teamKey].players.map(p => {
-              if (p.id !== ev.playerId) return p;
-              const newCards = { ...p.cards, [cardKey]: Math.max(0, p.cards[cardKey] - 1) };
-              const stillExpelled = newCards.red > 0 || newCards.yellow >= 2;
-              return { ...p, cards: newCards, isExpelled: stillExpelled ? p.isExpelled : false };
-            }),
-          },
-        };
-      } else if (ev.type === 'substitution' && ev.playerOutId && ev.playerInId) {
-        const teamKey = ev.team === 'home' ? 'homeTeam' : 'awayTeam';
-        next = {
-          ...next,
-          [teamKey]: {
-            ...next[teamKey],
-            players: next[teamKey].players.map(p => {
-              if (p.id === ev.playerOutId) {
-                // Was sent off → put back on field
-                return { ...p, isOnField: true, currentEntryTime: p.currentEntryTime ?? prev.elapsedTime };
-              }
-              if (p.id === ev.playerInId) {
-                // Was brought on → put back on bench
-                return { ...p, isOnField: false, currentEntryTime: null };
-              }
-              return p;
-            }),
-          },
-        };
-      }
-
-      return next;
+      outcome.found = ev;
+      return reverseEvent(prev, ev);
     });
-    toast.success('Evento eliminato');
+    if (outcome.found) toast.success('Evento eliminato');
   }, []);
 
   const resetMatch = useCallback((keepTeams = false) => {
@@ -1183,8 +1329,9 @@ export const useMatch = () => {
         localStorage.removeItem(storageKey);
       }
     }
-    // Reset DB reference so a new match record is created
-    dbMatchIdRef.current = null;
+    // dbMatchIdRef is deliberately kept: the route id does not change, so the
+    // next save must UPDATE the existing row — nulling it would try to INSERT
+    // the same UUID again and fail on every retry.
   }, [id, storageKey]);
 
   // Quick correction of initial starter error - moves player on/off field WITHOUT counting as a tactical substitution.
@@ -1291,6 +1438,8 @@ export const useMatch = () => {
     state,
     isReady,
     recoveryError,
+    saveStatus,
+    retrySave,
     retryRecovery: () => setRecoveryAttempt(attempt => attempt + 1),
     setHomeTeamName,
     setAwayTeamName,

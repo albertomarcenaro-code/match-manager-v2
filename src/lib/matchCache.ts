@@ -16,7 +16,7 @@ export function clearMatchCaches(storage: Storage, legacyOnly = false): void {
   for (const key of keys) {
     if (!key) continue;
     if (legacyKeys.has(key) || key.startsWith('match_state_') || key.startsWith('match_config_') ||
-        (!legacyOnly && key.startsWith('match-cache:v1:'))) {
+        (!legacyOnly && (key.startsWith('match-cache:v1:') || key.startsWith('tournament-cache:v1:')))) {
       storage.removeItem(key);
     }
   }

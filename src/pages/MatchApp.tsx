@@ -14,7 +14,7 @@ import { ShareLiveButton } from '@/components/live/ShareLiveButton';
 import { RosterSetup } from '@/components/setup/RosterSetup';
 import { MatchDetailsTab } from '@/components/match/MatchDetailsTab';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { FileText, Users, UserCheck, Play, Home, Loader2 } from 'lucide-react';
+import { FileText, Users, UserCheck, Play, Home, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 import { Header } from '@/components/layout/Header';
@@ -42,6 +42,8 @@ const MatchApp = () => {
     setMetadata,
     setHomeRosterFromMembers,
     saveNow,
+    saveStatus,
+    retrySave,
     addPlayer,
 
     setStarters,
@@ -204,6 +206,24 @@ const MatchApp = () => {
       </Helmet>
       {/* Global Header */}
       <Header />
+
+      {/* Cloud save failure: never let a lost write look like a successful one */}
+      {saveStatus === 'error' && (
+        <div
+          role="alert"
+          className="border-b border-destructive/40 bg-destructive/10 px-3 py-2"
+        >
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-medium text-destructive sm:text-sm">
+              Salvataggio sul cloud non riuscito: la partita è al sicuro su questo dispositivo.
+            </p>
+            <Button size="sm" variant="outline" onClick={retrySave}>
+              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              Riprova ora
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Unified top navigation bar with Home + Tabs */}
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/40">
