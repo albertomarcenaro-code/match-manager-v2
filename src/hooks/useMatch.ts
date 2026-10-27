@@ -211,6 +211,25 @@ const reverseEvent = (prev: MatchState, ev: MatchEvent): MatchState => {
 };
 
 
+// Translate a failed Supabase write into one sentence the coach can read on
+// screen. The raw code still goes to the console for debugging.
+const describeSaveError = (err: any): string => {
+  const code = String(err?.code ?? '');
+  const message = String(err?.message ?? '').split('\n')[0];
+
+  if (code === '42501') return 'Il database ha rifiutato la scrittura (permessi)';
+  if (code === 'PGRST116' || code === '401' || code === '40101') return 'Sessione scaduta: accedi di nuovo';
+  if (code === '23505') return 'La partita esiste già nel cloud (doppio salvataggio)';
+  if (code === '23503') return 'Riferimento mancante: torneo o squadra inesistente';
+  if (code === '22P02') return 'Identificativo partita non valido';
+  if (code === '23514') return 'Un campo obbligatorio non è valorizzato';
+  if (code === '40001' || code === '40P01') return 'Concorrenza sul database: riprovo';
+  if (/failed to fetch|networkerror|fetch failed/i.test(message))
+    return 'Connessione assente o instabile';
+  if (code) return `${message || 'Scrittura fallita'} (${code})`;
+  return message || 'Scrittura fallita';
+};
+
 export const useMatch = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
@@ -381,6 +400,9 @@ export const useMatch = () => {
   // Cloud save lifecycle. Failures are surfaced (status + toast + retry) so a
   // lost write can never look like a successful one to the coach.
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'error'>('idle');
+  // Human-readable reason of the last failed write, shown in the error banner so
+  // the coach never has to open devtools to know what went wrong.
+  const [saveErrorDetail, setSaveErrorDetail] = useState<string | null>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryAttemptRef = useRef(0);
   const saveErrorToastRef = useRef(false);
@@ -479,6 +501,7 @@ export const useMatch = () => {
         saveErrorToastRef.current = false;
         toast.success('Salvataggio sul cloud ripristinato', { id: 'match-save-error' });
       }
+      setSaveErrorDetail(null);
       setSaveStatus('idle');
     } catch (err: any) {
       console.error('Failed to save match to DB:', {
@@ -491,14 +514,16 @@ export const useMatch = () => {
         userId: user?.id,
       });
       setSaveStatus('error');
+      const detail = describeSaveError(err);
+      setSaveErrorDetail(detail);
       // The local recovery copy is still written, so nothing is lost yet:
       // say that once, then keep retrying quietly in the background.
       if (!saveErrorToastRef.current) {
         saveErrorToastRef.current = true;
         toast.error('Salvataggio sul cloud non riuscito', {
           id: 'match-save-error',
-          description: 'La partita è al sicuro su questo dispositivo. Riprovo automaticamente…',
-          duration: 8000,
+          description: `${detail} — la partita è al sicuro su questo dispositivo. Riprovo automaticamente…`,
+          duration: 10000,
         });
       }
       const delay = Math.min(30000, 1500 * 2 ** Math.min(retryAttemptRef.current, 4)); // 1.5s → 30s
@@ -1439,6 +1464,7 @@ export const useMatch = () => {
     isReady,
     recoveryError,
     saveStatus,
+    saveErrorDetail,
     retrySave,
     retryRecovery: () => setRecoveryAttempt(attempt => attempt + 1),
     setHomeTeamName,

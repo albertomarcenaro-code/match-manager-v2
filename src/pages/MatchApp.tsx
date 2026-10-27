@@ -43,6 +43,7 @@ const MatchApp = () => {
     setHomeRosterFromMembers,
     saveNow,
     saveStatus,
+    saveErrorDetail,
     retrySave,
     addPlayer,
 
@@ -216,6 +217,11 @@ const MatchApp = () => {
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-medium text-destructive sm:text-sm">
               Salvataggio sul cloud non riuscito: la partita è al sicuro su questo dispositivo.
+              {saveErrorDetail && (
+                <span className="block font-normal opacity-80 sm:inline sm:before:content-['_·_']">
+                  {saveErrorDetail}
+                </span>
+              )}
             </p>
             <Button size="sm" variant="outline" onClick={retrySave}>
               <RefreshCw className="mr-1.5 h-3.5 w-3.5" />

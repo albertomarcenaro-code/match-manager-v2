@@ -755,6 +755,7 @@ export function RosterSetup({
   };
 
   const eligiblePlayers = homePlayers.filter(p => p.number !== null);
+  const awayNumberedPlayers = awayPlayers.filter(p => p.number !== null);
   const canProceed = eligiblePlayers.length >= 1 && awayPlayers.length >= 1 && !hasDuplicates;
 
   // Determine page title - STRICT HIERARCHY:
@@ -856,12 +857,17 @@ export function RosterSetup({
                   )}
                 </div>
               </div>
-              <Input
-                value={homeTeamName}
-                onChange={(e) => onHomeTeamNameChange(e.target.value)}
-                placeholder="Nome squadra"
-                className="bg-team-home-foreground/10 border-team-home-foreground/20 text-team-home-foreground placeholder:text-team-home-foreground/50"
-              />
+              <div className="flex items-center gap-2">
+                <Input
+                  value={homeTeamName}
+                  onChange={(e) => onHomeTeamNameChange(e.target.value)}
+                  placeholder="Nome squadra"
+                  className="flex-1 bg-team-home-foreground/10 border-team-home-foreground/20 text-team-home-foreground placeholder:text-team-home-foreground/50"
+                />
+                <span className="shrink-0 text-xs whitespace-nowrap rounded-full border border-team-home-foreground/20 bg-team-home-foreground/10 px-2.5 py-1">
+                  {eligiblePlayers.length} con numero
+                </span>
+              </div>
             </div>
 
             <div className="p-4 space-y-4">
@@ -971,10 +977,6 @@ export function RosterSetup({
                   </p>
                 )}
               </div>
-
-              <p className="text-xs text-muted-foreground text-center">
-                {eligiblePlayers.length} giocatori con numero assegnato
-              </p>
             </div>
           </div>
 
@@ -985,12 +987,17 @@ export function RosterSetup({
                 <Shield className="h-5 w-5" />
                 <span className="font-bold">Squadra ospite</span>
               </div>
-              <Input
-                value={awayTeamName}
-                onChange={(e) => onAwayTeamNameChange(e.target.value)}
-                placeholder="Nome squadra avversaria"
-                className="bg-team-away-foreground/10 border-team-away-foreground/20 text-team-away-foreground placeholder:text-team-away-foreground/50"
-              />
+              <div className="flex items-center gap-2">
+                <Input
+                  value={awayTeamName}
+                  onChange={(e) => onAwayTeamNameChange(e.target.value)}
+                  placeholder="Nome squadra avversaria"
+                  className="flex-1 bg-team-away-foreground/10 border-team-away-foreground/20 text-team-away-foreground placeholder:text-team-away-foreground/50"
+                />
+                <span className="shrink-0 text-xs whitespace-nowrap rounded-full border border-team-away-foreground/20 bg-team-away-foreground/10 px-2.5 py-1">
+                  {awayNumberedPlayers.length} con numero
+                </span>
+              </div>
             </div>
 
             <div className="p-4 space-y-4">
