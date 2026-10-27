@@ -9,6 +9,22 @@ import { tournamentSchema, tournamentMatchSchema, tournamentPlayersArraySchema, 
 
 const generateId = () => crypto.randomUUID();
 
+// Translate a failed tournament query into one sentence the coach can read on
+// screen. The raw error still goes to the console for debugging.
+const describeTournamentError = (err: any): string => {
+  const code = String(err?.code ?? '');
+  const message = String(err?.message ?? '').split('\n')[0];
+  if (code === 'PGRST116') return 'Sono attivi più tornei in parallelo';
+  if (code === '42501') return 'Il database ha rifiutato la lettura (permessi)';
+  if (code === 'PGRST204') return 'Tabella torneo assente nel database';
+  if (code === '401' || code === 'PGRST301') return 'Sessione scaduta: accedi di nuovo';
+  if (code === '22P02') return 'Identificativo torneo non valido';
+  if (/failed to fetch|networkerror|fetch failed/i.test(message))
+    return 'Connessione assente o instabile';
+  if (code) return `${message || 'Lettura fallita'} (${code})`;
+  return message || 'Lettura fallita';
+};
+
 const createEmptyTournament = (): TournamentState => ({
   id: generateId(),
   name: '',
@@ -91,14 +107,20 @@ export function useTournament() {
     
     setIsLoading(true);
     try {
-      const { data: tournamentData, error: tournamentError } = await supabase
+      // `.maybeSingle()` only tolerates 0 rows: with more than one match it
+      // synthesises a PGRST116 error and the whole load fails. A coach can
+      // legitimately have several active tournaments, so fetch a list and keep
+      // the most recently created one instead of breaking the screen.
+      const { data: activeTournaments, error: tournamentError } = await supabase
         .from('tournaments')
         .select('*')
         .eq('user_id', user.id)
         .eq('is_active', true)
-        .maybeSingle();
+        .order('created_at', { ascending: false })
+        .limit(1);
 
       if (tournamentError) throw tournamentError;
+      const tournamentData = activeTournaments?.[0] ?? null;
 
       if (tournamentData) {
         setDbTournamentId(tournamentData.id);
@@ -143,7 +165,8 @@ export function useTournament() {
       // copy cannot prove it is fresher, so it is never applied as a fallback
       // (it could even be another account's data).
       toast.error('Impossibile caricare il torneo dal cloud', {
-        description: 'Controlla la connessione e riprova.',
+        description: `${describeTournamentError(error)} — riprova.`,
+        duration: 10000,
       });
     } finally {
       setIsLoading(false);
