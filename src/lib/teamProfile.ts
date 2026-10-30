@@ -44,7 +44,7 @@ export const mapTeamProfile = (t: any): TeamProfile => {
 };
 
 export const TEAM_PROFILE_COLUMNS =
-  "id, name, category, season, vat_number, fiscal_code, sdi_code, address, phone, email, logo_url";
+  "id, name, category, season, vat_number, fiscal_code, sdi_code, address, phone, email, logo_url, team_code";
 
 export async function fetchTeamProfile(teamId: string): Promise<TeamProfile | null> {
   const { data, error } = await supabase

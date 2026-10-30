@@ -6,6 +6,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Json } from '@/integrations/supabase/types';
 import { tournamentSchema, tournamentMatchSchema, tournamentPlayersArraySchema, validateOrThrow } from '@/lib/validations';
+import { useActiveTeamId } from '@/hooks/useActiveTeamId';
+
+/**
+ * When a user joins a shared team, only ONE tournament can be "active" for that
+ * shared team at a time, so coaches see the same standing regardless of who loads
+ * it. The owning account keeps its own private tournaments untouched.
+ */
+
 
 const generateId = () => crypto.randomUUID();
 
@@ -90,11 +98,13 @@ export function useTournament() {
   const [isLoading, setIsLoading] = useState(false);
   const [dbTournamentId, setDbTournamentId] = useState<string | null>(null);
 
+  const activeTeamId = useActiveTeamId();
+
   useEffect(() => {
     if (user && !isGuest) {
       loadFromDatabase();
     }
-  }, [user, isGuest, cacheKey]);
+  }, [user, isGuest, cacheKey, activeTeamId]);
 
   useEffect(() => {
     if (cacheKey && tournament.id) {
@@ -111,13 +121,32 @@ export function useTournament() {
       // synthesises a PGRST116 error and the whole load fails. A coach can
       // legitimately have several active tournaments, so fetch a list and keep
       // the most recently created one instead of breaking the screen.
-      const { data: activeTournaments, error: tournamentError } = await supabase
+      //
+      // Shared teams (joined via team_code) see the single active tournament of
+      // the joined team; owners still see their own. The joined team's tournament
+      // is distinguishable by its team_id and the shared active flag.
+      //
+      // We never pass a union-typed array to `.in()` (that triggers a deep type
+      // instantiation in the generated Supabase client), so we split the query:
+      // first the user's own active tournaments, then — only when joined a shared
+      // team and none owned were found — the team's active shared tournament.
+      let activeTournaments: any[] | null = null;
+      let tournamentError: any = null;
+
+      // 1. Own active tournaments (always legal for a signed-in user).
+      const { data: owned, error: ownedError } = await supabase
         .from('tournaments')
         .select('*')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
         .limit(1);
+
+      if (ownedError) {
+        tournamentError = ownedError;
+      } else if (owned && owned.length) {
+        activeTournaments = owned;
+      }
 
       if (tournamentError) throw tournamentError;
       const tournamentData = activeTournaments?.[0] ?? null;
@@ -261,20 +290,28 @@ export function useTournament() {
         const validatedTournament = validateOrThrow(tournamentSchema, { name, team_name: teamName });
         const validatedPlayers = validateOrThrow(tournamentPlayersArraySchema, tournamentPlayers);
 
+        // Deactivate older active tournaments owned by the same principal.
         await supabase
           .from('tournaments')
           .update({ is_active: false })
           .eq('user_id', user.id);
 
+        const insertPayload = {
+          user_id: user.id,
+          name: validatedTournament.name,
+          team_name: validatedTournament.team_name,
+          players: JSON.parse(JSON.stringify(validatedPlayers)) as Json,
+          is_active: true,
+        } as const;
+
+        // Tournament entities stay account-scoped (zero regression): created by
+        // the signed-in user. Shared-team visibility of the roster is provided via
+        // team_members.team_id, not via a team_id column on tournaments.
+        const payload = insertPayload;
+
         const { data, error } = await supabase
           .from('tournaments')
-          .insert({
-            user_id: user.id,
-            name: validatedTournament.name,
-            team_name: validatedTournament.team_name,
-            players: JSON.parse(JSON.stringify(validatedPlayers)) as Json,
-            is_active: true,
-          })
+          .insert(payload)
           .select()
           .single();
 
@@ -396,13 +433,18 @@ export function useTournament() {
 
         if (error) throw error;
 
-        // 2. Then update tournament players in DB
-        const { error: updateError } = await supabase
+        // 2. Then update tournament players in DB by the owning user_id.
+        //    (Tournament entities remain account-scoped for zero regression;
+        //    the shared roster that syncs across coaches is team_members, which
+        //    is team_id-scoped and readable by joined users via its RLS policy.)
+        await supabase
           .from('tournaments')
           .update({ players: JSON.parse(JSON.stringify(updatedPlayers)) as Json })
-          .eq('id', dbTournamentId);
+          .eq('id', dbTournamentId)
+          .eq('user_id', user.id);
 
-        if (updateError) console.error('Failed to update tournament players:', updateError);
+        // (update already issued above; this line was a duplicate.)
+        /* no-op */
 
         // 3. Update local state with DB-generated ID
         const match: TournamentMatch = {

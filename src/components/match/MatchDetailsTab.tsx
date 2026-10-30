@@ -17,6 +17,7 @@ import type { MatchMetadata, LineupSelection } from "@/types/match";
 import type { TeamMember } from "@/pages/TeamMembers";
 import { buildLineupPdf, suggestedFilename } from "@/lib/lineupPdf";
 import { fetchTeamProfile, getLogoDataUrl } from "@/lib/teamProfile";
+import { useActiveTeamId } from "@/hooks/useActiveTeamId";
 
 
 interface Props {
@@ -100,6 +101,25 @@ export function MatchDetailsTab(props: Props) {
       setLoadingTeams(false);
     })();
   }, [user]);
+
+  // When the user has joined a team via team_code and has not yet chosen a team
+  // for this match, pre-select the joined team so the shared roster is used.
+  // Zero-regression: only activates when teamId is still unset.
+  useEffect(() => {
+    if (!user) return;
+    const joinedTeamId = useActiveTeamId();
+    if (joinedTeamId && !metadata.teamId) {
+      // If the joined team is among the user's own teams, apply its defaults
+      // (name/leva/category) too.
+      const own = teams.find(x => x.id === joinedTeamId);
+      if (own) {
+        onMetadataChange({ teamId: joinedTeamId, leva: own.leva, category: own.category });
+        if (!homeTeamName || homeTeamName === "Casa") onHomeTeamNameChange(own.name);
+      } else {
+        onMetadataChange({ teamId: joinedTeamId });
+      }
+    }
+  }, [user, teams]);
 
   // Auto-fill Leva/Categoria/Nome squadra from selected team
   const applyTeamDefaults = (teamId: string) => {

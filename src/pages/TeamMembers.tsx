@@ -25,6 +25,7 @@ import {
 import {
   ChevronLeft, Upload, Plus, Trash2, Loader2, Pencil, IdCard,
   Download, Users, ArrowLeft, Image as ImageIcon,
+  Check, Share2, Link2,
 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -32,6 +33,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Json } from "@/integrations/supabase/types";
 import { LOGO_BUCKET, TEAM_PROFILE_COLUMNS, mapTeamProfile, getLogoSignedUrl } from "@/lib/teamProfile";
+import { useActiveTeamId } from "@/hooks/useActiveTeamId";
+import { generateTeamCode, clearActiveTeam } from "@/lib/teams";
 
 
 const ROLES = ["Giocatore", "Allenatore", "Dirigente", "Massaggiatore"];
@@ -53,6 +56,7 @@ interface TeamRow {
   category: string;
   leva: string;
   season: string;
+  team_code: string | null;
   vat_number: string;
   fiscal_code: string;
   sdi_code: string;
@@ -142,6 +146,20 @@ export default function TeamMembers() {
   );
 
   useEffect(() => { if (user) loadTeams(); }, [user]);
+
+  // When a user has joined a team via team_code and no team was explicitly
+  // selected via ?teamId=, auto-open the joined team so the shared roster is
+  // immediately visible. This is zero-regression: it only activates when the
+  // user has actually joined a team (localStorage + hook).
+  useEffect(() => {
+    if (!user) return;
+    const paramTeamId = searchParams.get('teamId');
+    const joinedTeamId = useActiveTeamId();
+    if (!paramTeamId && joinedTeamId) {
+      setSelectedTeamId(joinedTeamId);
+    }
+  }, [user, searchParams]);
+
   useEffect(() => {
     if (selectedTeamId) {
       loadMembers(selectedTeamId);
@@ -168,6 +186,7 @@ export default function TeamMembers() {
     (countsData || []).forEach((r: any) => counts.set(r.team_id, (counts.get(r.team_id) || 0) + 1));
     setTeams((teamsData || []).map((t: any) => ({
       ...mapTeamProfile(t),
+      team_code: t.team_code ?? null,
       memberCount: counts.get(t.id) || 0,
     })));
     setLoadingTeams(false);
@@ -247,13 +266,25 @@ export default function TeamMembers() {
       email: clean(teamForm.email),
       logo_url: clean(teamForm.logo_url),
     };
+    // Generate a stable team_code only when the team has none yet (creation or
+    // first-time enable of sharing). Existing codes are preserved to avoid
+    // breaking links already shared with other coaches.
+    // `payload` itself never carries team_code; the code is attached only in the
+    // finalPayload branch below so a never-shared team stays link-free.
+    let finalPayload: typeof payload & { team_code?: string } = payload;
+    if (!editingTeam) {
+      finalPayload = { ...payload, team_code: generateTeamCode(payload.name) };
+    } else if (!editingTeam.team_code) {
+      finalPayload = { ...payload, team_code: generateTeamCode(payload.name) };
+    }
+
     if (editingTeam) {
-      const { error } = await supabase.from("saved_teams").update(payload).eq("id", editingTeam.id);
+      const { error } = await supabase.from("saved_teams").update(finalPayload).eq("id", editingTeam.id);
       if (error) return toast.error(`Errore nel salvataggio: ${error.message}`);
     } else {
       const { data, error } = await supabase
         .from("saved_teams")
-        .insert({ user_id: user.id, players: [] as unknown as Json, ...payload })
+        .insert({ user_id: user.id, players: [] as unknown as Json, ...finalPayload })
         .select("id").single();
       if (error) return toast.error(`Errore nel salvataggio: ${error.message}`);
       if (data?.id) setSelectedTeamId(data.id);
@@ -578,6 +609,7 @@ export default function TeamMembers() {
                           {t.leva && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{t.leva}</span>}
                           {t.category && <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{t.category}</span>}
                           {t.season && <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{t.season}</span>}
+                          {t.team_code && <span className="text-xs bg-secondary/10 text-secondary px-2 py-0.5 rounded-full font-mono tracking-wider">{t.team_code}</span>}
                           <span className="text-xs text-muted-foreground">{t.memberCount} membri</span>
                         </div>
                       </button>
@@ -604,17 +636,106 @@ export default function TeamMembers() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div className="flex-1 min-w-0">
-                <h1 className="text-xl sm:text-2xl font-bold truncate">{selectedTeam.name}</h1>
-                <div className="flex flex-wrap gap-1.5 mt-1">
+                <h1 className="text-xl sm:text-2xl font-bold truncate">{selectedTeam.name}</h1>                    <div className="flex flex-wrap gap-1.5 mt-1">
                   {selectedTeam.leva && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{selectedTeam.leva}</span>}
                   {selectedTeam.category && <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{selectedTeam.category}</span>}
                   {selectedTeam.season && <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{selectedTeam.season}</span>}
+                  {selectedTeam.team_code && <span className="text-xs bg-secondary/10 text-secondary px-2 py-0.5 rounded-full font-mono tracking-wider">{selectedTeam.team_code}</span>}
                 </div>
               </div>
               <Button size="sm" variant="outline" onClick={() => openEditTeam(selectedTeam)}>
                 <Pencil className="h-3.5 w-3.5 mr-1" /> Squadra
               </Button>
             </div>
+
+            {/* Codice Squadra (condivisione rosa) — visibile per tutti; operazioni owner */}
+            {selectedTeam.team_code ? (
+              <Card className="p-3 mb-4 bg-muted/40">
+                <div className="flex items-start gap-3 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                      <span className="font-semibold text-foreground">Codice Squadra</span>
+                      {useActiveTeamId() === selectedTeam.id && (
+                        <span className="inline-flex items-center gap-1 text-emerald-600 text-xs">
+                          <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                          Collegato
+                        </span>
+                      )}
+                    </div>
+                    <div className="font-mono text-base font-bold tracking-wider break-all">{selectedTeam.team_code}</div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => {
+                        const code = selectedTeam.team_code;
+                        if (navigator.clipboard && code) {
+                          navigator.clipboard.writeText(code).then(() => {
+                            toast.success('Codice squadra copiato');
+                          }).catch(() => {
+                            // fallback manuale
+                            const ta = document.createElement('textarea');
+                            ta.value = code;
+                            ta.style.position = 'fixed';
+                            ta.style.opacity = '0';
+                            document.body.appendChild(ta);
+                            ta.select();
+                            try { document.execCommand('copy'); toast.success('Codice squadra copiato'); } catch { toast.error('Impossibile copiare il codice'); }
+                            document.body.removeChild(ta);
+                          });
+                        }
+                      }}
+                    >
+                      <Check className="h-3.5 w-3.5" /> Copia
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => {
+                        const code = selectedTeam.team_code;
+                        if (!code) return;
+                        const text = `Unisciti alla nostra squadra: codice ${code} — https://matchmanager-live.lovable.app/join-team?code=${encodeURIComponent(code)}`;
+                        const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+                        const appUrl = `whatsapp://send?text=${encodeURIComponent(text)}`;
+                        // Preferisci l'app WhatsApp se installata (mobile), altrimenti il link web.
+                        const tryOpen = (native: string, fallback: string) => {
+                          if ((navigator as any).canOpenURL && typeof (navigator as any).canOpenURL === 'function') {
+                            (navigator as any).canOpenURL(native).then(can => {
+                              if (can) window.open(native, '_blank');
+                              else window.open(fallback, '_blank');
+                            }).catch(() => window.open(fallback, '_blank'));
+                          } else {
+                            window.open(fallback, '_blank');
+                          }
+                        };
+                        tryOpen(appUrl, waUrl);
+                      }}
+                    >
+                      <Share2 className="h-3.5 w-3.5" /> Condividi
+                    </Button>
+                  </div>
+                </div>
+                {useActiveTeamId() !== selectedTeam.id && (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <Button variant="ghost" size="sm" className="gap-1.5 text-primary" onClick={() => navigate('/join-team?code=' + encodeURIComponent(selectedTeam.team_code!))}>
+                      <Link2 className="h-3.5 w-3.5" /> Unisciti a questa squadra
+                    </Button>
+                  </div>
+                )}
+              </Card>
+            ) : (
+              <Card className="p-3 mb-4 bg-muted/30">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Senza codice di condivisione.</span>
+                  <Button variant="ghost" size="sm" className="gap-1.5 text-primary" onClick={() => openEditTeam(selectedTeam)}>
+                    <Pencil className="h-3.5 w-3.5" /> Genera codice
+                  </Button>
+                </div>
+              </Card>
+            )}
 
             <div className="flex flex-col sm:flex-row gap-2 mb-4">
               <Button onClick={openAddMember} className="gap-2 flex-1">
