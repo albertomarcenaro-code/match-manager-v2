@@ -102,12 +102,11 @@ export function MatchDetailsTab(props: Props) {
     })();
   }, [user]);
 
-  // When the user has joined a team via team_code and has not yet chosen a team
-  // for this match, pre-select the joined team so the shared roster is used.
-  // Zero-regression: only activates when teamId is still unset.
+  // Pre-select the joined team (via team_code) so the shared roster is used.
+  // The hook is called at component level to obey the rules of React Hooks.
+  const joinedTeamId = useActiveTeamId();
   useEffect(() => {
     if (!user) return;
-    const joinedTeamId = useActiveTeamId();
     if (joinedTeamId && !metadata.teamId) {
       // If the joined team is among the user's own teams, apply its defaults
       // (name/leva/category) too.
@@ -119,7 +118,7 @@ export function MatchDetailsTab(props: Props) {
         onMetadataChange({ teamId: joinedTeamId });
       }
     }
-  }, [user, teams]);
+  }, [user, teams, joinedTeamId]);
 
   // Auto-fill Leva/Categoria/Nome squadra from selected team
   const applyTeamDefaults = (teamId: string) => {

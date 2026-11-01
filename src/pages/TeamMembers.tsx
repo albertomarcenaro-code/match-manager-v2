@@ -145,6 +145,9 @@ export default function TeamMembers() {
     [teams, selectedTeamId]
   );
 
+  // Team joined via team_code (rules of hooks: called at component level).
+  const joinedTeamId = useActiveTeamId();
+
   useEffect(() => { if (user) loadTeams(); }, [user]);
 
   // When a user has joined a team via team_code and no team was explicitly
@@ -154,11 +157,10 @@ export default function TeamMembers() {
   useEffect(() => {
     if (!user) return;
     const paramTeamId = searchParams.get('teamId');
-    const joinedTeamId = useActiveTeamId();
     if (!paramTeamId && joinedTeamId) {
       setSelectedTeamId(joinedTeamId);
     }
-  }, [user, searchParams]);
+  }, [user, searchParams, joinedTeamId]);
 
   useEffect(() => {
     if (selectedTeamId) {
@@ -655,14 +657,27 @@ export default function TeamMembers() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                       <span className="font-semibold text-foreground">Codice Squadra</span>
-                      {useActiveTeamId() === selectedTeam.id && (
+                      {selectedTeam.team_code ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-600 text-xs">
+                          <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                          Dal server
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-amber-600 text-xs">
+                          <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500" />
+                          Generato localmente
+                        </span>
+                      )}
+                      {joinedTeamId === selectedTeam.id && (
                         <span className="inline-flex items-center gap-1 text-emerald-600 text-xs">
                           <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
                           Collegato
                         </span>
                       )}
                     </div>
-                    <div className="font-mono text-base font-bold tracking-wider break-all">{selectedTeam.team_code}</div>
+                    <div className="font-mono text-base font-bold tracking-wider break-all">
+                      {selectedTeam.team_code || getTeamCodeForDisplay(selectedTeam)}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <Button
@@ -671,11 +686,23 @@ export default function TeamMembers() {
                       className="gap-1.5"
                       onClick={() => {
                         const code = selectedTeam.team_code;
-                        if (navigator.clipboard && code) {
-                          navigator.clipboard.writeText(code).then(() => {
-                            toast.success('Codice squadra copiato');
-                          }).catch(() => {
-                            // fallback manuale
+                        if (code) {
+                          if (navigator.clipboard) {
+                            navigator.clipboard.writeText(code).then(() => {
+                              toast.success('Codice squadra copiato');
+                            }).catch(() => {
+                              // fallback manuale
+                              const ta = document.createElement('textarea');
+                              ta.value = code;
+                              ta.style.position = 'fixed';
+                              ta.style.opacity = '0';
+                              document.body.appendChild(ta);
+                              ta.select();
+                              try { document.execCommand('copy'); toast.success('Codice squadra copiato'); } catch { toast.error('Impossibile copiare il codice'); }
+                              document.body.removeChild(ta);
+                            });
+                          } else {
+                            // clipboard API non disponibile: fallback manuale
                             const ta = document.createElement('textarea');
                             ta.value = code;
                             ta.style.position = 'fixed';
@@ -684,7 +711,7 @@ export default function TeamMembers() {
                             ta.select();
                             try { document.execCommand('copy'); toast.success('Codice squadra copiato'); } catch { toast.error('Impossibile copiare il codice'); }
                             document.body.removeChild(ta);
-                          });
+                          }
                         }
                       }}
                     >
@@ -695,8 +722,7 @@ export default function TeamMembers() {
                       size="sm"
                       className="gap-1.5"
                       onClick={() => {
-                        const code = selectedTeam.team_code;
-                        if (!code) return;
+                        const code = selectedTeam.team_code || getTeamCodeForDisplay(selectedTeam);
                         const text = `Unisciti alla nostra squadra: codice ${code} — https://matchmanager-live.lovable.app/join-team?code=${encodeURIComponent(code)}`;
                         const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
                         const appUrl = `whatsapp://send?text=${encodeURIComponent(text)}`;
@@ -718,9 +744,9 @@ export default function TeamMembers() {
                     </Button>
                   </div>
                 </div>
-                {useActiveTeamId() !== selectedTeam.id && (
+                {joinedTeamId !== selectedTeam.id && (
                   <div className="mt-3 pt-3 border-t border-border">
-                    <Button variant="ghost" size="sm" className="gap-1.5 text-primary" onClick={() => navigate('/join-team?code=' + encodeURIComponent(selectedTeam.team_code!))}>
+                    <Button variant="ghost" size="sm" className="gap-1.5 text-primary" onClick={() => navigate('/join-team?code=' + encodeURIComponent(selectedTeam.team_code || getTeamCodeForDisplay(selectedTeam)))}>
                       <Link2 className="h-3.5 w-3.5" /> Unisciti a questa squadra
                     </Button>
                   </div>
@@ -1008,4 +1034,24 @@ export default function TeamMembers() {
       </AlertDialog>
     </div>
   );
+}
+
+/**
+ * Restituisce il codice squadra da usare per la visualizzazione e la condivisione.
+ *
+ * Se la squadra ha un team_code reale (letto dal DB/Supabase), lo usa. Altrimenti
+genera un codice locale e deterministico basato su nome + stagione, esplicitamente
+segnato come non salvato sul server. Questo permette a chi non ha accesso al DB
+(o fintanto le migrazioni non sono state applicate) di comunque usare i pulsanti
+Copia/Condividi WhatsApp con un codice coerente.
+ */
+function getTeamCodeForDisplay(team: any): string {
+  if (team?.team_code) return team.team_code;
+  const name = (team?.name || '').trim();
+  const season = (team?.season || new Date().getFullYear().toString()).trim();
+  const safeName = name.toUpperCase().replace(/[^A-Z0-9]/g, '') || 'LEVA';
+  const seed = (safeName + '-' + season).slice(0, 8);
+  const hash = seed.split('').reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0)) & 0xffff, 0);
+  const hex = (hash >>> 0).toString(16).padStart(4, '0').slice(-4).toUpperCase();
+  return `${safeName}-${season}-${hex}`;
 }
