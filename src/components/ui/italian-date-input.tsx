@@ -43,12 +43,16 @@ interface ItalianDateInputProps extends Omit<React.InputHTMLAttributes<HTMLInput
 }
 
 export const ItalianDateInput = React.forwardRef<HTMLInputElement, ItalianDateInputProps>(
-  ({ value, onChange, onBlurIso, className, placeholder = "GG/MM/AAAA", ...rest }, ref) => {
+  ({ value, onChange, onBlurIso, className, placeholder = "GG/MM/AAAA", onFocus, ...rest }, ref) => {
     const [text, setText] = React.useState<string>(() => isoToIt(value));
+    const [isFocused, setIsFocused] = React.useState(false);
 
     React.useEffect(() => {
-      setText(isoToIt(value));
-    }, [value]);
+      // Never rewrite the field while the user is typing: a partial year such as
+      // "20" parses as 2020, so syncing from `value` mid-entry would turn
+      // "15/03/2026" into "15/03/2020" and swallow the last two digits.
+      if (!isFocused) setText(isoToIt(value));
+    }, [value, isFocused]);
 
     return (
       <Input
@@ -65,6 +69,7 @@ export const ItalianDateInput = React.forwardRef<HTMLInputElement, ItalianDateIn
           if (iso || formatted === "") onChange(iso);
         }}
         onBlur={() => {
+          setIsFocused(false);
           const iso = itToIso(text);
           if (!iso && text !== "") {
             // Invalid entry: reset to last valid value
@@ -73,6 +78,10 @@ export const ItalianDateInput = React.forwardRef<HTMLInputElement, ItalianDateIn
             setText(isoToIt(iso));
           }
           onBlurIso?.(iso);
+        }}
+        onFocus={(e) => {
+          setIsFocused(true);
+          onFocus?.(e);
         }}
         maxLength={10}
         {...rest}
