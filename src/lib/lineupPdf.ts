@@ -3,6 +3,7 @@ import autoTable from "jspdf-autotable";
 import type { TeamMember } from "@/pages/TeamMembers";
 import type { LineupSelection, MatchMetadata } from "@/types/match";
 import type { TeamProfile } from "@/lib/teamProfile";
+import { STAFF_SLOT_LABELS, normalizeStaffSlot } from "@/lib/staffSlots";
 
 interface BuildOpts {
   members: TeamMember[];
@@ -19,13 +20,6 @@ interface BuildOpts {
   /** Elenco staff dinamico (righe illimitate). Se assente usa gli slot fissi. */
   staffList?: Array<{ role: string; name: string; figc?: string | null }>;
 }
-
-const staffSlots: Array<{ label: string }> = [
-  { label: "Dirigente accompagnatore ufficiale" },
-  { label: "Allenatore" },
-  { label: "Allenatore in seconda" },
-  { label: "Massaggiatore" },
-];
 
 const formatItDate = (iso: string) => {
   if (!iso) return "";
@@ -172,13 +166,14 @@ export function buildLineupPdf(opts: BuildOpts): jsPDF {
   const assigned = new Map<string, TeamMember>();
   for (const [mid, slot] of Object.entries(selection.staffRoles || {})) {
     const m = staff.find(s => s.id === mid);
-    if (m) assigned.set(slot, m);
+    const normalized = normalizeStaffSlot(slot);
+    if (m && normalized) assigned.set(normalized, m);
   }
   const staffRows = opts.staffList && opts.staffList.length > 0
     ? opts.staffList.map(s => [(s.role || "Staff") + ":", s.name.toUpperCase(), "Tessera N°:", s.figc || ""])
-    : staffSlots.map(slot => {
-        const m = assigned.get(slot.label);
-        return [slot.label + ":", m ? m.full_name.toUpperCase() : "", "Tessera N°:", m?.figc_number || ""];
+    : STAFF_SLOT_LABELS.map(label => {
+        const m = assigned.get(label);
+        return [label + ":", m ? m.full_name.toUpperCase() : "", "Tessera N°:", m?.figc_number || ""];
       });
   autoTable(doc, {
     startY: y,

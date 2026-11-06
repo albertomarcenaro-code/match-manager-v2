@@ -17,6 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import type { TeamMember } from "@/pages/TeamMembers";
 import { useNavigate } from "react-router-dom";
+import { STAFF_SLOT_LABELS, normalizeStaffSlot } from "@/lib/staffSlots";
 
 interface Props {
   open: boolean;
@@ -205,24 +206,18 @@ export function GenerateLineupSheet({
 
     y = (doc as any).lastAutoTable.finalY + 6;
 
-    // Sezione staff
-    const staffSlots: Array<{ label: string; roles: string[] }> = [
-      { label: "Dirigente accompagnatore ufficiale", roles: ["dirigente accompagnatore ufficiale", "dirigente"] },
-      { label: "Allenatore", roles: ["allenatore"] },
-      { label: "Allenatore in seconda", roles: ["allenatore in seconda"] },
-      { label: "Massaggiatore", roles: ["massaggiatore"] },
-    ];
-
+    // Sezione staff (fino a 3 allenatori e 3 dirigenti: uno per slot)
     const assigned = new Map<string, TeamMember>();
     for (const [mid, slot] of Object.entries(staffRoles)) {
+      const normalized = normalizeStaffSlot(slot);
       const m = staff.find((s) => s.id === mid);
-      if (m) assigned.set(slot, m);
+      if (m && normalized) assigned.set(normalized, m);
     }
 
-    const staffRows = staffSlots.map((slot) => {
-      const member = assigned.get(slot.label);
+    const staffRows = STAFF_SLOT_LABELS.map((label) => {
+      const member = assigned.get(label);
       return [
-        slot.label + ":",
+        label + ":",
         member ? member.full_name.toUpperCase() : "",
         "Tessera N°:",
         member?.figc_number || "",
@@ -352,15 +347,17 @@ export function GenerateLineupSheet({
                       <p className="text-xs text-muted-foreground">{s.role} · Tess. {s.figc_number || "—"}</p>
                     </div>
                     <Select
-                      value={staffRoles[s.id] || "_none"}
+                      value={normalizeStaffSlot(staffRoles[s.id]) || "_none"}
                       onValueChange={(v) =>
                         setStaffRoles((prev) => {
                           const n = { ...prev };
-                          if (v === "_none") delete n[s.id];
+                          const normalized = normalizeStaffSlot(v);
+                          if (!normalized) delete n[s.id];
                           else {
-                            // ensure single occupant per slot
-                            for (const k of Object.keys(n)) if (n[k] === v) delete n[k];
-                            n[s.id] = v;
+                            // one person per slot: the chosen slot is freed for others
+                            for (const k of Object.keys(n))
+                              if (k !== s.id && normalizeStaffSlot(n[k]) === normalized) delete n[k];
+                            n[s.id] = normalized;
                           }
                           return n;
                         })
@@ -369,10 +366,9 @@ export function GenerateLineupSheet({
                       <SelectTrigger className="w-56 h-8 text-xs"><SelectValue placeholder="Assegna ruolo distinta" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="_none">— non convocato</SelectItem>
-                        <SelectItem value="Dirigente accompagnatore ufficiale">Dirigente accompagnatore</SelectItem>
-                        <SelectItem value="Allenatore">Allenatore</SelectItem>
-                        <SelectItem value="Allenatore in seconda">Allenatore in seconda</SelectItem>
-                        <SelectItem value="Massaggiatore">Massaggiatore</SelectItem>
+                        {STAFF_SLOT_LABELS.map((label) => (
+                          <SelectItem key={label} value={label}>{label}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>

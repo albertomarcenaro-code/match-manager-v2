@@ -18,6 +18,7 @@ import type { TeamMember } from "@/pages/TeamMembers";
 import { buildLineupPdf, suggestedFilename } from "@/lib/lineupPdf";
 import { fetchTeamProfile, getLogoDataUrl } from "@/lib/teamProfile";
 import { useActiveTeamId } from "@/hooks/useActiveTeamId";
+import { STAFF_SLOT_LABELS, normalizeStaffSlot } from "@/lib/staffSlots";
 
 
 interface Props {
@@ -46,12 +47,8 @@ const decodeCategory = (raw: string | null | undefined) => {
   return { leva: "", category: s };
 };
 
-const staffOptions = [
-  "Dirigente accompagnatore ufficiale",
-  "Allenatore",
-  "Allenatore in seconda",
-  "Massaggiatore",
-];
+// Up to 3 coaches and 3 managers per match: one person per numbered slot.
+const staffOptions = STAFF_SLOT_LABELS;
 
 export function MatchDetailsTab(props: Props) {
   const {
@@ -319,10 +316,14 @@ export function MatchDetailsTab(props: Props) {
 
   const setStaffRole = (id: string, slot: string | null) => {
     const next = { ...selection.staffRoles };
-    if (!slot) delete next[id];
+    const normalized = normalizeStaffSlot(slot);
+    if (!normalized) delete next[id];
     else {
-      for (const k of Object.keys(next)) if (next[k] === slot) delete next[k];
-      next[id] = slot;
+      // One person per slot; choosing an occupied slot frees it for the others.
+      for (const k of Object.keys(next)) {
+        if (k !== id && normalizeStaffSlot(next[k]) === normalized) delete next[k];
+      }
+      next[id] = normalized;
     }
     updateSelection({ staffRoles: next });
   };
@@ -444,7 +445,7 @@ export function MatchDetailsTab(props: Props) {
                     <p className="text-xs text-muted-foreground">{s.role} · Tess. {s.figc_number || "—"}</p>
                   </div>
                   <Select
-                    value={selection.staffRoles[s.id] || "_none"}
+                    value={normalizeStaffSlot(selection.staffRoles[s.id]) || "_none"}
                     onValueChange={(v) => setStaffRole(s.id, v === "_none" ? null : v)}
                   >
                     <SelectTrigger className="w-56 h-8 text-xs"><SelectValue placeholder="Assegna slot" /></SelectTrigger>
