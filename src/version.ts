@@ -11,6 +11,6 @@
 export const MAJOR_VERSION = "1.0";
 
 // AUTO-GENERATED-BUILD-NUMBER
-export const BUILD_NUMBER = 10;
+export const BUILD_NUMBER = 11;
 
 export const APP_VERSION = `v${MAJOR_VERSION}.${BUILD_NUMBER}`;

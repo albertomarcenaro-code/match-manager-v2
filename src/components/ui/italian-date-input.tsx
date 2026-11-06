@@ -1,5 +1,8 @@
 import * as React from "react";
+import { CalendarDays } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 // Converts YYYY-MM-DD (ISO) -> DD/MM/YYYY for display
@@ -33,6 +36,23 @@ function autoFormat(v: string): string {
   return parts.join("/");
 }
 
+// ISO -> local Date (calendar); no timezone shifting
+function isoToDate(iso: string | null | undefined): Date | undefined {
+  const parsed = itToIso(isoToIt(iso));
+  if (!parsed) return undefined;
+  const [y, mo, d] = parsed.split("-").map(Number);
+  const date = new Date(y, mo - 1, d);
+  return isNaN(date.getTime()) ? undefined : date;
+}
+
+// local Date -> ISO (YYYY-MM-DD)
+function dateToIso(date: Date): string {
+  const y = date.getFullYear();
+  const mo = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y.toString().padStart(4, "0")}-${mo}-${d}`;
+}
+
 interface ItalianDateInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type"> {
   /** ISO date string YYYY-MM-DD (or empty) */
   value: string | null | undefined;
@@ -40,12 +60,15 @@ interface ItalianDateInputProps extends Omit<React.InputHTMLAttributes<HTMLInput
   onChange: (iso: string) => void;
   /** Called on blur with the ISO value */
   onBlurIso?: (iso: string) => void;
+  /** Shows the calendar button that opens a month picker (default: true) */
+  showCalendar?: boolean;
 }
 
 export const ItalianDateInput = React.forwardRef<HTMLInputElement, ItalianDateInputProps>(
-  ({ value, onChange, onBlurIso, className, placeholder = "GG/MM/AAAA", onFocus, ...rest }, ref) => {
+  ({ value, onChange, onBlurIso, className, placeholder = "GG/MM/AAAA", onFocus, disabled, showCalendar = true, ...rest }, ref) => {
     const [text, setText] = React.useState<string>(() => isoToIt(value));
     const [isFocused, setIsFocused] = React.useState(false);
+    const [calendarOpen, setCalendarOpen] = React.useState(false);
 
     React.useEffect(() => {
       // Never rewrite the field while the user is typing: a partial year such as
@@ -54,12 +77,25 @@ export const ItalianDateInput = React.forwardRef<HTMLInputElement, ItalianDateIn
       if (!isFocused) setText(isoToIt(value));
     }, [value, isFocused]);
 
-    return (
+    // What the calendar shows as selected: the typed date if valid, else the saved one.
+    const selectedDate = isoToDate(itToIso(text) || value);
+
+    const pickDate = (date: Date | undefined) => {
+      if (!date) return;
+      const iso = dateToIso(date);
+      setText(isoToIt(iso));
+      onChange(iso);
+      onBlurIso?.(iso);
+      setCalendarOpen(false);
+    };
+
+    const input = (
       <Input
         ref={ref}
         inputMode="numeric"
         placeholder={placeholder}
-        className={cn("tabular-nums", className)}
+        disabled={disabled}
+        className={cn("tabular-nums", showCalendar && "pr-9", className)}
         value={text}
         onChange={(e) => {
           const formatted = autoFormat(e.target.value);
@@ -86,6 +122,36 @@ export const ItalianDateInput = React.forwardRef<HTMLInputElement, ItalianDateIn
         maxLength={10}
         {...rest}
       />
+    );
+
+    if (!showCalendar) return input;
+
+    return (
+      <div className="relative">
+        {input}
+        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label="Apri il calendario"
+              disabled={disabled}
+              className="absolute right-1 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+            >
+              <CalendarDays className="h-4 w-4" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-auto p-0">
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={pickDate}
+              // Opens on today's month when the field is still empty.
+              defaultMonth={selectedDate ?? new Date()}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
     );
   }
 );
