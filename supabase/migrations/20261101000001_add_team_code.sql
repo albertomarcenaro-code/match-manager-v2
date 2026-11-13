@@ -49,4 +49,6 @@ CREATE POLICY "Owners can set their team_code"
   WITH CHECK (auth.uid() = user_id);
 
 -- Grant the role the minimum it needs for the join flow.
-GRANT SELECT (id, name, category, leva, season, team_code) ON public.saved_teams TO authenticated;
+-- Solo colonne realmente esistenti: `leva` non è una colonna di saved_teams
+-- (viene codificata dentro `category`), e includerla faceva fallire la migrazione.
+GRANT SELECT (id, name, category, season, team_code) ON public.saved_teams TO authenticated;

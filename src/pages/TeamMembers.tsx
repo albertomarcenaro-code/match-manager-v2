@@ -120,6 +120,8 @@ export default function TeamMembers() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [teams, setTeams] = useState<TeamRow[]>([]);
+  // false quando il DB non ha la colonna team_code: niente codici inventati.
+  const [teamCodeAvailable, setTeamCodeAvailable] = useState(true);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(searchParams.get("teamId"));
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loadingTeams, setLoadingTeams] = useState(true);
@@ -222,6 +224,7 @@ export default function TeamMembers() {
       .select("team_id");
     const counts = new Map<string, number>();
     (countsData || []).forEach((r: any) => counts.set(r.team_id, (counts.get(r.team_id) || 0) + 1));
+    setTeamCodeAvailable(result.teamCodeAvailable);
     setTeams(result.rows.map((t: any) => ({
       ...mapTeamProfile(t),
       team_code: t.team_code ?? null,
@@ -795,7 +798,11 @@ export default function TeamMembers() {
             </div>
 
             {/* Codice Squadra (condivisione rosa) — visibile per tutti; operazioni owner */}
-            {selectedTeam.team_code ? (
+            {!teamCodeAvailable ? (
+              <p className="text-xs text-muted-foreground mb-4">
+                Condivisione squadra non disponibile: il database non ha ancora il campo del codice squadra.
+              </p>
+            ) : selectedTeam.team_code ? (
               <Card className="p-3 mb-4 bg-muted/40">
                 <div className="flex items-start gap-3 flex-wrap">
                   <div className="flex-1 min-w-0">
