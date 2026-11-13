@@ -65,7 +65,7 @@ interface ItalianDateInputProps extends Omit<React.InputHTMLAttributes<HTMLInput
 }
 
 export const ItalianDateInput = React.forwardRef<HTMLInputElement, ItalianDateInputProps>(
-  ({ value, onChange, onBlurIso, className, placeholder = "GG/MM/AAAA", onFocus, disabled, showCalendar = true, ...rest }, ref) => {
+  ({ value, onChange, onBlurIso, className, placeholder = "GG/MM/AAAA", onFocus, onBlur, disabled, showCalendar = true, ...rest }, ref) => {
     const [text, setText] = React.useState<string>(() => isoToIt(value));
     const [isFocused, setIsFocused] = React.useState(false);
     const [calendarOpen, setCalendarOpen] = React.useState(false);
@@ -104,7 +104,7 @@ export const ItalianDateInput = React.forwardRef<HTMLInputElement, ItalianDateIn
           // Emit iso only when valid or empty; keep parent in sync
           if (iso || formatted === "") onChange(iso);
         }}
-        onBlur={() => {
+        onBlur={(e) => {
           setIsFocused(false);
           const iso = itToIso(text);
           if (!iso && text !== "") {
@@ -114,6 +114,9 @@ export const ItalianDateInput = React.forwardRef<HTMLInputElement, ItalianDateIn
             setText(isoToIt(iso));
           }
           onBlurIso?.(iso);
+          // `onBlur` arriva da ...rest: va chiamato qui, altrimenti sovrascriverebbe
+          // la sincronizzazione del testo e il valore salvato non tornerebbe coerente.
+          onBlur?.(e);
         }}
         onFocus={(e) => {
           setIsFocused(true);

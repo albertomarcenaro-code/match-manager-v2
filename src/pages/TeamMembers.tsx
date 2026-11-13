@@ -211,10 +211,12 @@ export default function TeamMembers() {
       .select(TEAM_PROFILE_COLUMNS)
       .order("updated_at", { ascending: false });
     if (error) { toast.error("Errore nel caricamento squadre"); setLoadingTeams(false); return; }
+    // Nessun filtro user_id: la RLS restituisce già le righe delle squadre
+    // proprie più quelle delle squadre condivise a cui si è joinati, così il
+    // conteggio non mostra 0 su una rosa condivisa.
     const { data: countsData } = await supabase
       .from("team_members")
-      .select("team_id")
-      .eq("user_id", user.id);
+      .select("team_id");
     const counts = new Map<string, number>();
     (countsData || []).forEach((r: any) => counts.set(r.team_id, (counts.get(r.team_id) || 0) + 1));
     setTeams((teamsData || []).map((t: any) => ({
@@ -381,8 +383,10 @@ export default function TeamMembers() {
       role: memberForm.role || "Giocatore",
       jersey_number: memberForm.jersey_number ?? null,
     };
+    // Solo l'id: sulle squadre condivise un coach può correggere righe create
+    // da un altro (la RLS verifica l'appartenenza al team).
     const { error } = editingMemberId
-      ? await supabase.from("team_members").update(payload).eq("id", editingMemberId).eq("user_id", user.id)
+      ? await supabase.from("team_members").update(payload).eq("id", editingMemberId)
       : await supabase.from("team_members").insert(payload);
     if (error) return toast.error("Errore nel salvataggio");
     await syncSavedTeamPlayers(selectedTeamId);
@@ -394,7 +398,7 @@ export default function TeamMembers() {
   const confirmDeleteMember = async () => {
     if (!user || !deleteMember || !selectedTeamId) return;
     const { error } = await supabase
-      .from("team_members").delete().eq("id", deleteMember.id).eq("user_id", user.id);
+      .from("team_members").delete().eq("id", deleteMember.id);
     if (error) toast.error("Errore");
     else {
       await syncSavedTeamPlayers(selectedTeamId);
@@ -414,7 +418,15 @@ export default function TeamMembers() {
   const updateCell = async (m: TeamMember, patch: Partial<TeamMember>) => {
     setMembers(prev => prev.map(x => x.id === m.id ? { ...x, ...patch } : x));
     const payload: any = {};
-    if ("full_name" in patch) payload.full_name = (patch.full_name || "").trim();
+    if ("full_name" in patch) {
+      const nextName = (patch.full_name || "").trim();
+      if (!nextName) {
+        toast.error("Il nome non può essere vuoto");
+        if (selectedTeamId) loadMembers(selectedTeamId);
+        return;
+      }
+      payload.full_name = nextName;
+    }
     if ("figc_number" in patch) payload.figc_number = (patch.figc_number || "").toString().trim() || null;
     if ("fiscal_code" in patch) payload.fiscal_code = (patch.fiscal_code || "").toString().trim().toUpperCase() || null;
     if ("birth_date" in patch) payload.birth_date = patch.birth_date || null;
@@ -437,7 +449,7 @@ export default function TeamMembers() {
     if (!user || !selectedTeamId || selectedIds.size === 0) return;
     setBulkBusy(true);
     const ids = Array.from(selectedIds);
-    const { error } = await supabase.from("team_members").delete().in("id", ids).eq("user_id", user.id);
+    const { error } = await supabase.from("team_members").delete().in("id", ids);
     if (error) {
       // In caso di errore la finestra resta aperta: si può riprovare o annullare.
       toast.error(`Errore durante l'eliminazione: ${error.message}`);
@@ -457,7 +469,7 @@ export default function TeamMembers() {
     if (!user || !selectedTeamId || selectedIds.size === 0) return;
     setBulkBusy(true);
     const ids = Array.from(selectedIds);
-    const { error } = await supabase.from("team_members").update({ role }).in("id", ids).eq("user_id", user.id);
+    const { error } = await supabase.from("team_members").update({ role }).in("id", ids);
     if (error) toast.error(`Errore durante l'aggiornamento: ${error.message}`);
     else {
       setMembers(prev => prev.map(m => ids.includes(m.id) ? { ...m, role } : m));

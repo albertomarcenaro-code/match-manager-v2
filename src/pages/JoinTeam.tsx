@@ -150,7 +150,7 @@ export default function JoinTeam() {
             </div>
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1 gap-2" onClick={() => navigate('/my-teams')}>
-                <Link2 className="h-4 w-4" /> Vai all'Anagrafica
+                <Link2 className="h-4 w-4" /> Vai a La Mia Squadra
               </Button>
               <Button variant="ghost" className="gap-2" onClick={handleLeave}>
                 Esci dalla squadra

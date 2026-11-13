@@ -19,10 +19,14 @@ export type StaffSlot = (typeof STAFF_SLOT_LABELS)[number];
 
 /** Etichette salvate dalle distinte create prima degli slot numerati. */
 const LEGACY_SLOTS: Record<string, StaffSlot> = {
-  "Allenatore": "Allenatore 1",
-  "Allenatore in seconda": "Allenatore 2",
-  "Dirigente accompagnatore ufficiale": "Dirigente 1",
-  "Massaggiatore": "Massaggiatore",
+  "allenatore": "Allenatore 1",
+  "allenatore 1": "Allenatore 1",
+  "allenatore in seconda": "Allenatore 2",
+  "allenatore 2": "Allenatore 2",
+  "dirigente": "Dirigente 1",
+  "dirigente accompagnatore": "Dirigente 1",
+  "dirigente accompagnatore ufficiale": "Dirigente 1",
+  "massaggiatore": "Massaggiatore",
 };
 
 /**
@@ -32,6 +36,10 @@ const LEGACY_SLOTS: Record<string, StaffSlot> = {
 export function normalizeStaffSlot(label: string | null | undefined): StaffSlot | null {
   if (!label) return null;
   const trimmed = label.trim();
-  if ((STAFF_SLOT_LABELS as readonly string[]).includes(trimmed)) return trimmed as StaffSlot;
-  return LEGACY_SLOTS[trimmed] ?? null;
+  const exact = (STAFF_SLOT_LABELS as readonly string[]).find(l => l === trimmed);
+  if (exact) return exact as StaffSlot;
+  const lower = trimmed.toLowerCase();
+  const known = (STAFF_SLOT_LABELS as readonly string[]).find(l => l.toLowerCase() === lower);
+  if (known) return known as StaffSlot;
+  return LEGACY_SLOTS[lower] ?? null;
 }

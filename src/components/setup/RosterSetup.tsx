@@ -1271,7 +1271,7 @@ export function RosterSetup({
                 <div className="text-center py-8 text-muted-foreground">
                   <p className="text-sm">Nessuna squadra salvata.</p>
                   <Button variant="link" size="sm" onClick={() => { setSavedTeamsDialogOpen(false); navigate('/my-teams'); }}>
-                    Vai a "Le Mie Squadre" per crearne una
+                    Vai a "La Mia Squadra" per crearne una
                   </Button>
                 </div>
               ) : (

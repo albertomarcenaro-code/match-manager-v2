@@ -86,6 +86,11 @@ export function useActiveTeamId(): string | null {
   const { user, isGuest } = useAuth();
   const [teamId, setTeamId] = useState<string | null>(null);
   const mountedRef = useRef(true);
+  // Il canale realtime viene creato una volta sola: senza un ref confronterebbe
+  // sempre il teamId catturato al mount (null) e non riconoscerebbe la rimozione
+  // della squadra attiva.
+  const teamIdRef = useRef<string | null>(null);
+  teamIdRef.current = teamId;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -115,7 +120,7 @@ export function useActiveTeamId(): string | null {
           if (!mountedRef.current) return;
           if (payload.eventType === 'DELETE') {
             // We no longer own this team; if it was our active one, drop it.
-            if (payload.old?.id === teamId) {
+            if (payload.old?.id === teamIdRef.current) {
               setTeamId(null);
               clearActiveTeam();
             }
