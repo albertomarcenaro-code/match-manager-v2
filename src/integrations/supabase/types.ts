@@ -195,7 +195,6 @@ export type Database = {
           players: Json
           sdi_code: string | null
           season: string | null
-          team_code: string | null
           updated_at: string
           user_id: string
           vat_number: string | null
@@ -213,7 +212,6 @@ export type Database = {
           players?: Json
           sdi_code?: string | null
           season?: string | null
-          team_code?: string | null
           updated_at?: string
           user_id: string
           vat_number?: string | null
@@ -231,7 +229,6 @@ export type Database = {
           players?: Json
           sdi_code?: string | null
           season?: string | null
-          team_code?: string | null
           updated_at?: string
           user_id?: string
           vat_number?: string | null
@@ -284,45 +281,6 @@ export type Database = {
             columns: ["team_id"]
             isOneToOne: false
             referencedRelation: "saved_teams"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      user_team_joins: {
-        Row: {
-          created_at: string
-          id: string
-          team_id: string
-          user_id: string
-          joined_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          team_id: string
-          user_id: string
-          joined_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          joined_at?: string
-          team_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_team_joins_team_id_fkey"
-            columns: ["team_id"]
-            isOneToOne: false
-            referencedRelation: "saved_teams"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_team_joins_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
