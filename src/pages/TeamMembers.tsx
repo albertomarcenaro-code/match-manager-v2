@@ -33,7 +33,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Json } from "@/integrations/supabase/types";
-import { LOGO_BUCKET, TEAM_PROFILE_COLUMNS, mapTeamProfile, getLogoSignedUrl } from "@/lib/teamProfile";
+import { LOGO_BUCKET, mapTeamProfile, getLogoSignedUrl, fetchSavedTeams } from "@/lib/teamProfile";
 import { useActiveTeamId } from "@/hooks/useActiveTeamId";
 import { generateTeamCode, clearActiveTeam } from "@/lib/teams";
 
@@ -206,20 +206,23 @@ export default function TeamMembers() {
   const loadTeams = async () => {
     if (!user) return;
     setLoadingTeams(true);
-    const { data: teamsData, error } = await supabase
-      .from("saved_teams")
-      .select(TEAM_PROFILE_COLUMNS)
-      .order("updated_at", { ascending: false });
-    if (error) { toast.error("Errore nel caricamento squadre"); setLoadingTeams(false); return; }
-    // Nessun filtro user_id: la RLS restituisce già le righe delle squadre
-    // proprie più quelle delle squadre condivise a cui si è joinati, così il
-    // conteggio non mostra 0 su una rosa condivisa.
+    // Lettura tollerante: prova le colonne complete, poi set ridotti se
+    // `team_code` manca o le grant per colonna non coprono il profilo societario.
+    const result = await fetchSavedTeams(user.id);
+    if (result.error) {
+      console.error("[teams] caricamento squadre fallito:", result.error.message);
+      toast.error(`Errore nel caricamento squadre: ${result.error.message}`);
+      setLoadingTeams(false);
+      return;
+    }
+    // Conteggio su tutte le righe visibili (RLS), così le squadre condivise
+    // non risultano con 0 membri.
     const { data: countsData } = await supabase
       .from("team_members")
       .select("team_id");
     const counts = new Map<string, number>();
     (countsData || []).forEach((r: any) => counts.set(r.team_id, (counts.get(r.team_id) || 0) + 1));
-    setTeams((teamsData || []).map((t: any) => ({
+    setTeams(result.rows.map((t: any) => ({
       ...mapTeamProfile(t),
       team_code: t.team_code ?? null,
       memberCount: counts.get(t.id) || 0,
@@ -323,17 +326,28 @@ export default function TeamMembers() {
       finalPayload = { ...payload, team_code: generateTeamCode(payload.name) };
     }
 
-    if (editingTeam) {
-      const { error } = await supabase.from("saved_teams").update(finalPayload).eq("id", editingTeam.id);
-      if (error) return toast.error(`Errore nel salvataggio: ${error.message}`);
-    } else {
+    const write = async (withCode: boolean) => {
+      const p: any = withCode ? finalPayload : payload;
+      if (editingTeam) {
+        const { error } = await supabase.from("saved_teams").update(p).eq("id", editingTeam.id);
+        return { error, insertedId: undefined as string | undefined };
+      }
       const { data, error } = await supabase
         .from("saved_teams")
-        .insert({ user_id: user.id, players: [] as unknown as Json, ...finalPayload })
+        .insert({ user_id: user.id, players: [] as unknown as Json, ...p })
         .select("id").single();
-      if (error) return toast.error(`Errore nel salvataggio: ${error.message}`);
-      if (data?.id) setSelectedTeamId(data.id);
+      return { error, insertedId: data?.id as string | undefined };
+    };
+
+    let res = await write(true);
+    if (res.error && /team_code|column|schema cache/i.test(res.error.message)) {
+      // DB senza la colonna `team_code`: si salva comunque, senza condivisione.
+      console.warn("[teams] salvataggio senza team_code:", res.error.message);
+      res = await write(false);
+      if (!res.error) toast.warning("Squadra salvata: il codice di condivisione non è disponibile su questo database");
     }
+    if (res.error) return toast.error(`Errore nel salvataggio: ${res.error.message}`);
+    if (res.insertedId) setSelectedTeamId(res.insertedId);
     toast.success("Squadra salvata");
     setTeamDialogOpen(false);
     loadTeams();
