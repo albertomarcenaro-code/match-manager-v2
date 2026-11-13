@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useKeyboardAware } from "@/hooks/useKeyboardAware";
 
@@ -18,7 +18,6 @@ const Tournaments = lazy(() => import("./pages/Tournaments"));
 const TournamentDetail = lazy(() => import("./pages/TournamentDetail"));
 const TournamentRoster = lazy(() => import("./pages/TournamentRoster"));
 const MatchSummary = lazy(() => import("./pages/MatchSummary"));
-const MyTeams = lazy(() => import("./pages/MyTeams"));
 const TeamMembers = lazy(() => import("./pages/TeamMembers"));
 const JoinTeam = lazy(() => import("./pages/JoinTeam"));
 const Profile = lazy(() => import("./pages/Profile"));
@@ -33,6 +32,11 @@ const LiveTournament = lazy(() => import("./pages/LiveTournament"));
 const queryClient = new QueryClient();
 
 // Standard protection (guests + registered)
+const LegacyTeamMembersRedirect = () => {
+  const { search } = useLocation();
+  return <Navigate to={`/my-teams${search}`} replace />;
+};
+
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isGuest, isLoading } = useAuth();
   if (isLoading) return <div className="h-screen flex items-center justify-center font-sans">Caricamento...</div>;
@@ -81,8 +85,8 @@ const App = () => {
               <Route path="/tournament/:id" element={<RegisteredRoute><TournamentDetail /></RegisteredRoute>} />
               <Route path="/tournament/:id/roster" element={<RegisteredRoute><TournamentRoster /></RegisteredRoute>} />
               <Route path="/tournament-archive" element={<RegisteredRoute><TournamentArchive /></RegisteredRoute>} />
-              <Route path="/my-teams" element={<RegisteredRoute><MyTeams /></RegisteredRoute>} />
-              <Route path="/team-members" element={<RegisteredRoute><TeamMembers /></RegisteredRoute>} />
+              <Route path="/my-teams" element={<RegisteredRoute><TeamMembers /></RegisteredRoute>} />
+              <Route path="/team-members" element={<LegacyTeamMembersRedirect />} />
               <Route path="/join-team" element={<RegisteredRoute><JoinTeam /></RegisteredRoute>} />
               <Route path="/profile" element={<RegisteredRoute><Profile /></RegisteredRoute>} />
               <Route path="/terms" element={<Terms />} />

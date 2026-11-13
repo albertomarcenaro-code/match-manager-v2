@@ -283,8 +283,8 @@ export function GenerateLineupSheet({
             <p className="text-sm text-muted-foreground">
               Non hai ancora registrato membri in anagrafica.
             </p>
-            <Button onClick={() => { onOpenChange(false); navigate("/team-members"); }}>
-              Vai all'Anagrafica Squadra
+            <Button onClick={() => { onOpenChange(false); navigate("/my-teams"); }}>
+              Vai a La Mia Squadra
             </Button>
           </div>
         ) : (

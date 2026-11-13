@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ItalianDateInput } from "@/components/ui/italian-date-input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -25,7 +26,7 @@ import {
 import {
   ChevronLeft, Upload, Plus, Trash2, Loader2, Pencil, IdCard,
   Download, Users, ArrowLeft, Image as ImageIcon,
-  Check, Share2, Link2,
+  Check, Share2, Link2, Search, X, FileSpreadsheet,
 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -140,6 +141,34 @@ export default function TeamMembers() {
   const [deleteTeam, setDeleteTeam] = useState<TeamRow | null>(null);
   const [deleteMember, setDeleteMember] = useState<TeamMember | null>(null);
 
+  // Ricerca, filtri e selezione multipla
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<"all" | "players" | "staff">("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [teamLogoUrl, setTeamLogoUrl] = useState<string | null>(null);
+
+  const visibleMembers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return members
+      .filter(m => {
+        const isPlayer = (m.role || "").toLowerCase() === "giocatore";
+        if (filter === "players" && !isPlayer) return false;
+        if (filter === "staff" && isPlayer) return false;
+        return !q || (m.full_name || "").toLowerCase().includes(q);
+      })
+      .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || "", "it", { sensitivity: "base" }));
+  }, [members, search, filter]);
+
+  const selectedMembers = useMemo(() => members.filter(m => selectedIds.has(m.id)), [members, selectedIds]);
+  const allVisibleSelected = visibleMembers.length > 0 && visibleMembers.every(m => selectedIds.has(m.id));
+  const toggleOne = (id: string) => setSelectedIds(prev => {
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
+  });
+  const selectAllVisible = () => setSelectedIds(prev => { const n = new Set(prev); visibleMembers.forEach(m => n.add(m.id)); return n; });
+  const clearSelection = () => setSelectedIds(new Set());
+
   const selectedTeam = useMemo(
     () => teams.find(t => t.id === selectedTeamId) || null,
     [teams, selectedTeamId]
@@ -163,6 +192,8 @@ export default function TeamMembers() {
   }, [user, searchParams, joinedTeamId]);
 
   useEffect(() => {
+    setSelectedIds(new Set());
+    setSearch("");
     if (selectedTeamId) {
       loadMembers(selectedTeamId);
       setSearchParams({ teamId: selectedTeamId });
@@ -379,6 +410,67 @@ export default function TeamMembers() {
     if (selectedTeamId) await syncSavedTeamPlayers(selectedTeamId);
   };
 
+  useEffect(() => {
+    let cancelled = false;
+    setTeamLogoUrl(null);
+    if (selectedTeam?.logo_url) getLogoSignedUrl(selectedTeam.logo_url).then(u => { if (!cancelled) setTeamLogoUrl(u); });
+    return () => { cancelled = true; };
+  }, [selectedTeam?.logo_url]);
+
+  // ---------- Operazioni cumulative ----------
+  const bulkDelete = async () => {
+    if (!user || !selectedTeamId || selectedIds.size === 0) return;
+    setBulkBusy(true);
+    const ids = Array.from(selectedIds);
+    const { error } = await supabase.from("team_members").delete().in("id", ids).eq("user_id", user.id);
+    if (error) toast.error("Errore durante l'eliminazione");
+    else {
+      await syncSavedTeamPlayers(selectedTeamId);
+      setMembers(prev => prev.filter(m => !selectedIds.has(m.id)));
+      toast.success(`${ids.length} membri eliminati`);
+      clearSelection();
+      loadTeams();
+    }
+    setBulkBusy(false);
+    setBulkDeleteOpen(false);
+  };
+
+  const bulkSetRole = async (role: string) => {
+    if (!user || !selectedTeamId || selectedIds.size === 0) return;
+    setBulkBusy(true);
+    const ids = Array.from(selectedIds);
+    const { error } = await supabase.from("team_members").update({ role }).in("id", ids);
+    if (error) toast.error("Errore durante l'aggiornamento");
+    else {
+      setMembers(prev => prev.map(m => selectedIds.has(m.id) ? { ...m, role } : m));
+      await syncSavedTeamPlayers(selectedTeamId);
+      toast.success(`${ids.length} membri impostati come ${role}`);
+    }
+    setBulkBusy(false);
+  };
+
+  const fmtIt = (iso: string | null) => {
+    if (!iso) return "";
+    const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
+  };
+  const bulkExport = () => {
+    if (selectedMembers.length === 0) return;
+    const rows = [
+      ["Cognome Nome", "Data di nascita", "N. Matricola FIGC", "Codice Fiscale", "Qualifica", "N. Maglia"],
+      ...[...selectedMembers]
+        .sort((a, b) => a.full_name.localeCompare(b.full_name, "it", { sensitivity: "base" }))
+        .map(m => [m.full_name, fmtIt(m.birth_date), m.figc_number || "", m.fiscal_code || "", m.role, m.jersey_number ?? ""]),
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [{ wch: 28 }, { wch: 14 }, { wch: 18 }, { wch: 20 }, { wch: 16 }, { wch: 10 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Anagrafica");
+    const safe = (selectedTeam?.name || "squadra").replace(/[^a-z0-9]+/gi, "_");
+    XLSX.writeFile(wb, `anagrafica_${safe}_selezionati.xlsx`);
+    toast.success(`Esportati ${selectedMembers.length} nominativi`);
+  };
+
   // ---------- Excel template ----------
   const downloadTemplate = () => {
     const headers = [
@@ -559,7 +651,7 @@ export default function TeamMembers() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Helmet>
-        <title>{selectedTeam ? `${selectedTeam.name} — Anagrafica` : "Anagrafica Squadra"} | Match Manager Live</title>
+        <title>{selectedTeam ? `${selectedTeam.name} — La Mia Squadra` : "La Mia Squadra"} | Match Manager Live</title>
         <meta name="description" content="Gestisci le anagrafiche delle tue squadre: giocatori, allenatori e staff con dati federali per la distinta gara." />
       </Helmet>
       <Header />
@@ -572,11 +664,11 @@ export default function TeamMembers() {
               </Button>
               <div className="flex-1 min-w-0">
                 <h1 className="text-2xl font-bold flex items-center gap-2 truncate">
-                  <IdCard className="h-6 w-6 text-primary shrink-0" />
-                  Anagrafica Squadra
+                  <Users className="h-6 w-6 text-primary shrink-0" />
+                  La Mia Squadra
                 </h1>
                 <p className="text-xs text-muted-foreground">
-                  Crea e gestisci le rose delle tue squadre. Punto unico di data entry.
+                  Squadre, codice di condivisione e anagrafica di giocatori e staff.
                 </p>
               </div>
             </div>
@@ -587,6 +679,9 @@ export default function TeamMembers() {
               </Button>
               <Button variant="outline" onClick={downloadTemplate} className="gap-2 flex-1">
                 <Download className="h-4 w-4" /> Scarica Template Excel
+              </Button>
+              <Button variant="outline" onClick={() => navigate("/join-team")} className="gap-2 flex-1">
+                <Link2 className="h-4 w-4" /> Unisciti a una squadra
               </Button>
             </div>
 
@@ -637,6 +732,11 @@ export default function TeamMembers() {
               <Button variant="ghost" size="icon" onClick={() => setSelectedTeamId(null)}>
                 <ArrowLeft className="h-5 w-5" />
               </Button>
+              <div className="h-14 w-14 rounded-md border bg-muted/30 flex items-center justify-center overflow-hidden shrink-0">
+                {teamLogoUrl
+                  ? <img src={teamLogoUrl} alt={`Logo ${selectedTeam.name}`} className="h-full w-full object-contain" />
+                  : <ImageIcon className="h-6 w-6 text-muted-foreground opacity-50" />}
+              </div>
               <div className="flex-1 min-w-0">
                 <h1 className="text-xl sm:text-2xl font-bold truncate">{selectedTeam.name}</h1>                    <div className="flex flex-wrap gap-1.5 mt-1">
                   {selectedTeam.leva && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{selectedTeam.leva}</span>}
@@ -646,7 +746,7 @@ export default function TeamMembers() {
                 </div>
               </div>
               <Button size="sm" variant="outline" onClick={() => openEditTeam(selectedTeam)}>
-                <Pencil className="h-3.5 w-3.5 mr-1" /> Squadra
+                <Pencil className="h-3.5 w-3.5 mr-1" /> Dati squadra
               </Button>
             </div>
 
@@ -765,17 +865,58 @@ export default function TeamMembers() {
 
             <div className="flex flex-col sm:flex-row gap-2 mb-4">
               <Button onClick={openAddMember} className="gap-2 flex-1">
-                <Plus className="h-4 w-4" /> Aggiungi Membro
+                <Plus className="h-4 w-4" /> Aggiungi
               </Button>
               <Button variant="outline" className="gap-2 flex-1" onClick={() => fileRef.current?.click()} disabled={importing}>
                 {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                Importa Excel
+                Importa da Excel
               </Button>
               <Button variant="outline" onClick={downloadTemplate} className="gap-2">
                 <Download className="h-4 w-4" /> Template
               </Button>
               <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFile} />
             </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 mb-3">
+              <div className="relative flex-1">
+                <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input className="pl-9" placeholder="Cerca per cognome o nome" value={search} onChange={e => setSearch(e.target.value)} aria-label="Cerca membro" />
+              </div>
+              <div className="flex gap-1" role="group" aria-label="Filtro qualifica">
+                {([["all", "Tutti"], ["players", "Giocatori"], ["staff", "Staff"]] as const).map(([k, l]) => (
+                  <Button key={k} size="sm" variant={filter === k ? "default" : "outline"} onClick={() => setFilter(k)} aria-pressed={filter === k}>{l}</Button>
+                ))}
+              </div>
+            </div>
+
+            {members.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <Button size="sm" variant="outline" onClick={selectAllVisible} disabled={visibleMembers.length === 0}>Seleziona Tutti</Button>
+                <Button size="sm" variant="outline" onClick={clearSelection} disabled={selectedIds.size === 0}>Deseleziona Tutti</Button>
+                <span className="text-xs text-muted-foreground ml-auto">{visibleMembers.length} di {members.length} mostrati</span>
+              </div>
+            )}
+
+            {selectedIds.size > 0 && (
+              <Card className="sticky top-2 z-20 p-3 mb-3 border-primary bg-primary/5 shadow-md">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-sm">{selectedIds.size} selezionati</span>
+                  <Select onValueChange={bulkSetRole} disabled={bulkBusy}>
+                    <SelectTrigger className="h-8 w-44"><SelectValue placeholder="Imposta qualifica" /></SelectTrigger>
+                    <SelectContent>{ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <Button size="sm" variant="outline" className="gap-1.5" onClick={bulkExport} disabled={bulkBusy}>
+                    <FileSpreadsheet className="h-3.5 w-3.5" /> Esporta Excel
+                  </Button>
+                  <Button size="sm" variant="destructive" className="gap-1.5" onClick={() => setBulkDeleteOpen(true)} disabled={bulkBusy}>
+                    <Trash2 className="h-3.5 w-3.5" /> Elimina
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-8 w-8 ml-auto" onClick={clearSelection} aria-label="Annulla selezione">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </Card>
+            )}
 
             {loadingMembers ? (
               <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
@@ -788,6 +929,13 @@ export default function TeamMembers() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={allVisibleSelected}
+                          onCheckedChange={(c) => c ? selectAllVisible() : setSelectedIds(prev => { const n = new Set(prev); visibleMembers.forEach(m => n.delete(m.id)); return n; })}
+                          aria-label="Seleziona tutti i visibili"
+                        />
+                      </TableHead>
                       <TableHead className="w-14">#</TableHead>
                       <TableHead>Cognome Nome</TableHead>
                       <TableHead className="w-36">Qualifica</TableHead>
@@ -798,8 +946,14 @@ export default function TeamMembers() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {members.map(m => (
-                      <TableRow key={m.id}>
+                    {visibleMembers.length === 0 && (
+                      <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-6">Nessun risultato</TableCell></TableRow>
+                    )}
+                    {visibleMembers.map(m => (
+                      <TableRow key={m.id} data-state={selectedIds.has(m.id) ? "selected" : undefined}>
+                        <TableCell>
+                          <Checkbox checked={selectedIds.has(m.id)} onCheckedChange={() => toggleOne(m.id)} aria-label={`Seleziona ${m.full_name}`} />
+                        </TableCell>
                         <TableCell>
                           <Input
                             type="number" min={0} max={99}
@@ -1016,6 +1170,21 @@ export default function TeamMembers() {
           <AlertDialogFooter>
             <AlertDialogCancel>Annulla</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeleteTeam}>Elimina</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={(o) => !o && !bulkBusy && setBulkDeleteOpen(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Elimina {selectedIds.size} membri</AlertDialogTitle>
+            <AlertDialogDescription>
+              Verranno eliminati dall'anagrafica: {selectedMembers.slice(0, 5).map(m => m.full_name).join(", ")}{selectedMembers.length > 5 ? ` e altri ${selectedMembers.length - 5}` : ""}. L'operazione è irreversibile.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkBusy}>Annulla</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); bulkDelete(); }} disabled={bulkBusy}>Elimina</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
