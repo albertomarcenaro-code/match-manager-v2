@@ -27,6 +27,7 @@ import {
   ChevronLeft, Upload, Plus, Trash2, Loader2, Pencil, IdCard,
   Download, Users, ArrowLeft, Image as ImageIcon,
   Check, Share2, Link2, Search, X, FileSpreadsheet,
+  ArrowUp, ArrowDown, ChevronsUpDown,
 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -39,6 +40,32 @@ import { generateTeamCode, clearActiveTeam } from "@/lib/teams";
 
 
 const ROLES = ["Giocatore", "Allenatore", "Dirigente", "Massaggiatore"];
+
+type SortKey = "jersey_number" | "full_name" | "role" | "birth_date" | "figc_number" | "fiscal_code";
+
+/** Intestazione di colonna cliccabile per ordinare la tabella. */
+function SortableHead({ label, active, direction, onSort, className }: {
+  label: string;
+  active: boolean;
+  direction: "asc" | "desc";
+  onSort: () => void;
+  className?: string;
+}) {
+  return (
+    <TableHead className={className} aria-sort={active ? (direction === "asc" ? "ascending" : "descending") : "none"}>
+      <button
+        type="button"
+        onClick={onSort}
+        className="inline-flex items-center gap-1 -ml-1 rounded px-1 py-0.5 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        {label}
+        {active
+          ? (direction === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />)
+          : <ChevronsUpDown className="h-3.5 w-3.5 opacity-40" />}
+      </button>
+    </TableHead>
+  );
+}
 
 export interface TeamMember {
   id: string;
@@ -151,8 +178,34 @@ export default function TeamMembers() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [teamLogoUrl, setTeamLogoUrl] = useState<string | null>(null);
 
+  // Ordinamento della tabella: primo click ascendente, secondo discendente.
+  const [sortKey, setSortKey] = useState<SortKey>("full_name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("asc"); }
+  };
+
   const visibleMembers = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const dir = sortDir === "asc" ? 1 : -1;
+    const compare = (a: TeamMember, b: TeamMember) => {
+      if (sortKey === "jersey_number") {
+        const an = a.jersey_number ?? null;
+        const bn = b.jersey_number ?? null;
+        // Le caselle vuote restano sempre in fondo, in entrambi i versi.
+        if (an === null && bn === null) return 0;
+        if (an === null) return 1;
+        if (bn === null) return -1;
+        return (an - bn) * dir;
+      }
+      const av = (a[sortKey] ?? "").toString();
+      const bv = (b[sortKey] ?? "").toString();
+      if (!av && !bv) return 0;
+      if (!av) return 1;
+      if (!bv) return -1;
+      return av.localeCompare(bv, "it", { numeric: true, sensitivity: "base" }) * dir;
+    };
     return members
       .filter(m => {
         const isPlayer = (m.role || "").toLowerCase() === "giocatore";
@@ -160,8 +213,8 @@ export default function TeamMembers() {
         if (filter === "staff" && isPlayer) return false;
         return !q || (m.full_name || "").toLowerCase().includes(q);
       })
-      .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || "", "it", { sensitivity: "base" }));
-  }, [members, search, filter]);
+      .sort(compare);
+  }, [members, search, filter, sortKey, sortDir]);
 
   const selectedMembers = useMemo(() => members.filter(m => selectedIds.has(m.id)), [members, selectedIds]);
   const allVisibleSelected = visibleMembers.length > 0 && visibleMembers.every(m => selectedIds.has(m.id));
@@ -175,6 +228,37 @@ export default function TeamMembers() {
     () => teams.find(t => t.id === selectedTeamId) || null,
     [teams, selectedTeamId]
   );
+
+  // Condivisione della squadra: usa il pannello nativo del telefono quando c'è,
+  // altrimenti copia i dettagli negli appunti. Il codice di invito compare solo
+  // se il database lo espone davvero.
+  const shareTeam = async () => {
+    if (!selectedTeam) return;
+    const code = selectedTeam.team_code;
+    const details = [selectedTeam.leva, selectedTeam.category, selectedTeam.season].filter(Boolean).join(" · ");
+    const text = [
+      `Squadra: ${selectedTeam.name}`,
+      details || null,
+      `${members.length} ${members.length === 1 ? "membro" : "membri"} in anagrafica`,
+      code ? `Codice squadra: ${code}` : null,
+      code ? `${window.location.origin}/join-team?code=${encodeURIComponent(code)}` : null,
+    ].filter(Boolean).join("\n");
+    const nativeShare = (navigator as any).share as undefined | ((data: { title?: string; text?: string }) => Promise<void>);
+    if (nativeShare) {
+      try {
+        await nativeShare.call(navigator, { title: `Squadra ${selectedTeam.name}`, text });
+        return;
+      } catch {
+        // Condivisione annullata dall'utente: si prova con gli appunti.
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Dettagli squadra copiati");
+    } catch {
+      toast.error("Condivisione non disponibile su questo dispositivo");
+    }
+  };
 
   // Team joined via team_code (rules of hooks: called at component level).
   const joinedTeamId = useActiveTeamId();
@@ -792,6 +876,9 @@ export default function TeamMembers() {
                   {selectedTeam.team_code && <span className="text-xs bg-secondary/10 text-secondary px-2 py-0.5 rounded-full font-mono tracking-wider">{selectedTeam.team_code}</span>}
                 </div>
               </div>
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={shareTeam}>
+                <Share2 className="h-3.5 w-3.5" /> Condividi
+              </Button>
               <Button size="sm" variant="outline" onClick={() => openEditTeam(selectedTeam)}>
                 <Pencil className="h-3.5 w-3.5 mr-1" /> Dati squadra
               </Button>
@@ -987,12 +1074,12 @@ export default function TeamMembers() {
                           aria-label="Seleziona tutti i visibili"
                         />
                       </TableHead>
-                      <TableHead className="w-14">#</TableHead>
-                      <TableHead>Cognome Nome</TableHead>
-                      <TableHead className="w-36">Qualifica</TableHead>
-                      <TableHead className="hidden sm:table-cell w-32">Nascita</TableHead>
-                      <TableHead className="hidden md:table-cell w-28">Matricola</TableHead>
-                      <TableHead className="hidden md:table-cell w-40">Cod. Fiscale</TableHead>
+                      <SortableHead label="#" className="w-14" active={sortKey === "jersey_number"} direction={sortDir} onSort={() => toggleSort("jersey_number")} />
+                      <SortableHead label="Cognome Nome" active={sortKey === "full_name"} direction={sortDir} onSort={() => toggleSort("full_name")} />
+                      <SortableHead label="Qualifica" className="w-36" active={sortKey === "role"} direction={sortDir} onSort={() => toggleSort("role")} />
+                      <SortableHead label="Nascita" className="hidden sm:table-cell w-32" active={sortKey === "birth_date"} direction={sortDir} onSort={() => toggleSort("birth_date")} />
+                      <SortableHead label="Matricola" className="hidden md:table-cell w-28" active={sortKey === "figc_number"} direction={sortDir} onSort={() => toggleSort("figc_number")} />
+                      <SortableHead label="Cod. Fiscale" className="hidden md:table-cell w-40" active={sortKey === "fiscal_code"} direction={sortDir} onSort={() => toggleSort("fiscal_code")} />
                       <TableHead className="w-20 text-right">Azioni</TableHead>
                     </TableRow>
                   </TableHeader>
