@@ -234,7 +234,17 @@ export default function TeamMembers() {
       .order("role")
       .order("full_name");
     if (error) toast.error("Errore nel caricamento membri");
-    else setMembers((data || []) as TeamMember[]);
+    else {
+      const rows = (data || []) as TeamMember[];
+      setMembers(rows);
+      // La selezione non deve sopravvivere a righe che non esistono più
+      // (membro eliminato, oppure roster ricaricato/importato).
+      const stillValid = new Set(rows.map(m => m.id));
+      setSelectedIds(prev => {
+        const next = new Set([...prev].filter(id => stillValid.has(id)));
+        return next.size === prev.size ? prev : next;
+      });
+    }
     setLoadingMembers(false);
   };
 
@@ -389,6 +399,11 @@ export default function TeamMembers() {
     else {
       await syncSavedTeamPlayers(selectedTeamId);
       setMembers(prev => prev.filter(m => m.id !== deleteMember.id));
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        next.delete(deleteMember.id);
+        return next;
+      });
       toast.success("Membro eliminato");
       loadTeams();
     }
@@ -423,14 +438,17 @@ export default function TeamMembers() {
     setBulkBusy(true);
     const ids = Array.from(selectedIds);
     const { error } = await supabase.from("team_members").delete().in("id", ids).eq("user_id", user.id);
-    if (error) toast.error("Errore durante l'eliminazione");
-    else {
-      await syncSavedTeamPlayers(selectedTeamId);
-      setMembers(prev => prev.filter(m => !selectedIds.has(m.id)));
-      toast.success(`${ids.length} membri eliminati`);
-      clearSelection();
-      loadTeams();
+    if (error) {
+      // In caso di errore la finestra resta aperta: si può riprovare o annullare.
+      toast.error(`Errore durante l'eliminazione: ${error.message}`);
+      setBulkBusy(false);
+      return;
     }
+    await syncSavedTeamPlayers(selectedTeamId);
+    setMembers(prev => prev.filter(m => !ids.includes(m.id)));
+    toast.success(`${ids.length} membri eliminati`);
+    clearSelection();
+    loadTeams();
     setBulkBusy(false);
     setBulkDeleteOpen(false);
   };
@@ -439,10 +457,10 @@ export default function TeamMembers() {
     if (!user || !selectedTeamId || selectedIds.size === 0) return;
     setBulkBusy(true);
     const ids = Array.from(selectedIds);
-    const { error } = await supabase.from("team_members").update({ role }).in("id", ids);
-    if (error) toast.error("Errore durante l'aggiornamento");
+    const { error } = await supabase.from("team_members").update({ role }).in("id", ids).eq("user_id", user.id);
+    if (error) toast.error(`Errore durante l'aggiornamento: ${error.message}`);
     else {
-      setMembers(prev => prev.map(m => selectedIds.has(m.id) ? { ...m, role } : m));
+      setMembers(prev => prev.map(m => ids.includes(m.id) ? { ...m, role } : m));
       await syncSavedTeamPlayers(selectedTeamId);
       toast.success(`${ids.length} membri impostati come ${role}`);
     }
@@ -901,7 +919,7 @@ export default function TeamMembers() {
               <Card className="sticky top-2 z-20 p-3 mb-3 border-primary bg-primary/5 shadow-md">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-semibold text-sm">{selectedIds.size} selezionati</span>
-                  <Select onValueChange={bulkSetRole} disabled={bulkBusy}>
+                  <Select value="" onValueChange={(v) => v && bulkSetRole(v)} disabled={bulkBusy}>
                     <SelectTrigger className="h-8 w-44"><SelectValue placeholder="Imposta qualifica" /></SelectTrigger>
                     <SelectContent>{ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
                   </Select>
