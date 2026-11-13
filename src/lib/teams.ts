@@ -1,4 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
+
+// Team-sharing columns/tables are not yet in the generated types; use an untyped client.
+const db = supabase as any;
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
@@ -35,7 +38,7 @@ function extractLeva(name: string): string {
 
 // ----- lookup a team by its public code (used by the join flow) -----
 export async function lookupTeamByCode(code: string): Promise<TeamCodeRow | null> {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('saved_teams')
     .select('id, name, category, team_code, season')
     .eq('team_code', code.trim().toUpperCase())
@@ -167,7 +170,7 @@ export async function joinTeamByCode(code: string, userId: string | undefined): 
   // devices until the server record is created.
   if (userId) {
     try {
-      await supabase
+      await db
         .from('user_team_joins')
         .insert({ user_id: userId, team_id: team.id })
         .select('id')
@@ -189,7 +192,7 @@ export async function joinTeamByCode(code: string, userId: string | undefined): 
 export async function leaveTeamJoin(teamId: string, userId: string | undefined): Promise<boolean> {
   if (!userId) return false;
   try {
-    await supabase
+    await db
       .from('user_team_joins')
       .delete()
       .eq('user_id', userId)
